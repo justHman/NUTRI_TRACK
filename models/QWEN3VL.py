@@ -37,11 +37,18 @@ class Qwen3VL:
     (Note: instructor.from_bedrock() is NOT compatible with Qwen3 VL for structured output)
     """
 
-    def __init__(self, region="us-east-1", model_id="qwen.qwen3-vl-235b-a22b"):
+    def __init__(self, region=None, model_id="qwen.qwen3-vl-235b-a22b"):
         self.model_id = model_id
-        self.region = region
-        self.client = boto3.client("bedrock-runtime", region_name=region)
-        print(f"✅ Qwen3 VL Ready! (model: {model_id}, region: {region})")
+        # Ưu tiên lấy từ biến môi trường, nếu không có thì dùng mặc định us-east-1
+        self.region = region or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
+        
+        # Boto3 sẽ tự động tìm AWS_ACCESS_KEY_ID và AWS_SECRET_ACCESS_KEY 
+        # trong biến môi trường hệ thống.
+        self.client = boto3.client(
+            "bedrock-runtime", 
+            region_name=self.region
+        )
+        print(f"✅ Qwen3 VL Ready! (model: {model_id}, region: {self.region})")
 
     # ─── Generic analyze method ──────────────────────────────────────────
 
