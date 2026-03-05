@@ -27,7 +27,7 @@ import os
 import sys
 import re
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 
 
 # ─── Constants ───────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ class NutriBaseFormatter(logging.Formatter):
         # 1. Truncate byte strings (b'...') that are longer than 100 chars
         # Supports both b'\\x...' and b'ABC...' formats
         if "b'" in formatted or 'b"' in formatted:
-            formatted = re.sub(r"(b['\"][^'\"]{100,})['\"]", r"b'<TRUNCATED BYTES>'", formatted)
+            formatted = re.sub(r"(b['\"][^'\"]{20,})['\"]", r"b'<TRUNCATED BYTES>'", formatted)
             
         # 2. Hard limit for any extremely long log message (safety net)
         # If any log record is > 10,000 chars, truncate the middle
@@ -140,6 +140,13 @@ def setup_logging() -> None:
     log_filepath = os.path.join(LOG_DIR, log_filename)
     session_log_filepath = os.path.join(LOG_DIR, "session.log")
 
+    # Try to clean up previous session log if we are the first process starting
+    # This maintains the "overwrite per session" feature safely
+    import contextlib
+    with contextlib.suppress(OSError):
+        if not logging.getLogger().handlers:
+            os.remove(session_log_filepath)
+
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, LOG_LEVEL, logging.DEBUG))
 
@@ -154,24 +161,29 @@ def setup_logging() -> None:
         NutriConsoleFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
     )
 
-    # 2. Rotating File handler (DEBUG+) — prevents file from growing forever
-    file_handler = RotatingFileHandler(
-        log_filepath, 
-        maxBytes=MAX_LOG_SIZE, 
-        backupCount=BACKUP_COUNT, 
-        encoding="utf-8"
+    # 2. Rotating File handler (DEBUG+) — ConcurrentRotatingFileHandler is multi-process
+    #    safe on Windows (uses portalocker/file locking instead of os.rename)
+    file_handler = ConcurrentRotatingFileHandler(
+        log_filepath,
+        maxBytes=MAX_LOG_SIZE,
+        backupCount=BACKUP_COUNT,
+        encoding="utf-8",
+        delay=True,      # Don't open the file until the first write
+        use_gzip=False   # Keep .log.1 .log.2 ... readable without decompression
     )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(NutriBaseFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
+    file_handler.setFormatter(NutriConsoleFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
 
-    # 3. Session File Handler (DEBUG+) — overwrites every run
-    session_handler = logging.FileHandler(
+    # 3. Session File Handler (DEBUG+) — Safe concurrent writes per session
+    session_handler = ConcurrentRotatingFileHandler(
         session_log_filepath,
-        mode="w",
-        encoding="utf-8"
+        maxBytes=MAX_LOG_SIZE,
+        backupCount=0,   # No backups needed for session logs
+        encoding="utf-8",
+        delay=True
     )
     session_handler.setLevel(logging.DEBUG)
-    session_handler.setFormatter(NutriBaseFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
+    session_handler.setFormatter(NutriConsoleFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
 
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)

@@ -53,3 +53,28 @@ Return ONLY valid JSON in this exact format:
   ],
   "image_quality": "good | poor_lighting | blurry | partial_view"
 }"""
+
+FOOD_VISION_TOOLS_PROMPT = """
+
+TOOL USAGE INSTRUCTIONS (MANDATORY):
+You have access to USDA nutrition lookup tools. Follow this exact workflow:
+
+STEP 1 — For EACH dish you identify in the image:
+  Call get_PCF_and_ingredients(food_name) with the English dish name.
+  This returns: {description, PCF_nutrients: {calories, protein, fat, carbs}, ingredients: [...] or null}
+  Use the returned data as REFERENCE values for the dish.
+
+STEP 2 — For EACH ingredient you visually detect in each dish:
+  Call get_PCF(food_name) with the English ingredient name (e.g., "white rice", "grilled pork").
+  This returns: {calories, protein, fat, carbs} per 100g.
+  Use these as REFERENCE values to estimate per-ingredient nutrition based on estimated weight.
+
+STEP 3 — After receiving ALL tool results, compile the final JSON response.
+  Use the USDA data as reference hints — adjust for estimated portion sizes.
+  The final output MUST follow the FoodList JSON schema exactly.
+
+IMPORTANT:
+- Always call get_PCF_and_ingredients FIRST for each dish before calling get_PCF for ingredients.
+- If ingredients returned is null, that is OK — still proceed with get_PCF for visible ingredients.
+- Use English food names when calling tools.
+- After all tool calls complete, return ONLY the final JSON. No extra text."""

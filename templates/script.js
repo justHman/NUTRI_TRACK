@@ -8,6 +8,9 @@ const translations = {
         upload_sub: "Hỗ trợ JPG, PNG, WebP",
         btn_choose: "📁 Chọn ảnh",
         btn_capture: "📸 Chụp ảnh",
+        method_label: "Chế độ phân tích:",
+        tools_option: "Tools (Nhanh, gọi API tự động)",
+        manual_option: "Manual (Phân tích chi tiết 2 bước)",
         btn_analyze: "🔍 Phân tích dinh dưỡng",
         loading_text: "🤖 AI đang phân tích ảnh...",
         loading_sub: "Quá trình này có thể mất 10-30 giây",
@@ -25,6 +28,9 @@ const translations = {
         upload_sub: "Supports JPG, PNG, WebP",
         btn_choose: "📁 Choose image",
         btn_capture: "📸 Capture image",
+        method_label: "Analysis Mode:",
+        tools_option: "Tools (Fast, auto API calls)",
+        manual_option: "Manual (Detailed 2-step analysis)",
         btn_analyze: "🔍 Analyze nutrition",
         loading_text: "🤖 AI is analyzing the image...",
         loading_sub: "This process may take 10-30 seconds",
@@ -118,6 +124,7 @@ async function analyzeImage() {
 
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('method', document.getElementById('methodSelect').value);
 
     try {
         const res = await fetch('http://localhost:8000/analyze', { method: 'POST', body: formData });

@@ -1,0 +1,220 @@
+[
+  {
+    "name": "Vietnamese Pork Chop Rice",
+    "vi_name": "Cơm Tấm Sườn Nướng",
+    "qwen_estimated_calories": 680.0,
+    "ingredients": [
+      {
+        "name": "Grilled pork chop",
+        "vi_name": "Sườn nướng",
+        "weight_g": 180.0,
+        "usda_100g": {
+          "calories": 190.0,
+          "protein": 18.37,
+          "fat": 9.04,
+          "carbs": 7.82
+        },
+        "nutrition": {
+          "calories": 342.0,
+          "protein": 33.066,
+          "carbs": 14.076,
+          "fat": 16.272
+        }
+      },
+      {
+        "name": "Broken rice",
+        "vi_name": "Cơm tấm",
+        "weight_g": 150.0,
+        "usda_100g": {
+          "calories": 311.0,
+          "protein": 13.3,
+          "fat": 1.11,
+          "carbs": 66.7
+        },
+        "nutrition": {
+          "calories": 466.5,
+          "protein": 19.950000000000003,
+          "carbs": 100.05000000000001,
+          "fat": 1.665
+        }
+      },
+      {
+        "name": "Fried egg",
+        "vi_name": "Trứng ốp la",
+        "weight_g": 60.0,
+        "usda_100g": {
+          "calories": 196.0,
+          "protein": 13.6,
+          "fat": 14.8,
+          "carbs": 0.83
+        },
+        "nutrition": {
+          "calories": 117.6,
+          "protein": 8.16,
+          "carbs": 0.49799999999999994,
+          "fat": 8.88
+        }
+      },
+      {
+        "name": "Pork roll (chả lụa)",
+        "vi_name": "Chả lụa",
+        "weight_g": 50.0,
+        "usda_100g": {
+          "calories": 143.0,
+          "protein": 8.93,
+          "fat": 10.7,
+          "carbs": 1.79
+        },
+        "nutrition": {
+          "calories": 71.5,
+          "protein": 4.465,
+          "carbs": 0.895,
+          "fat": 5.35
+        }
+      },
+      {
+        "name": "Pickled carrots and daikon",
+        "vi_name": "Đồ chua (cà rốt, củ cải)",
+        "weight_g": 30.0,
+        "usda_100g": {
+          "calories": 38.0,
+          "protein": 0.0,
+          "fat": 0.0,
+          "carbs": 7.69
+        },
+        "nutrition": {
+          "calories": 11.4,
+          "protein": 0.0,
+          "carbs": 2.307,
+          "fat": 0.0
+        }
+      },
+      {
+        "name": "Cucumber slices",
+        "vi_name": "Dưa leo cắt lát",
+        "weight_g": 25.0,
+        "usda_100g": {
+          "calories": 34.0,
+          "protein": 0.5,
+          "fat": 0.13,
+          "carbs": 6.79
+        },
+        "nutrition": {
+          "calories": 8.5,
+          "protein": 0.125,
+          "carbs": 1.6975,
+          "fat": 0.0325
+        }
+      },
+      {
+        "name": "Tomato slices",
+        "vi_name": "Cà chua cắt lát",
+        "weight_g": 20.0,
+        "usda_100g": {
+          "calories": 90.0,
+          "protein": 4.37,
+          "fat": 2.38,
+          "carbs": 12.7
+        },
+        "nutrition": {
+          "calories": 18.0,
+          "protein": 0.8740000000000001,
+          "carbs": 2.54,
+          "fat": 0.476
+        }
+      },
+      {
+        "name": "Scallion oil",
+        "vi_name": "Dầu hành",
+        "weight_g": 5.0,
+        "usda_100g": {
+          "calories": 32.0,
+          "protein": 1.83,
+          "fat": 0.19,
+          "carbs": 7.34
+        },
+        "nutrition": {
+          "calories": 1.6,
+          "protein": 0.09150000000000001,
+          "carbs": 0.367,
+          "fat": 0.009500000000000001
+        }
+      },
+      {
+        "name": "Roasted peanuts",
+        "vi_name": "Đậu phộng rang",
+        "weight_g": 5.0,
+        "usda_100g": {
+          "calories": 586.0,
+          "protein": 25.0,
+          "fat": 50.0,
+          "carbs": 21.4
+        },
+        "nutrition": {
+          "calories": 29.3,
+          "protein": 1.25,
+          "carbs": 1.07,
+          "fat": 2.5
+        }
+      },
+      {
+        "name": "Fresh lettuce",
+        "vi_name": "Rau xà lách",
+        "weight_g": 20.0,
+        "usda_100g": {
+          "calories": 20.0,
+          "protein": 0.92,
+          "fat": 0.1,
+          "carbs": 3.69
+        },
+        "nutrition": {
+          "calories": 4.0,
+          "protein": 0.18400000000000002,
+          "carbs": 0.738,
+          "fat": 0.020000000000000004
+        }
+      },
+      {
+        "name": "Red chili pepper",
+        "vi_name": "Ớt đỏ",
+        "weight_g": 2.0,
+        "usda_100g": {
+          "calories": 40.0,
+          "protein": 1.87,
+          "fat": 0.44,
+          "carbs": 8.81
+        },
+        "nutrition": {
+          "calories": 0.8,
+          "protein": 0.0374,
+          "carbs": 0.17620000000000002,
+          "fat": 0.0088
+        }
+      },
+      {
+        "name": "Fish sauce (dipping sauce)",
+        "vi_name": "Nước mắm chấm",
+        "weight_g": 15.0,
+        "usda_100g": {
+          "calories": 35.0,
+          "protein": 5.06,
+          "fat": 0.01,
+          "carbs": 3.64
+        },
+        "nutrition": {
+          "calories": 5.25,
+          "protein": 0.7589999999999999,
+          "carbs": 0.546,
+          "fat": 0.0015
+        }
+      }
+    ],
+    "total_nutrition": {
+      "calories": 1076.4499999999998,
+      "protein": 68.9619,
+      "carbs": 124.96070000000002,
+      "fat": 35.215300000000006
+    },
+    "average_calories": 878.2249999999999
+  }
+]

@@ -10,7 +10,7 @@
 
 <body>
     <div class="lang-switcher">
-        <button id="langToggle" onclick="toggleLanguage()">🇬🇧 EN</button>
+        <button type="button" id="langToggle" onclick="toggleLanguage()">🇬🇧 EN</button>
     </div>
     <div class="container">
         <header>
@@ -27,10 +27,10 @@
 
         <!-- Action Buttons -->
         <div class="upload-actions">
-            <button class="btn btn-primary" onclick="fileInput.click()">
+            <button type="button" class="btn btn-primary" onclick="fileInput.click()">
                 <span data-i18n="btn_choose">📁 Chọn ảnh</span>
             </button>
-            <button class="btn btn-secondary" onclick="cameraInput.click()">
+            <button type="button" class="btn btn-secondary" onclick="cameraInput.click()">
                 <span data-i18n="btn_capture">📸 Chụp ảnh</span>
             </button>
         </div>
@@ -43,8 +43,17 @@
         <div class="preview" id="preview">
             <img id="previewImg" src="" alt="Preview">
             <div class="filename" id="fileName"></div>
-            <div style="margin-top: 12px;">
-                <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeImage()">
+
+            <div class="method-selector" style="margin-top: 16px;">
+                <label for="methodSelect" data-i18n="method_label">Chế độ phân tích:</label>
+                <select id="methodSelect" class="form-select">
+                    <option value="tools" data-i18n="tools_option">Tools (Nhanh, gọi API tự động)</option>
+                    <option value="manual" data-i18n="manual_option">Manual (Phân tích chi tiết 2 bước)</option>
+                </select>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <button type="button" class="btn btn-primary" id="analyzeBtn" onclick="analyzeImage()">
                     <span data-i18n="btn_analyze">🔍 Phân tích dinh dưỡng</span>
                 </button>
             </div>

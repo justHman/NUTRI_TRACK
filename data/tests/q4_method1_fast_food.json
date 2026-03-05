@@ -1,0 +1,468 @@
+{
+  "items": [
+    {
+      "name": "Roasted Potatoes",
+      "vi_name": "Khoai tây nướng",
+      "confidence": 0.98,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Potatoes",
+          "vi_name": "Khoai tây",
+          "estimated_weight_g": 200.0,
+          "confidence": 0.95,
+          "note": "cubed and golden brown"
+        },
+        {
+          "name": "Oil",
+          "vi_name": "Dầu ăn",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.8,
+          "note": "inferred – used for frying"
+        },
+        {
+          "name": "Salt",
+          "vi_name": "Muối",
+          "estimated_weight_g": 2.0,
+          "confidence": 0.75,
+          "note": "visible seasoning"
+        }
+      ],
+      "total_estimated_calories": 220.0,
+      "calorie_range": {
+        "min": 200.0,
+        "max": 240.0
+      },
+      "scale_reference_used": "plate size"
+    },
+    {
+      "name": "Fried Chicken Sandwich",
+      "vi_name": "Bánh mì gà rán",
+      "confidence": 0.97,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Fried Chicken",
+          "vi_name": "Gà rán",
+          "estimated_weight_g": 150.0,
+          "confidence": 0.95,
+          "note": "breaded and crispy"
+        },
+        {
+          "name": "Bun",
+          "vi_name": "Bánh mì",
+          "estimated_weight_g": 80.0,
+          "confidence": 0.9,
+          "note": "sesame seed topped"
+        },
+        {
+          "name": "Lettuce",
+          "vi_name": "Xà lách",
+          "estimated_weight_g": 10.0,
+          "confidence": 0.85,
+          "note": "visible green leaf"
+        },
+        {
+          "name": "Onion",
+          "vi_name": "Hành tây",
+          "estimated_weight_g": 10.0,
+          "confidence": 0.8,
+          "note": "purple slices"
+        },
+        {
+          "name": "Mayonnaise",
+          "vi_name": "Sốt mayonnaise",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.85,
+          "note": "white sauce drizzle"
+        }
+      ],
+      "total_estimated_calories": 520.0,
+      "calorie_range": {
+        "min": 490.0,
+        "max": 550.0
+      },
+      "scale_reference_used": "plate size"
+    },
+    {
+      "name": "Fried Chicken Pieces",
+      "vi_name": "Gà rán miếng",
+      "confidence": 0.96,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Chicken",
+          "vi_name": "Thịt gà",
+          "estimated_weight_g": 200.0,
+          "confidence": 0.95,
+          "note": "breaded and golden"
+        },
+        {
+          "name": "Oil",
+          "vi_name": "Dầu ăn",
+          "estimated_weight_g": 20.0,
+          "confidence": 0.8,
+          "note": "inferred – used for frying"
+        }
+      ],
+      "total_estimated_calories": 450.0,
+      "calorie_range": {
+        "min": 420.0,
+        "max": 480.0
+      },
+      "scale_reference_used": "no reference"
+    },
+    {
+      "name": "Margherita Pizza",
+      "vi_name": "Pizza Margherita",
+      "confidence": 0.99,
+      "cooking_method": "baked",
+      "ingredients": [
+        {
+          "name": "Pizza Dough",
+          "vi_name": "Bột pizza",
+          "estimated_weight_g": 180.0,
+          "confidence": 0.95,
+          "note": "thin crust"
+        },
+        {
+          "name": "Tomato Sauce",
+          "vi_name": "Sốt cà chua",
+          "estimated_weight_g": 50.0,
+          "confidence": 0.9,
+          "note": "red base layer"
+        },
+        {
+          "name": "Mozzarella Cheese",
+          "vi_name": "Phô mai mozzarella",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.9,
+          "note": "melted white cheese"
+        },
+        {
+          "name": "Basil",
+          "vi_name": "Húng quế",
+          "estimated_weight_g": 5.0,
+          "confidence": 0.85,
+          "note": "fresh green leaves"
+        }
+      ],
+      "total_estimated_calories": 480.0,
+      "calorie_range": {
+        "min": 450.0,
+        "max": 510.0
+      },
+      "scale_reference_used": "plate size"
+    },
+    {
+      "name": "Beef Shawarma Wrap",
+      "vi_name": "Cuộn thịt bò Shawarma",
+      "confidence": 0.95,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Beef",
+          "vi_name": "Thịt bò",
+          "estimated_weight_g": 100.0,
+          "confidence": 0.9,
+          "note": "sliced grilled meat"
+        },
+        {
+          "name": "Pita Bread",
+          "vi_name": "Bánh mì pita",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.9,
+          "note": "grilled wrap"
+        },
+        {
+          "name": "Lettuce",
+          "vi_name": "Xà lách",
+          "estimated_weight_g": 10.0,
+          "confidence": 0.85,
+          "note": "green leafy"
+        },
+        {
+          "name": "Tomato",
+          "vi_name": "Cà chua",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.85,
+          "note": "red slices"
+        },
+        {
+          "name": "Onion",
+          "vi_name": "Hành tây",
+          "estimated_weight_g": 10.0,
+          "confidence": 0.8,
+          "note": "purple slices"
+        },
+        {
+          "name": "Tahini Sauce",
+          "vi_name": "Sốt tahini",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.75,
+          "note": "creamy white sauce"
+        }
+      ],
+      "total_estimated_calories": 380.0,
+      "calorie_range": {
+        "min": 350.0,
+        "max": 410.0
+      },
+      "scale_reference_used": "no reference"
+    },
+    {
+      "name": "Nachos with Cheese and Salsa",
+      "vi_name": "Nachos phô mai và sốt salsa",
+      "confidence": 0.94,
+      "cooking_method": "baked",
+      "ingredients": [
+        {
+          "name": "Tortilla Chips",
+          "vi_name": "Khoai tây chiên giòn",
+          "estimated_weight_g": 120.0,
+          "confidence": 0.9,
+          "note": "yellow corn chips"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 50.0,
+          "confidence": 0.85,
+          "note": "melted yellow cheese"
+        },
+        {
+          "name": "Salsa",
+          "vi_name": "Sốt salsa",
+          "estimated_weight_g": 30.0,
+          "confidence": 0.8,
+          "note": "red and green diced"
+        },
+        {
+          "name": "Jalapeño",
+          "vi_name": "Ớt jalapeño",
+          "estimated_weight_g": 5.0,
+          "confidence": 0.75,
+          "note": "green diced pepper"
+        }
+      ],
+      "total_estimated_calories": 420.0,
+      "calorie_range": {
+        "min": 390.0,
+        "max": 450.0
+      },
+      "scale_reference_used": "plate size"
+    },
+    {
+      "name": "French Fries",
+      "vi_name": "Khoai tây chiên",
+      "confidence": 0.98,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Potatoes",
+          "vi_name": "Khoai tây",
+          "estimated_weight_g": 150.0,
+          "confidence": 0.95,
+          "note": "golden sticks"
+        },
+        {
+          "name": "Oil",
+          "vi_name": "Dầu ăn",
+          "estimated_weight_g": 20.0,
+          "confidence": 0.8,
+          "note": "inferred – used for frying"
+        },
+        {
+          "name": "Salt",
+          "vi_name": "Muối",
+          "estimated_weight_g": 2.0,
+          "confidence": 0.75,
+          "note": "visible seasoning"
+        }
+      ],
+      "total_estimated_calories": 320.0,
+      "calorie_range": {
+        "min": 290.0,
+        "max": 350.0
+      },
+      "scale_reference_used": "no reference"
+    },
+    {
+      "name": "Fried Chicken Nuggets",
+      "vi_name": "Gà rán viên",
+      "confidence": 0.96,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Chicken",
+          "vi_name": "Thịt gà",
+          "estimated_weight_g": 150.0,
+          "confidence": 0.95,
+          "note": "breaded nuggets"
+        },
+        {
+          "name": "Oil",
+          "vi_name": "Dầu ăn",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.8,
+          "note": "inferred – used for frying"
+        }
+      ],
+      "total_estimated_calories": 380.0,
+      "calorie_range": {
+        "min": 350.0,
+        "max": 410.0
+      },
+      "scale_reference_used": "no reference"
+    },
+    {
+      "name": "Grilled Cheese Quesadilla",
+      "vi_name": "Quesadilla phô mai nướng",
+      "confidence": 0.95,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Tortilla",
+          "vi_name": "Bánh tortilla",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.9,
+          "note": "grilled flatbread"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 50.0,
+          "confidence": 0.9,
+          "note": "melted inside"
+        }
+      ],
+      "total_estimated_calories": 300.0,
+      "calorie_range": {
+        "min": 270.0,
+        "max": 330.0
+      },
+      "scale_reference_used": "no reference"
+    },
+    {
+      "name": "Bacon and Egg",
+      "vi_name": "Thịt xông khói và trứng",
+      "confidence": 0.97,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Egg",
+          "vi_name": "Trứng",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.95,
+          "note": "sunny-side up"
+        },
+        {
+          "name": "Bacon",
+          "vi_name": "Thịt xông khói",
+          "estimated_weight_g": 50.0,
+          "confidence": 0.9,
+          "note": "crispy strips"
+        },
+        {
+          "name": "Oil",
+          "vi_name": "Dầu ăn",
+          "estimated_weight_g": 5.0,
+          "confidence": 0.75,
+          "note": "inferred – used for frying"
+        }
+      ],
+      "total_estimated_calories": 350.0,
+      "calorie_range": {
+        "min": 320.0,
+        "max": 380.0
+      },
+      "scale_reference_used": "plate size"
+    },
+    {
+      "name": "Fried Shrimp",
+      "vi_name": "Tôm chiên",
+      "confidence": 0.96,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Shrimp",
+          "vi_name": "Tôm",
+          "estimated_weight_g": 150.0,
+          "confidence": 0.95,
+          "note": "breaded and golden"
+        },
+        {
+          "name": "Oil",
+          "vi_name": "Dầu ăn",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.8,
+          "note": "inferred – used for frying"
+        }
+      ],
+      "total_estimated_calories": 320.0,
+      "calorie_range": {
+        "min": 290.0,
+        "max": 350.0
+      },
+      "scale_reference_used": "no reference"
+    },
+    {
+      "name": "Breakfast Sandwich",
+      "vi_name": "Bánh mì ăn sáng",
+      "confidence": 0.95,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Toast",
+          "vi_name": "Bánh mì nướng",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.9,
+          "note": "grilled bread"
+        },
+        {
+          "name": "Egg",
+          "vi_name": "Trứng",
+          "estimated_weight_g": 50.0,
+          "confidence": 0.95,
+          "note": "fried egg"
+        },
+        {
+          "name": "Bacon",
+          "vi_name": "Thịt xông khói",
+          "estimated_weight_g": 30.0,
+          "confidence": 0.9,
+          "note": "crispy strips"
+        },
+        {
+          "name": "Tomato",
+          "vi_name": "Cà chua",
+          "estimated_weight_g": 20.0,
+          "confidence": 0.85,
+          "note": "red slice"
+        },
+        {
+          "name": "Lettuce",
+          "vi_name": "Xà lách",
+          "estimated_weight_g": 10.0,
+          "confidence": 0.8,
+          "note": "green leaf"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.85,
+          "note": "melted slice"
+        }
+      ],
+      "total_estimated_calories": 400.0,
+      "calorie_range": {
+        "min": 370.0,
+        "max": 430.0
+      },
+      "scale_reference_used": "plate size"
+    }
+  ],
+  "image_quality": "good",
+  "error": null
+}

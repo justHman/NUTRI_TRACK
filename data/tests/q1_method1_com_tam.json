@@ -1,0 +1,97 @@
+{
+  "items": [
+    {
+      "name": "Vietnamese Pork Chop Rice",
+      "vi_name": "Cơm Tấm Sườn Nướng",
+      "confidence": 0.98,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Grilled pork chop",
+          "vi_name": "Sườn nướng",
+          "estimated_weight_g": 180.0,
+          "confidence": 0.95,
+          "note": "main protein, glazed surface visible"
+        },
+        {
+          "name": "Broken rice",
+          "vi_name": "Cơm tấm",
+          "estimated_weight_g": 150.0,
+          "confidence": 0.95,
+          "note": "base of dish, white grains visible"
+        },
+        {
+          "name": "Fried egg",
+          "vi_name": "Trứng ốp la",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.9,
+          "note": "sunny-side up, yolk intact"
+        },
+        {
+          "name": "Pork roll (chả lụa)",
+          "vi_name": "Chả lụa",
+          "estimated_weight_g": 50.0,
+          "confidence": 0.85,
+          "note": "sliced, yellowish layer visible"
+        },
+        {
+          "name": "Pickled vegetables (carrot & daikon)",
+          "vi_name": "Đồ chua (cà rốt, củ cải)",
+          "estimated_weight_g": 30.0,
+          "confidence": 0.9,
+          "note": "shredded, colorful garnish"
+        },
+        {
+          "name": "Tomato slices",
+          "vi_name": "Cà chua cắt lát",
+          "estimated_weight_g": 25.0,
+          "confidence": 0.9,
+          "note": "arranged in rose shape"
+        },
+        {
+          "name": "Cucumber slices",
+          "vi_name": "Dưa leo cắt lát",
+          "estimated_weight_g": 20.0,
+          "confidence": 0.9,
+          "note": "green, crisp slices"
+        },
+        {
+          "name": "Fresh lettuce",
+          "vi_name": "Rau xà lách",
+          "estimated_weight_g": 25.0,
+          "confidence": 0.85,
+          "note": "leafy greens on side"
+        },
+        {
+          "name": "Fried shallots",
+          "vi_name": "Hành phi",
+          "estimated_weight_g": 10.0,
+          "confidence": 0.8,
+          "note": "crispy topping on rice"
+        },
+        {
+          "name": "Scallion oil",
+          "vi_name": "Dầu hành",
+          "estimated_weight_g": 5.0,
+          "confidence": 0.7,
+          "note": "inferred – typical topping on cơm tấm"
+        },
+        {
+          "name": "Fish sauce (dipping)",
+          "vi_name": "Nước mắm chấm",
+          "estimated_weight_g": 15.0,
+          "confidence": 0.75,
+          "note": "in small bowl, red chili visible"
+        }
+      ],
+      "total_estimated_calories": 680.0,
+      "calorie_range": {
+        "min": 640.0,
+        "max": 720.0
+      },
+      "scale_reference_used": "plate size"
+    }
+  ],
+  "image_quality": "good",
+  "error": null
+}
