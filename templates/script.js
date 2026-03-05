@@ -120,7 +120,7 @@ async function analyzeImage() {
     formData.append('file', selectedFile);
 
     try {
-        const res = await fetch('/analyze', { method: 'POST', body: formData });
+        const res = await fetch('http://localhost:8000/analyze', { method: 'POST', body: formData });
         const data = await res.json();
 
         if (!res.ok) throw new Error(data.detail || 'Server error');

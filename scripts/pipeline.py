@@ -21,8 +21,11 @@ if project_root not in sys.path:
 
 load_dotenv(os.path.join(project_root, "config", ".env"))
 
+from config.logging_config import get_logger
 from models.QWEN3VL import Qwen3VL, FoodList
-from third_apis.USAD import USDAClient
+from third_apis.USDA import USDAClient
+
+logger = get_logger(__name__)
 
 
 def analyze_nutrition(image_path: str, qwen: Qwen3VL = None, usda_client: USDAClient = None) -> list[dict]:
@@ -37,24 +40,43 @@ def analyze_nutrition(image_path: str, qwen: Qwen3VL = None, usda_client: USDACl
     Returns:
         List of dicts, one per detected dish, with full nutrition breakdown
     """
+    logger.title("Nutrition Analysis Pipeline")
+    logger.info("Image: %s", image_path)
+    
+    pipeline_start = time.time()
+
     # 1. Load env & init clients if not provided
     env_path = os.path.join(project_root, "config", ".env")
     load_dotenv(env_path)
 
     if qwen is None:
+        logger.info("Initializing Qwen3VL client...")
         qwen = Qwen3VL()
+    else:
+        logger.debug("Using pre-initialized Qwen3VL client")
+
     if usda_client is None:
+        logger.info("Initializing USDAClient...")
         usda_client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
+    else:
+        logger.debug("Using pre-initialized USDAClient")
 
     # 2. Analyze image with Qwen3VL
-    print(f"📸 Phân tích ảnh: {image_path}")
+    logger.title("Step 1/2: Qwen3VL Image Analysis")
+    step_start = time.time()
     food_list: FoodList = qwen.analyze_food(image_path)
-    print(f"✅ Phát hiện {len(food_list.items)} món ăn.")
+    logger.info("Step 1/2 complete: detected %d dish(es) in %.1fs",
+                len(food_list.items), time.time() - step_start)
 
     # 3. Lookup USDA & calculate real nutrition
+    logger.title("Step 2/2: USDA Nutrition Lookup")
+    step_start = time.time()
     final_nutrition_results = []
 
-    for food in food_list.items:
+    for food_idx, food in enumerate(food_list.items, 1):
+        logger.info("Processing dish %d/%d: %s (%s)",
+                     food_idx, len(food_list.items), food.name, food.vi_name or "N/A")
+        
         food_data = {
             "name": food.name,
             "vi_name": food.vi_name,
@@ -64,7 +86,11 @@ def analyze_nutrition(image_path: str, qwen: Qwen3VL = None, usda_client: USDACl
 
         total_nutrition = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0}
 
-        for ing in food.ingredients:
+        for ing_idx, ing in enumerate(food.ingredients, 1):
+            logger.debug("  Ingredient %d/%d: %s (weight=%.1fg)",
+                         ing_idx, len(food.ingredients), ing.name,
+                         ing.estimated_weight_g if ing.estimated_weight_g else 0)
+
             # Lookup USDA (always returns per 100g)
             usda_100g = usda_client.get_nutrition(ing.name)
 
@@ -78,6 +104,11 @@ def analyze_nutrition(image_path: str, qwen: Qwen3VL = None, usda_client: USDACl
                 "carbs": usda_100g["carbs"] * ratio,
                 "fat": usda_100g["fat"] * ratio,
             }
+
+            logger.debug("  USDA per 100g: %s → Scaled (%.1fg): cal=%.1f pro=%.1f carb=%.1f fat=%.1f",
+                         usda_100g, weight,
+                         nutrition["calories"], nutrition["protein"],
+                         nutrition["carbs"], nutrition["fat"])
 
             food_data["ingredients"].append({
                 "name": ing.name,
@@ -97,11 +128,25 @@ def analyze_nutrition(image_path: str, qwen: Qwen3VL = None, usda_client: USDACl
         food_data["average_calories"] = avg_calories
         final_nutrition_results.append(food_data)
 
+        logger.info("Dish '%s' totals: cal=%.1f pro=%.1f carb=%.1f fat=%.1f (avg_cal=%.1f)",
+                     food.name, total_nutrition["calories"], total_nutrition["protein"],
+                     total_nutrition["carbs"], total_nutrition["fat"], avg_calories)
+
+    logger.info("Step 2/2 complete: processed %d dish(es) with %d total ingredients in %.1fs",
+                len(final_nutrition_results),
+                sum(len(f["ingredients"]) for f in final_nutrition_results),
+                time.time() - step_start)
+
+    total_time = time.time() - pipeline_start
+    logger.info("Pipeline complete in %.1fs", total_time)
+
     return final_nutrition_results
 
 
 def print_report(results: list[dict]):
     """Pretty-print the nutrition report to console"""
+    logger.info("Generating nutrition report for %d dish(es)...", len(results))
+
     print(f"\n{'='*95}")
     print(f"📊 BÁO CÁO DINH DƯỠNG CHI TIẾT")
     print(f"{'='*95}\n")
@@ -127,9 +172,12 @@ def print_report(results: list[dict]):
         print(f"📊 TỔNG CỘNG THỰC TẾ: {'':>10} | Avg Cal: {avg:>5.1f} | Cal: {t['calories']:>5.0f} | Pro: {t['protein']:>4.1f}g | Carb: {t['carbs']:>4.1f}g | Fat: {t['fat']:>4.1f}g")
         print("\n" + "=" * 95 + "\n")
 
+    logger.info("Report generation complete")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
+        logger.error("No image path provided")
         print("Usage: python -m app.scripts.pipeline <image_path>")
         print("Example: python -m app.scripts.pipeline data/images/food/com_tam.jpg")
         sys.exit(1)
@@ -138,6 +186,7 @@ if __name__ == "__main__":
     if not os.path.isabs(img):
         img = os.path.join(project_root, img)
 
+    logger.info("CLI invocation: image_path=%s", img)
     results = analyze_nutrition(img)
     print_report(results)
 
@@ -146,4 +195,4 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
-    print(f"💾 JSON saved to: {output_path}")
+    logger.info("JSON results saved to: %s", output_path)

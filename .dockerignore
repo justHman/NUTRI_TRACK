@@ -1,0 +1,5 @@
+.env
+app/config/logging_config.py
+__pycache__/
+.venv/
+data/weights/

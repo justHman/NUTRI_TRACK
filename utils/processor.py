@@ -4,6 +4,10 @@ from io import BytesIO
 from PIL import Image
 from typing import Tuple
 
+from config.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 # Bedrock Converse API: max request body = 10MB
 # Base64 encoding adds ~33% overhead, so raw image should be < 7.5MB
@@ -23,9 +27,14 @@ def load_image_bytes(image_path: str) -> bytes:
         FileNotFoundError: If image_path doesn't exist
     """
     if not os.path.exists(image_path):
+        logger.error("Image file not found: %s", image_path)
         raise FileNotFoundError(f"Image not found: {image_path}")
+    
     with open(image_path, "rb") as f:
-        return f.read()
+        data = f.read()
+    
+    logger.debug("Loaded image: %s (%.2f MB)", image_path, len(data) / 1024 / 1024)
+    return data
 
 
 def detect_image_format(image_path: str) -> str:
@@ -44,7 +53,9 @@ def detect_image_format(image_path: str) -> str:
         ".gif": "gif",
         ".webp": "webp",
     }
-    return fmt_map.get(ext, "jpeg")
+    detected = fmt_map.get(ext, "jpeg")
+    logger.debug("Detected image format: %s → %s", ext, detected)
+    return detected
 
 
 def compress_image(image_bytes: bytes, max_pixels: int = 2048, quality: int = 85) -> bytes:
@@ -58,13 +69,23 @@ def compress_image(image_bytes: bytes, max_pixels: int = 2048, quality: int = 85
     Returns:
         Compressed image bytes in JPEG format
     """
+    original_size = len(image_bytes) / 1024 / 1024
+    logger.info("Compressing image: %.2f MB (max_pixels=%d, quality=%d)", original_size, max_pixels, quality)
+
     img = Image.open(BytesIO(image_bytes))
     if img.mode == "RGBA":
+        logger.debug("Converting RGBA → RGB for JPEG compression")
         img = img.convert("RGB")
     img.thumbnail((max_pixels, max_pixels), Image.LANCZOS)
     buf = BytesIO()
     img.save(buf, format="JPEG", quality=quality)
-    return buf.getvalue()
+    compressed = buf.getvalue()
+
+    compressed_size = len(compressed) / 1024 / 1024
+    logger.info("Compression complete: %.2f MB → %.2f MB (%.0f%% reduction)",
+                original_size, compressed_size,
+                (1 - compressed_size / original_size) * 100 if original_size > 0 else 0)
+    return compressed
 
 
 def prepare_image_for_bedrock(image_path: str) -> Tuple[bytes, str]:
@@ -79,14 +100,19 @@ def prepare_image_for_bedrock(image_path: str) -> Tuple[bytes, str]:
     Returns:
         Tuple of (image_bytes, format_string)
     """
+    logger.info("Preparing image for Bedrock: %s", image_path)
     image_bytes = load_image_bytes(image_path)
     img_format = detect_image_format(image_path)
 
     if len(image_bytes) > BEDROCK_MAX_RAW_BYTES:
         original_mb = len(image_bytes) / 1024 / 1024
-        print(f"⚠️ Image too large ({original_mb:.1f}MB), compressing...")
+        logger.warning("Image too large (%.1f MB > %.1f MB limit), compressing...",
+                       original_mb, BEDROCK_MAX_RAW_BYTES / 1024 / 1024)
         image_bytes = compress_image(image_bytes)
         img_format = "jpeg"
-        print(f"✅ Compressed to {len(image_bytes) / 1024 / 1024:.1f}MB")
+        logger.info("Image compressed to %.1f MB, format changed to jpeg",
+                     len(image_bytes) / 1024 / 1024)
+    else:
+        logger.debug("Image size OK: %.2f MB", len(image_bytes) / 1024 / 1024)
 
     return image_bytes, img_format
