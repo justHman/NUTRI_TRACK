@@ -1,5 +1,10 @@
 .env
-app/config/logging_config.py
 __pycache__/
+*.pyc
 .venv/
-data/weights/
+venv/
+data/
+logs/
+tests/
+.pytest_cache/
+.github/

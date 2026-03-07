@@ -1,0 +1,91 @@
+{
+    "success": true,
+    "method": "tools",
+    "message": "Phát hiện 1 món ăn.",
+    "data": {
+        "dishes": [
+            {
+                "name": "Grilled Steak with Mashed Potatoes and Roasted Vegetables",
+                "vi_name": "Thịt bò nướng với khoai tây nghiền và rau củ nướng",
+                "confidence": 0.95,
+                "cooking_method": "grilled",
+                "ingredients": [
+                    {
+                        "name": "Beef steak",
+                        "vi_name": "Thịt bò",
+                        "estimated_weight_g": 250,
+                        "estimated_nutritions": {
+                            "calories": 535,
+                            "protein": 107.25,
+                            "carbs": 17.85,
+                            "fat": 8.92
+                        },
+                        "confidence": 0.95,
+                        "note": "grilled, visible sear marks"
+                    },
+                    {
+                        "name": "Mashed potatoes",
+                        "vi_name": "Khoai tây nghiền",
+                        "estimated_weight_g": 150,
+                        "estimated_nutritions": {
+                            "calories": 111,
+                            "protein": 3.05,
+                            "carbs": 26.4,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "inferred from texture and color; nutrition adjusted from raw potato base"
+                    },
+                    {
+                        "name": "Roasted carrots",
+                        "vi_name": "Cà rốt nướng",
+                        "estimated_weight_g": 30,
+                        "estimated_nutritions": {
+                            "calories": 11.4,
+                            "protein": 0.38,
+                            "carbs": 2.69,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "visible orange pieces with char"
+                    },
+                    {
+                        "name": "Roasted root vegetables (parsnips, potatoes, yams)",
+                        "vi_name": "Rau củ nướng (củ cải, khoai tây, khoai lang)",
+                        "estimated_weight_g": 70,
+                        "estimated_nutritions": {
+                            "calories": 111.3,
+                            "protein": 1.86,
+                            "carbs": 17.29,
+                            "fat": 4.53
+                        },
+                        "confidence": 0.85,
+                        "note": "inferred from mixed roasted veg mix; nutrition estimated from tool data"
+                    },
+                    {
+                        "name": "Rosemary garnish",
+                        "vi_name": "Hương thảo trang trí",
+                        "estimated_weight_g": 2,
+                        "estimated_nutritions": {
+                            "calories": 1,
+                            "protein": 0.05,
+                            "carbs": 0.2,
+                            "fat": 0
+                        },
+                        "confidence": 0.7,
+                        "note": "minimal, for flavor and presentation"
+                    }
+                ],
+                "total_estimated_weight_g": 502,
+                "total_estimated_nutritions": {
+                    "calories": 770.1,
+                    "protein": 112.59,
+                    "carbs": 64.43,
+                    "fat": 13.45
+                },
+                "scale_reference_used": "spoon visible (~40g) for scale"
+            }
+        ],
+        "image_quality": "good"
+    }
+}

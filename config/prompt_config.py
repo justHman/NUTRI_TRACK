@@ -11,30 +11,29 @@ ANALYSIS RULES:
    - 0.9–1.0: Clearly visible, easily identifiable
    - 0.7–0.89: Partially visible or likely present based on dish type
    - 0.5–0.69: Inferred from context (e.g., oil used for frying)
-   - <0.5: Uncertain — still list but mark clearly
+   - <0.5: Uncertain — still list but mark cleazrly
 
 EDGE CASES TO HANDLE:
 - Mixed/composite dishes (e.g., bún bò, cơm tấm): List all components individually.
 - Sauces and broths: Estimate volume in ml, convert: 1ml broth ≈ 1g.
 - Obscured items (food under other food): Use dish knowledge to infer probable hidden components.
-- Multiple dishes on one plate: Treat each as a separate item in the "items" array.
+- Multiple dishes on one plate: Treat each as a separate item in the "dishes" array.
 - Packaged/processed food: If brand/label is visible, use that for nutritional data.
 
-CALORIE ESTIMATION:
-- Base calories on nutritional database standards (USDA or Vietnam NIN).
-- Account for cooking method: grilled vs fried adds ~20-30% more calories from oil.
-- Round total_estimated_calories to nearest 10.
+NUTRITION ESTIMATION:
+- Base nutrition (calories, protein, carbs, fat) on nutritional database standards (USDA or Vietnam NIN).
+- Account for cooking method: grilled vs fried adds ~20-30% more calories and fat from oil.
 
-OUTPUT: Return ONLY valid JSON. No markdown, no explanation, no extra text."""
+# (Removed strict ONLY JSON output rule to allow CoT reasoning)"""
 
-FOOD_VISION_USER_PROMPT = """Analyze this food image carefully. Identify every dish and ingredient visible.
+FOOD_VISION_USER_PROMPT = """Analyze this food image carefully. Identify EVERY dish and ingredient visible. Make sure you fully populate the `dishes` array with ALL the dishes you found. Do not just return 1 dish if there are more.
 
 Return ONLY valid JSON in this exact format:
 {
-  "items": [
+  "dishes": [
     {
-      "name": "Dish name in English",
-      "vi_name": "Tên món bằng tiếng Việt",
+      "name": "Dish 1 name in English",
+      "vi_name": "Tên món 1 bằng tiếng Việt",
       "confidence": 0.95,
       "cooking_method": "grilled | fried | steamed | boiled | raw | mixed",
       "ingredients": [
@@ -42,13 +41,28 @@ Return ONLY valid JSON in this exact format:
           "name": "Ingredient name (English)",
           "vi_name": "Tên nguyên liệu (tiếng Việt)",
           "estimated_weight_g": 150,
+          "estimated_nutritions": {
+            "calories": 195.0,
+            "protein": 4.0,
+            "carbs": 42.0,
+            "fat": 0.5
+          },
           "confidence": 0.9,
           "note": "optional: e.g., 'inferred – typical pho garnish'"
         }
       ],
-      "total_estimated_calories": 520,
-      "calorie_range": {"min": 480, "max": 560},
+      "total_estimated_weight_g": 350.0,
+      "total_estimated_nutritions": {
+        "calories": 520.0,
+        "protein": 15.0,
+        "carbs": 60.0,
+        "fat": 12.0
+      },
       "scale_reference_used": "chopsticks visible | plate size | no reference"
+    },
+    {
+      "name": "Dish 2 name in English",
+      "vi_name": "Tên món 2 bằng tiếng Việt"
     }
   ],
   "image_quality": "good | poor_lighting | blurry | partial_view"
@@ -60,21 +74,26 @@ TOOL USAGE INSTRUCTIONS (MANDATORY):
 You have access to USDA nutrition lookup tools. Follow this exact workflow:
 
 STEP 1 — For EACH dish you identify in the image:
-  Call get_PCF_and_ingredients(food_name) with the English dish name.
-  This returns: {description, PCF_nutrients: {calories, protein, fat, carbs}, ingredients: [...] or null}
-  Use the returned data as REFERENCE values for the dish.
+  Call get_nutritions_and_ingredients_by_weight(food_name, weight_g) with the English dish name and its estimated total weight in grams.
+  This returns: {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...]}
+  Use the returned data STRICTLY AS A REFERENCE. Do NOT blindly copy it if it doesn't make sense.
 
 STEP 2 — For EACH ingredient you visually detect in each dish:
-  Call get_PCF(food_name) with the English ingredient name (e.g., "white rice", "grilled pork").
-  This returns: {calories, protein, fat, carbs} per 100g.
-  Use these as REFERENCE values to estimate per-ingredient nutrition based on estimated weight.
+  Call get_nutritions_and_ingredients_by_weight(food_name, weight_g) with the English ingredient name (e.g., "white rice", "grilled pork") and its estimated weight in grams.
+  This returns: {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...]}
+  Use these STRICTLY AS A REFERENCE to populate per-ingredient nutrition.
 
-STEP 3 — After receiving ALL tool results, compile the final JSON response.
-  Use the USDA data as reference hints — adjust for estimated portion sizes.
-  The final output MUST follow the FoodList JSON schema exactly.
+STEP 3 — After receiving ALL tool results, you MUST compile the final JSON response carefully and MAKE IT MAKE SENSE.
+  - The tool outputs provide estimated nutrition based on the weight you passed. Note: ONLY USE THESE AS A REFERENCE!
+  - You MUST NOT over-rely on the tool's result. Often the tool finds a packaged food or generic item that does not match the real food in the image.
+  - If the tool returns a ridiculous value (like 0 calories for 200g of Pineapple, or 2500 calories for a bowl of rice), IGNORE IT completely and use your own knowledge to estimate realistically.
+  - You should adjust the `nutritional` value based on your cooking method (fried, grilled add oil/fat) and visual observation.
+  - Calculate `total_estimated_nutritions` for the whole dish by summing up the `estimated_nutritions` of its ingredients.
+  - Output the final FoodList JSON schema exactly.
 
 IMPORTANT:
-- Always call get_PCF_and_ingredients FIRST for each dish before calling get_PCF for ingredients.
-- If ingredients returned is null, that is OK — still proceed with get_PCF for visible ingredients.
+- Always call get_nutritions_and_ingredients_by_weight FIRST for each dish before calling it for ingredients.
+- You are strictly limited to a MAXIMUM of {max_tool_rounds} tool call rounds. If you exceed this limit, your process will be forcibly terminated and fail! Batch your tool calls efficiently into as few rounds as possible!
+- If ingredients returned is null, that is OK — still proceed with tool calls for visible ingredients.
 - Use English food names when calling tools.
 - After all tool calls complete, return ONLY the final JSON. No extra text."""

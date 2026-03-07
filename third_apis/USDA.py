@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 import unicodedata
 
 from config.logging_config import get_logger
+from utils.caculator import calculate_ingredient_nutrition
 
 logger = get_logger(__name__)
 
@@ -73,10 +74,29 @@ def _is_expired(entry: dict) -> bool:
 
 
 def _load_disk_cache() -> dict:
-    """Load Level-2 disk cache from JSON file.
-    To swap to S3:
-        Replace with:  s3.get_object(Bucket=..., Key="usda_cache.json")
+    """Load Level-2 disk cache from JSON file, with optional S3 syncing.
+    Pulls from S3 first (if configured), then loads from disk.
     """
+    s3_bucket = os.getenv("AWS_S3_CACHE_BUCKET")
+    if s3_bucket:
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+            
+            s3_key = "usda_cache.json"
+            logger.info("Syncing L2 cache from S3: s3://%s/%s", s3_bucket, s3_key)
+            region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
+            s3 = boto3.client('s3', region_name=region)
+            
+            os.makedirs(_CACHE_DIR, exist_ok=True)
+            s3.download_file(s3_bucket, s3_key, _CACHE_FILE)
+            logger.debug("Successfully downloaded cache from S3 to %s", _CACHE_FILE)
+        except Exception as e:
+            if hasattr(e, 'response') and getattr(e, 'response', {}).get('Error', {}).get('Code') in ('404', 'NoSuchKey'):
+                logger.info("No cache found on S3, starting fresh or using existing local file")
+            else:
+                logger.warning("Failed to download cache from S3: %s", e)
+
     if not os.path.exists(_CACHE_FILE):
         return {}
     try:
@@ -90,17 +110,26 @@ def _load_disk_cache() -> dict:
 
 
 def _save_disk_cache(cache: dict):
-    """Persist Level-2 disk cache to JSON file.
-    To swap to S3:
-        Replace with:  s3.put_object(Bucket=..., Key="usda_cache.json", Body=...)
-    """
+    """Persist Level-2 disk cache to JSON file and sync to S3 if configured."""
     try:
         os.makedirs(_CACHE_DIR, exist_ok=True)
         with open(_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
         logger.debug("L2 cache saved: %d entries to %s", len(cache), _CACHE_FILE)
+        
+        # Sync to S3 if configured
+        s3_bucket = os.getenv("AWS_S3_CACHE_BUCKET")
+        if s3_bucket:
+            import boto3
+            s3_key = "usda_cache.json"
+            logger.info("Uploading L2 cache to S3: s3://%s/%s", s3_bucket, s3_key)
+            region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
+            s3 = boto3.client('s3', region_name=region)
+            s3.upload_file(_CACHE_FILE, s3_bucket, s3_key)
+            logger.debug("Successfully uploaded cache to S3")
+            
     except Exception as e:
-        logger.warning("L2 cache save failed: %s", e)
+        logger.warning("L2 cache save/sync failed: %s", e)
 
 
 # Load once at module import
@@ -118,7 +147,7 @@ class USDAClient:
     ├──────────────────────────────────────────────────────────┤
     │ Level 2 │ JSON file│ TTL=30 days  │ persists across runs │
     ├──────────────────────────────────────────────────────────┤
-    │ Level 3 │ USDA API │ real network │ only on full miss     │
+    │ Level 3 │ USDA API │ real network │ only on full miss    │
     └──────────────────────────────────────────────────────────┘
 
     Swap Level 2 to S3/DynamoDB by replacing _load_disk_cache / _save_disk_cache.
@@ -142,24 +171,24 @@ class USDAClient:
     # Public API
     # ─────────────────────────────────────────────────────────────────────
 
-    def get_PCF(self, query: str, pageSize: int = 5) -> Dict[str, float]:
+    def get_nutritions(self, query: str, pageSize: int = 5) -> Dict[str, float]:
         """
         Return Protein/Calories/Fat nutrition data per 100g.
         Uses two-tier cache before calling USDA API.
         Falls back to mock values if api_key is DEMO_KEY.
         """
-        logger.debug("get_PCF() called with query='%s'", query)
+        logger.debug("get_nutritions() called with query='%s'", query)
         normalized_query = self._normalize_query(query)
 
         if not self.api_key or self.api_key == "DEMO_KEY":
-            logger.info("get_PCF: using mock data (api_key=%s)", self.api_key or "None")
+            logger.info("get_nutritions: using mock data (api_key=%s)", self.api_key or "None")
             return self._get_mock_nutrition(query)
 
         best = self.search_best(normalized_query, pageSize)
         if best:
-            return self._parse_PCF(best)
+            return self._parse_100g_nutritions(best)
 
-        logger.warning("get_PCF: no result for '%s', falling back to mock", normalized_query)
+        logger.warning("get_nutritions: no result for '%s', falling back to mock", normalized_query)
         return self._get_mock_nutrition(query)
 
     def get_ingredients(self, query: str, pageSize: int = 5) -> Optional[List[str]]:
@@ -183,34 +212,54 @@ class USDAClient:
                     len(ingredients) if ingredients else 0, normalized_query)
         return ingredients
 
-    def get_PCF_and_ingredients(self, query: str, pageSize: int = 5) -> Optional[Dict]:
+    def get_nutritions_and_ingredients(self, query: str, pageSize: int = 5) -> Optional[Dict]:
         """
         Return both PCF nutrition data and ingredients in one dict.
         Calls search_best() once — cache ensures only 1 API call per unique query.
         """
-        logger.debug("get_PCF_and_ingredients() called with query='%s'", query)
+        logger.debug("get_nutritions_and_ingredients() called with query='%s'", query)
         normalized_query = self._normalize_query(query)
         if not normalized_query:
-            logger.warning("get_PCF_and_ingredients: empty query")
+            logger.warning("get_nutritions_and_ingredients: empty query")
             return None
 
         best = self.search_best(normalized_query, pageSize)
         if not best:
-            logger.warning("get_PCF_and_ingredients: no USDA result for '%s'", normalized_query)
+            logger.warning("get_nutritions_and_ingredients: no USDA result for '%s'", normalized_query)
             return None
 
         description = best.get("description", "N/A").lower()
-        pcf_data     = self._parse_PCF(best)
+        nutritions     = self._parse_100g_nutritions(best)
         ingredients  = self._parse_ingredient_string(best)
 
         result = {
             "description": description,
-            "PCF_nutrients": pcf_data,
+            "nutritions": nutritions,
             "ingredients": ingredients,
         }
-        logger.info("get_PCF_and_ingredients: '%s' → %d ingredients",
+        logger.info("get_nutritions_and_ingredients: '%s' → %d ingredients",
                     normalized_query, len(ingredients) if ingredients else 0)
-        logger.debug("get_PCF_and_ingredients result: %s", result)
+        logger.debug("get_nutritions_and_ingredients result: %s", result)
+        return result
+
+    def get_nutritions_and_ingredients_by_weight(self, query: str, weight_g: float, pageSize: int = 5) -> Optional[Dict]:
+        """
+        Return actual PCF nutrition data calculated by weight and ingredients in one dict.
+        Calls get_nutritions_and_ingredients to get 100g reference and calculates actual nutritions.
+        """
+        logger.debug("get_nutritions_and_ingredients_by_weight() called with query='%s', weight_g=%.2f", query, weight_g)
+        
+        result = self.get_nutritions_and_ingredients(query, pageSize)
+        if not result:
+            return None
+            
+        nutritions_100g = result["nutritions"]
+        actual_nutritions = calculate_ingredient_nutrition(nutritions_100g, weight_g)
+        
+        result["nutritions"] = actual_nutritions
+        result["weight_g"] = weight_g
+        
+        logger.debug("get_nutritions_and_ingredients_by_weight actual result: %s", result)
         return result
 
     # ─────────────────────────────────────────────────────────────────────
@@ -366,11 +415,11 @@ class USDAClient:
     # Private: Parse
     # ─────────────────────────────────────────────────────────────────────
 
-    def _parse_PCF(self, food: dict) -> Dict[str, float]:
+    def _parse_100g_nutritions(self, food: dict) -> Dict[str, float]:
         """
         Extract calories, protein, fat, carbs per 100g from a USDA food dict.
         """
-        logger.info("_parse_PCF: '%s' (fdcId=%s, score=%.1f)",
+        logger.info("_parse_100g_nutritions: '%s' (fdcId=%s, score=%.1f)",
                     food.get("description", "N/A"),
                     food.get("fdcId", "N/A"),
                     food.get("score", 0))
@@ -395,7 +444,7 @@ class USDAClient:
             elif nutrient_number in self.TARGET_NUTRIENTS:
                 result[self.TARGET_NUTRIENTS[nutrient_number]] = float(value)
 
-        logger.debug("_parse_PCF result: %s", result)
+        logger.debug("_parse_100g_nutritions result: %s", result)
         return result
 
     def _parse_ingredient_string(self, food: dict) -> Optional[List[str]]:
@@ -465,7 +514,7 @@ class USDAClient:
             return ""
 
         original = query
-        query = query.strip().lower()
+        query = str(query).strip().lower()
 
         # Remove accents
         query = unicodedata.normalize('NFKD', query)

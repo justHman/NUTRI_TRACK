@@ -10,7 +10,7 @@ Available models:
 Pydantic schemas:
     - Ingredient: (name, vi_name, estimated_weight_g, confidence)
     - FoodItem: (name, vi_name, ingredients: List[Ingredient], total_estimated_calories)
-    - FoodList: (items: List[FoodItem])
+    - FoodList: (dishes: List[FoodItem])
 """
 
 from models.QWEN3VL import (

@@ -9,9 +9,9 @@ from config.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-# Bedrock Converse API: max request body = 10MB
-# Base64 encoding adds ~33% overhead, so raw image should be < 7.5MB
-BEDROCK_MAX_RAW_BYTES = 7_500_000
+# Bedrock Converse API payload limits can be strict.
+# Base64 encoding adds ~33% overhead. Set limit to 3MB to be absolutely safe.
+BEDROCK_MAX_RAW_BYTES = 3_000_000
 
 
 def load_image_bytes(image_path: str) -> bytes:
@@ -58,7 +58,7 @@ def detect_image_format(image_path: str) -> str:
     return detected
 
 
-def compress_image(image_bytes: bytes, max_pixels: int = 2048, quality: int = 85) -> bytes:
+def compress_image(image_bytes: bytes, max_pixels: int = 1024, quality: int = 85) -> bytes:
     """Compress an image by resizing and converting to JPEG.
     
     Args:
@@ -88,27 +88,52 @@ def compress_image(image_bytes: bytes, max_pixels: int = 2048, quality: int = 85
     return compressed
 
 
-def prepare_image_for_bedrock(image_path: str) -> Tuple[bytes, str]:
-    """Load image and ensure it fits within Bedrock's size limit.
-    
-    Automatically compresses the image if it exceeds ~7.5MB
-    (to account for base64 overhead in the API request).
-    
-    Args:
-        image_path: Path to the image file
-    
-    Returns:
-        Tuple of (image_bytes, format_string)
-    """
-    logger.info("Preparing image for Bedrock: %s", image_path)
-    image_bytes = load_image_bytes(image_path)
-    img_format = detect_image_format(image_path)
+def prepare_image_for_bedrock(image_path: str = None, image_bytes: bytes = None, filename: str = None, max_pixels: int = 1024) -> Tuple[bytes, str]:
+    """Load image and ensure it fits within Bedrock's size and dimension limits."""
+    if image_bytes is None:
+        if not image_path:
+            raise ValueError("Either image_path or image_bytes must be provided")
+        logger.info("Preparing image for Bedrock: %s", image_path)
+        image_bytes = load_image_bytes(image_path)
+        img_format = detect_image_format(image_path)
+    else:
+        logger.info("Preparing image bytes for Bedrock (size: %.2fMB)", len(image_bytes) / 1024 / 1024)
+        if filename:
+            img_format = detect_image_format(filename)
+        elif image_path:
+            img_format = detect_image_format(image_path)
+        else:
+            img_format = "jpeg"
 
+    # Đọc nhanh kích thước ảnh bằng con trỏ BytesIO để không tải lại file
+    needs_compression = False
+    
+    # 1. Check file size
     if len(image_bytes) > BEDROCK_MAX_RAW_BYTES:
-        original_mb = len(image_bytes) / 1024 / 1024
-        logger.warning("Image too large (%.1f MB > %.1f MB limit), compressing...",
-                       original_mb, BEDROCK_MAX_RAW_BYTES / 1024 / 1024)
-        image_bytes = compress_image(image_bytes)
+        logger.warning(
+            "Image too large (%.1f MB > %.1f MB limit), needs compression",
+            len(image_bytes) / 1024 / 1024, 
+            BEDROCK_MAX_RAW_BYTES / 1024 / 1024
+        )
+        needs_compression = True
+    else:
+        # 2. Check dimensions
+        try:
+            img = Image.open(BytesIO(image_bytes))
+            width, height = img.size
+            if max(width, height) > max_pixels:
+                logger.warning(
+                    "Image dimensions too large (%dx%d > %d), needs compression",
+                    width, height, max_pixels
+                )
+                needs_compression = True
+        except Exception as e:
+            logger.error("Failed to read image dimensions: %s", e)
+            # Safe bet is to compress if reading fails to avoid Converse API errors
+            needs_compression = True
+
+    if needs_compression:
+        image_bytes = compress_image(image_bytes, max_pixels=max_pixels)
         img_format = "jpeg"
         logger.info("Image compressed to %.1f MB, format changed to jpeg",
                      len(image_bytes) / 1024 / 1024)

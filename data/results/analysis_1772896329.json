@@ -1,0 +1,722 @@
+{
+    "success": true,
+    "method": "tools",
+    "message": "Phát hiện 12 món ăn.",
+    "data": {
+        "dishes": [
+            {
+                "name": "Fried Potatoes",
+                "vi_name": "Khoai tây chiên",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Potatoes",
+                        "vi_name": "Khoai tây",
+                        "estimated_weight_g": 150,
+                        "estimated_nutritions": {
+                            "calories": 111,
+                            "protein": 3.04,
+                            "carbs": 26.4,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "Base ingredient, fried with oil"
+                    },
+                    {
+                        "name": "Vegetable Oil",
+                        "vi_name": "Dầu thực vật",
+                        "estimated_weight_g": 20,
+                        "estimated_nutritions": {
+                            "calories": 180,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 20
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from frying method"
+                    }
+                ],
+                "total_estimated_weight_g": 170,
+                "total_estimated_nutritions": {
+                    "calories": 291,
+                    "protein": 3.04,
+                    "carbs": 26.4,
+                    "fat": 20
+                },
+                "scale_reference_used": "plate size"
+            },
+            {
+                "name": "Chicken Sandwich",
+                "vi_name": "Bánh mì gà rán",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Chicken Breast",
+                        "vi_name": "Ức gà",
+                        "estimated_weight_g": 100,
+                        "estimated_nutritions": {
+                            "calories": 165,
+                            "protein": 20.4,
+                            "carbs": 1.06,
+                            "fat": 8.1
+                        },
+                        "confidence": 0.9,
+                        "note": "Main protein component"
+                    },
+                    {
+                        "name": "Bread Bun",
+                        "vi_name": "Bánh mì",
+                        "estimated_weight_g": 80,
+                        "estimated_nutritions": {
+                            "calories": 218.4,
+                            "protein": 8.94,
+                            "carbs": 31.82,
+                            "fat": 6.06
+                        },
+                        "confidence": 0.9,
+                        "note": "Sesame seed bun"
+                    },
+                    {
+                        "name": "Lettuce",
+                        "vi_name": "Xà lách",
+                        "estimated_weight_g": 20,
+                        "estimated_nutritions": {
+                            "calories": 4,
+                            "protein": 0.18,
+                            "carbs": 0.74,
+                            "fat": 0.02
+                        },
+                        "confidence": 0.85,
+                        "note": "Visible green leafy garnish"
+                    },
+                    {
+                        "name": "Onion",
+                        "vi_name": "Hành tây",
+                        "estimated_weight_g": 15,
+                        "estimated_nutritions": {
+                            "calories": 43.35,
+                            "protein": 1.64,
+                            "carbs": 8.91,
+                            "fat": 0.12
+                        },
+                        "confidence": 0.85,
+                        "note": "Visible purple onion slices"
+                    },
+                    {
+                        "name": "Mayonnaise",
+                        "vi_name": "Sốt mayonnaise",
+                        "estimated_weight_g": 15,
+                        "estimated_nutritions": {
+                            "calories": 90,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 10
+                        },
+                        "confidence": 0.7,
+                        "note": "Inferred white sauce under chicken"
+                    }
+                ],
+                "total_estimated_weight_g": 230,
+                "total_estimated_nutritions": {
+                    "calories": 510.75,
+                    "protein": 31.16,
+                    "carbs": 42.53,
+                    "fat": 24.3
+                },
+                "scale_reference_used": "plate size"
+            },
+            {
+                "name": "Fried Chicken Wings",
+                "vi_name": "Cánh gà rán",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Chicken Wing",
+                        "vi_name": "Cánh gà",
+                        "estimated_weight_g": 180,
+                        "estimated_nutritions": {
+                            "calories": 338.4,
+                            "protein": 28.98,
+                            "carbs": 0,
+                            "fat": 25.74
+                        },
+                        "confidence": 0.9,
+                        "note": "Main ingredient, fried"
+                    },
+                    {
+                        "name": "Vegetable Oil",
+                        "vi_name": "Dầu thực vật",
+                        "estimated_weight_g": 15,
+                        "estimated_nutritions": {
+                            "calories": 135,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 15
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from frying method"
+                    }
+                ],
+                "total_estimated_weight_g": 195,
+                "total_estimated_nutritions": {
+                    "calories": 473.4,
+                    "protein": 28.98,
+                    "carbs": 0,
+                    "fat": 40.74
+                },
+                "scale_reference_used": "no reference"
+            },
+            {
+                "name": "Margherita Pizza",
+                "vi_name": "Pizza Margherita",
+                "confidence": 0.95,
+                "cooking_method": "baked",
+                "ingredients": [
+                    {
+                        "name": "Pizza Crust",
+                        "vi_name": "Vỏ pizza",
+                        "estimated_weight_g": 120,
+                        "estimated_nutritions": {
+                            "calories": 314.4,
+                            "protein": 7.38,
+                            "carbs": 57.24,
+                            "fat": 4.62
+                        },
+                        "confidence": 0.9,
+                        "note": "Base crust"
+                    },
+                    {
+                        "name": "Tomato Sauce",
+                        "vi_name": "Sốt cà chua",
+                        "estimated_weight_g": 60,
+                        "estimated_nutritions": {
+                            "calories": 15,
+                            "protein": 0.98,
+                            "carbs": 2.95,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "Red sauce base"
+                    },
+                    {
+                        "name": "Mozzarella Cheese",
+                        "vi_name": "Phô mai mozzarella",
+                        "estimated_weight_g": 80,
+                        "estimated_nutritions": {
+                            "calories": 243.2,
+                            "protein": 20.88,
+                            "carbs": 3.48,
+                            "fat": 15.68
+                        },
+                        "confidence": 0.9,
+                        "note": "Melted cheese topping"
+                    },
+                    {
+                        "name": "Basil",
+                        "vi_name": "Húng quế",
+                        "estimated_weight_g": 5,
+                        "estimated_nutritions": {
+                            "calories": 0,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 0
+                        },
+                        "confidence": 0.85,
+                        "note": "Fresh herb garnish"
+                    }
+                ],
+                "total_estimated_weight_g": 265,
+                "total_estimated_nutritions": {
+                    "calories": 572.6,
+                    "protein": 29.24,
+                    "carbs": 63.67,
+                    "fat": 20.3
+                },
+                "scale_reference_used": "plate size"
+            },
+            {
+                "name": "Beef Burrito",
+                "vi_name": "Burrito bò",
+                "confidence": 0.95,
+                "cooking_method": "mixed",
+                "ingredients": [
+                    {
+                        "name": "Beef",
+                        "vi_name": "Thịt bò",
+                        "estimated_weight_g": 80,
+                        "estimated_nutritions": {
+                            "calories": 103.2,
+                            "protein": 16,
+                            "carbs": 0,
+                            "fat": 4.7
+                        },
+                        "confidence": 0.9,
+                        "note": "Main protein"
+                    },
+                    {
+                        "name": "Tortilla",
+                        "vi_name": "Bánh tráng ngô",
+                        "estimated_weight_g": 60,
+                        "estimated_nutritions": {
+                            "calories": 126.6,
+                            "protein": 3.16,
+                            "carbs": 26.82,
+                            "fat": 1.58
+                        },
+                        "confidence": 0.9,
+                        "note": "Wrap"
+                    },
+                    {
+                        "name": "Lettuce",
+                        "vi_name": "Xà lách",
+                        "estimated_weight_g": 15,
+                        "estimated_nutritions": {
+                            "calories": 3,
+                            "protein": 0.135,
+                            "carbs": 0.555,
+                            "fat": 0.015
+                        },
+                        "confidence": 0.8,
+                        "note": "Visible green leafy"
+                    },
+                    {
+                        "name": "Tomato",
+                        "vi_name": "Cà chua",
+                        "estimated_weight_g": 10,
+                        "estimated_nutritions": {
+                            "calories": 2,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 0
+                        },
+                        "confidence": 0.7,
+                        "note": "Inferred from typical burrito"
+                    },
+                    {
+                        "name": "Cheese",
+                        "vi_name": "Phô mai",
+                        "estimated_weight_g": 20,
+                        "estimated_nutritions": {
+                            "calories": 60.8,
+                            "protein": 5.22,
+                            "carbs": 0.87,
+                            "fat": 3.92
+                        },
+                        "confidence": 0.8,
+                        "note": "Melted cheese visible"
+                    }
+                ],
+                "total_estimated_weight_g": 185,
+                "total_estimated_nutritions": {
+                    "calories": 300.6,
+                    "protein": 24.515,
+                    "carbs": 27.645,
+                    "fat": 10.215
+                },
+                "scale_reference_used": "no reference"
+            },
+            {
+                "name": "Nachos with Cheese and Salsa",
+                "vi_name": "Nachos phô mai và sốt salsa",
+                "confidence": 0.95,
+                "cooking_method": "mixed",
+                "ingredients": [
+                    {
+                        "name": "Nachos Chips",
+                        "vi_name": "Khoai tây chiên giòn",
+                        "estimated_weight_g": 100,
+                        "estimated_nutritions": {
+                            "calories": 519,
+                            "protein": 7.36,
+                            "carbs": 60.8,
+                            "fat": 27.4
+                        },
+                        "confidence": 0.9,
+                        "note": "Base chips"
+                    },
+                    {
+                        "name": "Cheese Sauce",
+                        "vi_name": "Sốt phô mai",
+                        "estimated_weight_g": 50,
+                        "estimated_nutritions": {
+                            "calories": 81.5,
+                            "protein": 1.57,
+                            "carbs": 3.93,
+                            "fat": 6.63
+                        },
+                        "confidence": 0.85,
+                        "note": "Yellow cheese topping"
+                    },
+                    {
+                        "name": "Salsa",
+                        "vi_name": "Sốt salsa",
+                        "estimated_weight_g": 30,
+                        "estimated_nutritions": {
+                            "calories": 16.2,
+                            "protein": 0,
+                            "carbs": 2.14,
+                            "fat": 1.07
+                        },
+                        "confidence": 0.85,
+                        "note": "Red sauce topping"
+                    }
+                ],
+                "total_estimated_weight_g": 180,
+                "total_estimated_nutritions": {
+                    "calories": 616.7,
+                    "protein": 8.93,
+                    "carbs": 66.87,
+                    "fat": 35.1
+                },
+                "scale_reference_used": "plate size"
+            },
+            {
+                "name": "French Fries",
+                "vi_name": "Khoai tây chiên",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Potatoes",
+                        "vi_name": "Khoai tây",
+                        "estimated_weight_g": 150,
+                        "estimated_nutritions": {
+                            "calories": 111,
+                            "protein": 3.04,
+                            "carbs": 26.4,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "Base ingredient"
+                    },
+                    {
+                        "name": "Vegetable Oil",
+                        "vi_name": "Dầu thực vật",
+                        "estimated_weight_g": 15,
+                        "estimated_nutritions": {
+                            "calories": 135,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 15
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from frying"
+                    }
+                ],
+                "total_estimated_weight_g": 165,
+                "total_estimated_nutritions": {
+                    "calories": 246,
+                    "protein": 3.04,
+                    "carbs": 26.4,
+                    "fat": 15
+                },
+                "scale_reference_used": "plate size"
+            },
+            {
+                "name": "Fried Chicken Nuggets",
+                "vi_name": "Gà rán viên",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Chicken",
+                        "vi_name": "Gà",
+                        "estimated_weight_g": 100,
+                        "estimated_nutritions": {
+                            "calories": 165,
+                            "protein": 20.4,
+                            "carbs": 1.06,
+                            "fat": 8.1
+                        },
+                        "confidence": 0.9,
+                        "note": "Main ingredient"
+                    },
+                    {
+                        "name": "Breading",
+                        "vi_name": "Lớp bột chiên",
+                        "estimated_weight_g": 20,
+                        "estimated_nutritions": {
+                            "calories": 70,
+                            "protein": 2,
+                            "carbs": 15,
+                            "fat": 1
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from crispy coating"
+                    },
+                    {
+                        "name": "Vegetable Oil",
+                        "vi_name": "Dầu thực vật",
+                        "estimated_weight_g": 10,
+                        "estimated_nutritions": {
+                            "calories": 90,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 10
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from frying"
+                    }
+                ],
+                "total_estimated_weight_g": 130,
+                "total_estimated_nutritions": {
+                    "calories": 325,
+                    "protein": 22.4,
+                    "carbs": 16.06,
+                    "fat": 19.1
+                },
+                "scale_reference_used": "no reference"
+            },
+            {
+                "name": "Grilled Cheese Sandwich",
+                "vi_name": "Bánh mì phô mai nướng",
+                "confidence": 0.95,
+                "cooking_method": "grilled",
+                "ingredients": [
+                    {
+                        "name": "Bread",
+                        "vi_name": "Bánh mì",
+                        "estimated_weight_g": 60,
+                        "estimated_nutritions": {
+                            "calories": 87.6,
+                            "protein": 2.14,
+                            "carbs": 19.26,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "Toasted bread"
+                    },
+                    {
+                        "name": "Cheese",
+                        "vi_name": "Phô mai",
+                        "estimated_weight_g": 40,
+                        "estimated_nutritions": {
+                            "calories": 121.6,
+                            "protein": 10.44,
+                            "carbs": 1.74,
+                            "fat": 7.84
+                        },
+                        "confidence": 0.9,
+                        "note": "Melted cheese"
+                    },
+                    {
+                        "name": "Butter",
+                        "vi_name": "Bơ",
+                        "estimated_weight_g": 5,
+                        "estimated_nutritions": {
+                            "calories": 36,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 4
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from grilling"
+                    }
+                ],
+                "total_estimated_weight_g": 105,
+                "total_estimated_nutritions": {
+                    "calories": 245.2,
+                    "protein": 12.58,
+                    "carbs": 21,
+                    "fat": 11.84
+                },
+                "scale_reference_used": "no reference"
+            },
+            {
+                "name": "Bacon and Egg Breakfast Plate",
+                "vi_name": "Món ăn sáng thịt xông khói và trứng",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Bacon",
+                        "vi_name": "Thịt xông khói",
+                        "estimated_weight_g": 30,
+                        "estimated_nutritions": {
+                            "calories": 180,
+                            "protein": 9.99,
+                            "carbs": 0,
+                            "fat": 14.01
+                        },
+                        "confidence": 0.9,
+                        "note": "Crispy strips"
+                    },
+                    {
+                        "name": "Fried Egg",
+                        "vi_name": "Trứng ốp la",
+                        "estimated_weight_g": 50,
+                        "estimated_nutritions": {
+                            "calories": 98,
+                            "protein": 6.8,
+                            "carbs": 0.41,
+                            "fat": 7.4
+                        },
+                        "confidence": 0.9,
+                        "note": "Sunny-side up egg"
+                    },
+                    {
+                        "name": "Vegetable Oil",
+                        "vi_name": "Dầu thực vật",
+                        "estimated_weight_g": 5,
+                        "estimated_nutritions": {
+                            "calories": 45,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 5
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from frying"
+                    }
+                ],
+                "total_estimated_weight_g": 85,
+                "total_estimated_nutritions": {
+                    "calories": 323,
+                    "protein": 16.79,
+                    "carbs": 0.41,
+                    "fat": 26.41
+                },
+                "scale_reference_used": "plate size"
+            },
+            {
+                "name": "Fried Shrimp",
+                "vi_name": "Tôm chiên",
+                "confidence": 0.95,
+                "cooking_method": "fried",
+                "ingredients": [
+                    {
+                        "name": "Shrimp",
+                        "vi_name": "Tôm",
+                        "estimated_weight_g": 120,
+                        "estimated_nutritions": {
+                            "calories": 56.4,
+                            "protein": 14.16,
+                            "carbs": 0,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "Main ingredient"
+                    },
+                    {
+                        "name": "Breading",
+                        "vi_name": "Lớp bột chiên",
+                        "estimated_weight_g": 20,
+                        "estimated_nutritions": {
+                            "calories": 70,
+                            "protein": 2,
+                            "carbs": 15,
+                            "fat": 1
+                        },
+                        "confidence": 0.8,
+                        "note": "Crispy coating"
+                    },
+                    {
+                        "name": "Vegetable Oil",
+                        "vi_name": "Dầu thực vật",
+                        "estimated_weight_g": 10,
+                        "estimated_nutritions": {
+                            "calories": 90,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 10
+                        },
+                        "confidence": 0.8,
+                        "note": "Inferred from frying"
+                    }
+                ],
+                "total_estimated_weight_g": 150,
+                "total_estimated_nutritions": {
+                    "calories": 216.4,
+                    "protein": 16.16,
+                    "carbs": 15,
+                    "fat": 11
+                },
+                "scale_reference_used": "no reference"
+            },
+            {
+                "name": "Egg Sandwich",
+                "vi_name": "Bánh mì trứng",
+                "confidence": 0.95,
+                "cooking_method": "grilled",
+                "ingredients": [
+                    {
+                        "name": "Bread",
+                        "vi_name": "Bánh mì",
+                        "estimated_weight_g": 60,
+                        "estimated_nutritions": {
+                            "calories": 87.6,
+                            "protein": 2.14,
+                            "carbs": 19.26,
+                            "fat": 0
+                        },
+                        "confidence": 0.9,
+                        "note": "Toasted bread"
+                    },
+                    {
+                        "name": "Fried Egg",
+                        "vi_name": "Trứng ốp la",
+                        "estimated_weight_g": 50,
+                        "estimated_nutritions": {
+                            "calories": 98,
+                            "protein": 6.8,
+                            "carbs": 0.41,
+                            "fat": 7.4
+                        },
+                        "confidence": 0.9,
+                        "note": "Egg inside sandwich"
+                    },
+                    {
+                        "name": "Tomato",
+                        "vi_name": "Cà chua",
+                        "estimated_weight_g": 20,
+                        "estimated_nutritions": {
+                            "calories": 4,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 0
+                        },
+                        "confidence": 0.8,
+                        "note": "Visible slice"
+                    },
+                    {
+                        "name": "Lettuce",
+                        "vi_name": "Xà lách",
+                        "estimated_weight_g": 10,
+                        "estimated_nutritions": {
+                            "calories": 2,
+                            "protein": 0.09,
+                            "carbs": 0.37,
+                            "fat": 0.01
+                        },
+                        "confidence": 0.8,
+                        "note": "Visible green leaf"
+                    },
+                    {
+                        "name": "Mayonnaise",
+                        "vi_name": "Sốt mayonnaise",
+                        "estimated_weight_g": 10,
+                        "estimated_nutritions": {
+                            "calories": 60,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fat": 6.7
+                        },
+                        "confidence": 0.7,
+                        "note": "Inferred white sauce"
+                    }
+                ],
+                "total_estimated_weight_g": 150,
+                "total_estimated_nutritions": {
+                    "calories": 251.6,
+                    "protein": 9.03,
+                    "carbs": 19.64,
+                    "fat": 14.11
+                },
+                "scale_reference_used": "no reference"
+            }
+        ],
+        "image_quality": "good"
+    }
+}

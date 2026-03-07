@@ -1,0 +1,67 @@
+{
+    "role": "assistant",
+    "content": [
+        {
+            "text": {
+                "dishes": [
+                    {
+                        "name": "Grilled Steak with Mashed Potatoes and Roasted Vegetables",
+                        "vi_name": "Thịt bò nướng với khoai tây nghiền và rau củ nướng",
+                        "confidence": 0.95,
+                        "cooking_method": "grilled",
+                        "ingredients": [
+                            {
+                                "name": "Beef Sirloin Steak",
+                                "vi_name": "Thịt bò thăn",
+                                "estimated_weight_g": 250,
+                                "estimated_nutritions": {
+                                    "calories": 507.5,
+                                    "protein": 78.75,
+                                    "carbs": 0.0,
+                                    "fat": 21.3
+                                },
+                                "confidence": 0.95,
+                                "note": "Grilled, visible sear marks and rosemary garnish"
+                            },
+                            {
+                                "name": "Mashed Potatoes",
+                                "vi_name": "Khoai tây nghiền",
+                                "estimated_weight_g": 150,
+                                "estimated_nutritions": {
+                                    "calories": 111.0,
+                                    "protein": 3.05,
+                                    "carbs": 26.4,
+                                    "fat": 0.0
+                                },
+                                "confidence": 0.9,
+                                "note": "Assumed butter/milk added during mashing; USDA data adjusted for typical preparation"
+                            },
+                            {
+                                "name": "Roasted Root Vegetables",
+                                "vi_name": "Rau củ nướng",
+                                "estimated_weight_g": 100,
+                                "estimated_nutritions": {
+                                    "calories": 159.0,
+                                    "protein": 2.65,
+                                    "carbs": 24.7,
+                                    "fat": 6.47
+                                },
+                                "confidence": 0.85,
+                                "note": "Includes carrots, parsnips, potatoes, herbs, and oil"
+                            }
+                        ],
+                        "total_estimated_weight_g": 500.0,
+                        "total_estimated_nutritions": {
+                            "calories": 777.5,
+                            "protein": 84.45,
+                            "carbs": 51.1,
+                            "fat": 27.77
+                        },
+                        "scale_reference_used": "plate size"
+                    }
+                ],
+                "image_quality": "good"
+            }
+        }
+    ]
+}

@@ -16,8 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy toàn bộ mã nguồn vào container
 COPY . .
 
-# Tạo thư mục data/output nếu chưa có
-RUN mkdir -p data/output
+# Tạo thư mục data/output và logs nếu chưa có
+RUN mkdir -p data/output logs
 
 # Mở cổng 8000 (cần khớp với cấu hình trong api.py)
 EXPOSE 8000

@@ -189,7 +189,16 @@ def setup_logging() -> None:
     root_logger.addHandler(file_handler)
     root_logger.addHandler(session_handler)
 
-    # 3. Log a "New Session" marker only once per process run
+    # 4. Capture unhandled exceptions
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        root_logger.critical("Unhandled Exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+    sys.excepthook = handle_exception
+
+    # 5. Log a "New Session" marker only once per process run
     # This helps visually separate different runs in the log file
     session_start_msg = f" NEW SESSION STARTED AT {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
     

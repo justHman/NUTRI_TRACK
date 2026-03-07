@@ -2,48 +2,8 @@
     "tools": [
         {
             "toolSpec": {
-                "name": "get_PCF",
-                "description": "Look up nutrition facts (calories, protein, fat, carbs per 100g) for a food item from the USDA FoodData Central database. Returns {calories, protein, fat, carbs} in floats.",
-                "inputSchema": {
-                    "json": {
-                        "type": "object",
-                        "properties": {
-                            "food_name": {
-                                "type": "string",
-                                "description": "Name of the food item in English (e.g., 'fried chicken', 'white rice', 'grilled pork chop')"
-                            }
-                        },
-                        "required": [
-                            "food_name"
-                        ]
-                    }
-                }
-            }
-        },
-        {
-            "toolSpec": {
-                "name": "get_ingredients",
-                "description": "Look up the ingredient list for a packaged/branded food item from the USDA database. Returns a list of ingredient name strings, or null if no ingredient data is available (common for non-branded foods).",
-                "inputSchema": {
-                    "json": {
-                        "type": "object",
-                        "properties": {
-                            "food_name": {
-                                "type": "string",
-                                "description": "Name of the food item in English (e.g., 'snickers bar', 'coca cola', 'oreo cookies')"
-                            }
-                        },
-                        "required": [
-                            "food_name"
-                        ]
-                    }
-                }
-            }
-        },
-        {
-            "toolSpec": {
-                "name": "get_PCF_and_ingredients",
-                "description": "Combined lookup: returns both nutrition facts (calories, protein, fat, carbs per 100g) AND ingredient list for a food item. Returns {description, PCF_nutrients: {calories, protein, fat, carbs}, ingredients: [...] or null}. Use this as the primary tool for each dish to get comprehensive USDA data in one call.",
+                "name": "get_nutritions_and_ingredients_by_weight",
+                "description": "Combined lookup: returns actual nutrition facts (calories, protein, fat, carbs) calculated based on the provided weight_g, AND ingredient list for a food item. Returns {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...] or null}. Use this to get actual estimated nutrition for ingredients or dishes.",
                 "inputSchema": {
                     "json": {
                         "type": "object",
@@ -51,10 +11,15 @@
                             "food_name": {
                                 "type": "string",
                                 "description": "Name of the food item in English (e.g., 'fried rice', 'grilled pork', 'pho bo')"
+                            },
+                            "weight_g": {
+                                "type": "number",
+                                "description": "The estimated weight of the food item in grams (e.g., 150.0)"
                             }
                         },
                         "required": [
-                            "food_name"
+                            "food_name",
+                            "weight_g"
                         ]
                     }
                 }

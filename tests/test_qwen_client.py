@@ -35,6 +35,7 @@ logger = get_logger(__name__)
 
 FAST_FOOD_IMG = r"D:\Project\Code\nutritrack-documentation\data\images\food\fast_food.jpg"
 COM_TAM_IMG   = r"D:\Project\Code\nutritrack-documentation\data\images\food\com_tam.jpg"
+STEAK_IMG = r"D:\Project\Code\nutritrack-documentation\data\images\food\steak.png"
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -65,28 +66,28 @@ def validate_food_list(result: FoodList, min_items: int, label: str) -> bool:
         logger.error("❌ FAIL | %s: result is not FoodList, got %s", label, type(result))
         return False
     
-    if len(result.items) < min_items:
-        logger.error("❌ FAIL | %s: expected >= %d items, got %d", label, min_items, len(result.items))
+    if len(result.dishes) < min_items:
+        logger.error("❌ FAIL | %s: expected >= %d items, got %d", label, min_items, len(result.dishes))
         return False
     
-    for i, item in enumerate(result.items, 1):
+    for i, item in enumerate(result.dishes, 1):
         if not item.name:
             logger.error("❌ FAIL | %s: item %d has no name", label, i)
             return False
         if not item.ingredients:
             logger.warning("⚠️ WARN | %s: item %d '%s' has no ingredients", label, i, item.name)
     
-    logger.info("✅ PASS | %s: %d items detected", label, len(result.items))
+    logger.info("✅ PASS | %s: %d items detected", label, len(result.dishes))
     return True
 
 
 def print_food_list(result: FoodList, label: str):
     """Pretty print a FoodList for debugging"""
     logger.info("─── %s ───", label)
-    for i, item in enumerate(result.items, 1):
+    for i, item in enumerate(result.dishes, 1):
         logger.info("  [%d] %s (%s) — Cal: %s, Ingredients: %d",
                      i, item.name, item.vi_name or "N/A",
-                     item.total_estimated_calories, len(item.ingredients))
+                     item.total_estimated_nutritions.calories if item.total_estimated_nutritions else "N/A", len(item.ingredients))
         for ing in item.ingredients[:5]:  # Show max 5 per dish
             logger.debug("      • %s — %.1fg (conf: %.2f)",
                          ing.name,
@@ -105,8 +106,11 @@ def test_analyze_food(qwen: Qwen3VL, image_path: str, expected_min: int, label: 
         return True  # Don't fail if image missing
 
     try:
+        with open(image_path, "rb") as f:
+            img_bytes = f.read()
+
         start = time.time()
-        result = qwen.analyze_food(image_path)
+        result = qwen.analyze_food(image_bytes=img_bytes, filename=os.path.basename(image_path))
         duration = time.time() - start
         
         logger.info("Method 1 completed in %.1fs", duration)
@@ -116,8 +120,8 @@ def test_analyze_food(qwen: Qwen3VL, image_path: str, expected_min: int, label: 
             "success": passed,
             "status": "✅ PASS" if passed else "❌ FAIL",
             "time_s": round(duration, 1),
-            "dishes": len(result.items),
-            "ingredients": sum(len(i.ingredients) for i in result.items),
+            "dishes": len(result.dishes),
+            "ingredients": sum(len(i.ingredients) for i in result.dishes),
             "bedrock_calls": 1,
             "usda_calls": 0,
             "usda_cache_hits": 0,
@@ -141,8 +145,11 @@ def test_analyze_food_with_instructor(qwen: Qwen3VL, image_path: str, expected_m
         return True
 
     try:
+        with open(image_path, "rb") as f:
+            img_bytes = f.read()
+
         start = time.time()
-        result = qwen.analyze_food_with_instructor(image_path)
+        result = qwen.analyze_food_with_instructor(image_bytes=img_bytes, filename=os.path.basename(image_path))
         duration = time.time() - start
         
         logger.info("Method 2 completed in %.1fs", duration)
@@ -153,8 +160,8 @@ def test_analyze_food_with_instructor(qwen: Qwen3VL, image_path: str, expected_m
             "success": passed,
             "status": "✅ PASS" if passed else "⚠️ KNOWN",
             "time_s": round(duration, 1),
-            "dishes": len(result.items),
-            "ingredients": sum(len(i.ingredients) for i in result.items),
+            "dishes": len(result.dishes),
+            "ingredients": sum(len(i.ingredients) for i in result.dishes),
             "bedrock_calls": 1,
             "usda_calls": 0,
             "usda_cache_hits": 0,
@@ -186,9 +193,12 @@ def test_analyze_food_with_tools(qwen: Qwen3VL, image_path: str, expected_min: i
         # 🧹 Clear L1 RAM cache for a fair cold-start measurement
         USDAClient.clear_l1_cache()
         
+        with open(image_path, "rb") as f:
+            img_bytes = f.read()
+
         ts_before = get_timestamp_str()
         start = time.time()
-        result = qwen.analyze_food_with_tools(image_path, usda_client)
+        result = qwen.analyze_food_with_tools(image_bytes=img_bytes, filename=os.path.basename(image_path), usda_client=usda_client)
         duration = time.time() - start
         
         logger.info("Method 3 completed in %.1fs", duration)
@@ -202,7 +212,7 @@ def test_analyze_food_with_tools(qwen: Qwen3VL, image_path: str, expected_min: i
         
         # Exact calls from log
         bedrock_calls = count_log_pattern(r'\[ToolCalling\] Round \d+', ts_before)
-        if bedrock_calls == 0 and result.items: bedrock_calls = 1 # Fallback
+        if bedrock_calls == 0 and result.dishes: bedrock_calls = 1 # Fallback
         usda_calls = count_log_pattern(r'USDA API search: query=', ts_before)
         usda_cache_hits = count_log_pattern(r'search_best: Cache HIT', ts_before)
 
@@ -210,8 +220,8 @@ def test_analyze_food_with_tools(qwen: Qwen3VL, image_path: str, expected_min: i
             "success": passed,
             "status": "✅ PASS" if passed else "❌ FAIL",
             "time_s": round(duration, 1),
-            "dishes": len(result.items),
-            "ingredients": sum(len(i.ingredients) for i in result.items),
+            "dishes": len(result.dishes),
+            "ingredients": sum(len(i.ingredients) for i in result.dishes),
             "bedrock_calls": bedrock_calls,
             "usda_calls": usda_calls,
             "usda_cache_hits": usda_cache_hits,
@@ -227,24 +237,54 @@ def test_analyze_food_with_tools(qwen: Qwen3VL, image_path: str, expected_min: i
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
+
+# ─── Automated Execution ────────────────────────────────────────────────────
+
+DEFAULT_TEST_CONFIGS = [
+    {"image": STEAK_IMG, "expected_min": 1, "label": "steak"},
+    {"image": FAST_FOOD_IMG, "expected_min": 10, "label": "fast_food"},
+]
+
+def run_all(qwen: Qwen3VL, configs: list = None, run_instructor: bool = False) -> list[dict]:
+    """Run all Qwen analysis methods on specified configs and return result list."""
+    if configs is None:
+        configs = DEFAULT_TEST_CONFIGS
+    
+    results = []
+    
+    for cfg in configs:
+        img = cfg["image"]
+        exp = cfg["expected_min"]
+        lbl = cfg["label"]
+        
+        # Method 1
+        res1 = test_analyze_food(qwen, img, exp, lbl)
+        res1["method"] = "Converse"
+        res1["image"] = lbl
+        results.append(res1)
+        
+        # Method 2
+        if run_instructor:
+            res2 = test_analyze_food_with_instructor(qwen, img, exp, lbl)
+            res2["method"] = "Instructor"
+            res2["image"] = lbl
+            results.append(res2)
+            
+        # Method 3
+        res3 = test_analyze_food_with_tools(qwen, img, exp, lbl)
+        res3["method"] = "Tools"
+        res3["image"] = lbl
+        results.append(res3)
+        
+    return results
+
+
 def main():
     logger.title("NutriTrack Qwen3VL Complete Test Suite")
     
     qwen = Qwen3VL()
-    all_passed = True
-
-    # ── com_tam.jpg — 1 dish ──
-    all_passed &= test_analyze_food(qwen, COM_TAM_IMG, expected_min=1, label="com_tam").get("success")
-    all_passed &= test_analyze_food_with_instructor(qwen, COM_TAM_IMG, expected_min=1, label="com_tam").get("success")
-    all_passed &= test_analyze_food_with_tools(qwen, COM_TAM_IMG, expected_min=1, label="com_tam").get("success")
-
-    # ── fast_food.jpg — ~12 dishes (model may detect 10-12 non-deterministically) ──
-    all_passed &= test_analyze_food(qwen, FAST_FOOD_IMG, expected_min=10, label="fast_food").get("success")
-    # NOTE: Method 2 (Instructor BEDROCK_JSON) is a known limitation —
-    #   Instructor injects Pydantic schema into prompt, confusing the model
-    #   into returning empty items=[]. This is NOT a code bug.
-    all_passed &= test_analyze_food_with_instructor(qwen, FAST_FOOD_IMG, expected_min=10, label="fast_food").get('success', False)
-    all_passed &= test_analyze_food_with_tools(qwen, FAST_FOOD_IMG, expected_min=10, label="fast_food").get("success")
+    results = run_all(qwen, run_instructor=False)
+    all_passed = all(r["success"] for r in results)
 
     try:
         if all_passed:

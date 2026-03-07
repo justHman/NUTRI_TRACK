@@ -1,0 +1,104 @@
+{
+    "success": true,
+    "method": "manual",
+    "message": "Phát hiện 1 món ăn.",
+    "data": {
+        "dishes": [
+            {
+                "name": "Grilled Ribeye Steak with Mashed Potatoes and Roasted Vegetables",
+                "vi_name": "Thịt bò nướng sốt cùng khoai tây nghiền và rau củ nướng",
+                "confidence": 0.98,
+                "cooking_method": "grilled",
+                "ingredients": [
+                    {
+                        "name": "Ribeye steak",
+                        "vi_name": "Thịt bò thăn",
+                        "estimated_weight_g": 250,
+                        "estimated_nutritions": {
+                            "calories": 420,
+                            "protein": 48.75,
+                            "carbs": 0,
+                            "fat": 26.5
+                        },
+                        "confidence": 0.95,
+                        "note": "Main protein component, clearly visible with grill marks"
+                    },
+                    {
+                        "name": "Mashed potatoes",
+                        "vi_name": "Khoai tây nghiền",
+                        "estimated_weight_g": 120,
+                        "estimated_nutritions": {
+                            "calories": 120,
+                            "protein": 2,
+                            "carbs": 25,
+                            "fat": 0.5
+                        },
+                        "confidence": 0.9,
+                        "note": "Creamy texture and color indicate mashed potatoes"
+                    },
+                    {
+                        "name": "Roasted carrots",
+                        "vi_name": "Cà rốt nướng",
+                        "estimated_weight_g": 40,
+                        "estimated_nutritions": {
+                            "calories": 17.6,
+                            "protein": 0.35,
+                            "carbs": 3.87,
+                            "fat": 0.1
+                        },
+                        "confidence": 0.85,
+                        "note": "Visible orange pieces with caramelized edges"
+                    },
+                    {
+                        "name": "Roasted parsnips or potatoes",
+                        "vi_name": "Củ cải vàng hoặc khoai tây nướng",
+                        "estimated_weight_g": 30,
+                        "estimated_nutritions": {
+                            "calories": 27.6,
+                            "protein": 0.39,
+                            "carbs": 4.94,
+                            "fat": 0.85
+                        },
+                        "confidence": 0.75,
+                        "note": "Light-colored roasted root vegetable, likely parsnip or potato"
+                    },
+                    {
+                        "name": "Rosemary sprig",
+                        "vi_name": "Nhánh hương thảo",
+                        "estimated_weight_g": 2,
+                        "estimated_nutritions": {
+                            "calories": 10.66,
+                            "protein": 0,
+                            "carbs": 0.13,
+                            "fat": 1.13
+                        },
+                        "confidence": 0.9,
+                        "note": "Garnish, visible on top of steak"
+                    },
+                    {
+                        "name": "Pan sauce or jus",
+                        "vi_name": "Sốt nồi hoặc nước sốt thịt",
+                        "estimated_weight_g": 15,
+                        "estimated_nutritions": {
+                            "calories": 2.4,
+                            "protein": 0.18,
+                            "carbs": 0.38,
+                            "fat": 0.03
+                        },
+                        "confidence": 0.8,
+                        "note": "Drizzled on plate, likely beef jus or pan sauce"
+                    }
+                ],
+                "total_estimated_weight_g": 457,
+                "total_estimated_nutritions": {
+                    "calories": 688,
+                    "protein": 51.67,
+                    "carbs": 34.32,
+                    "fat": 33.48
+                },
+                "scale_reference_used": "plate size"
+            }
+        ],
+        "image_quality": "good"
+    }
+}

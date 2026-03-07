@@ -1,615 +1,649 @@
-[
-  {
-    "name": "Roasted Potatoes",
-    "vi_name": "Khoai tây nướng",
-    "qwen_estimated_calories": 148.0,
-    "ingredients": [
-      {
-        "name": "potatoes",
-        "vi_name": "khoai tây",
-        "weight_g": 200.0,
-        "usda_100g": {
-          "calories": 74.0,
-          "protein": 2.03,
-          "fat": 0.0,
-          "carbs": 17.6
+{
+  "dishes": [
+    {
+      "name": "Fried Potatoes",
+      "vi_name": "Khoai tây chiên",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Potatoes",
+          "vi_name": "Khoai tây",
+          "estimated_weight_g": 120.0,
+          "estimated_nutritions": {
+            "calories": 88.8,
+            "protein": 2.44,
+            "carbs": 21.12,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "main ingredient, visually dominant"
         },
-        "nutrition": {
-          "calories": 148.0,
-          "protein": 4.06,
-          "carbs": 35.2,
-          "fat": 0.0
+        {
+          "name": "Vegetable Oil",
+          "vi_name": "Dầu thực vật",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 270.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 30.0
+          },
+          "confidence": 0.85,
+          "note": "inferred from frying method"
         }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 148.0,
-      "protein": 4.06,
-      "carbs": 35.2,
-      "fat": 0.0
+      ],
+      "total_estimated_weight_g": 150.0,
+      "total_estimated_nutritions": {
+        "calories": 358.8,
+        "protein": 2.44,
+        "carbs": 21.12,
+        "fat": 30.0
+      },
+      "scale_reference_used": "plate size"
     },
-    "average_calories": 148.0
-  },
-  {
-    "name": "Chicken Sandwich",
-    "vi_name": "Bánh mì gà rán",
-    "qwen_estimated_calories": 456.0,
-    "ingredients": [
-      {
-        "name": "chicken breast",
-        "vi_name": "ức gà",
-        "weight_g": 100.0,
-        "usda_100g": {
-          "calories": 165.0,
-          "protein": 20.4,
-          "fat": 8.1,
-          "carbs": 1.06
+    {
+      "name": "Chicken Sandwich",
+      "vi_name": "Bánh mì gà rán",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Chicken Breast",
+          "vi_name": "Ức gà",
+          "estimated_weight_g": 100.0,
+          "estimated_nutritions": {
+            "calories": 165.0,
+            "protein": 20.4,
+            "carbs": 1.06,
+            "fat": 8.1
+          },
+          "confidence": 0.9,
+          "note": "main protein component"
         },
-        "nutrition": {
-          "calories": 165.0,
-          "protein": 20.4,
-          "carbs": 1.06,
-          "fat": 8.1
+        {
+          "name": "Bread Bun",
+          "vi_name": "Bánh mì",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 218.4,
+            "protein": 8.94,
+            "carbs": 31.82,
+            "fat": 6.06
+          },
+          "confidence": 0.9,
+          "note": "bun structure"
+        },
+        {
+          "name": "Lettuce",
+          "vi_name": "Xà lách",
+          "estimated_weight_g": 15.0,
+          "estimated_nutritions": {
+            "calories": 3.0,
+            "protein": 0.14,
+            "carbs": 0.55,
+            "fat": 0.01
+          },
+          "confidence": 0.85,
+          "note": "visible garnish"
+        },
+        {
+          "name": "Tomato",
+          "vi_name": "Cà chua",
+          "estimated_weight_g": 20.0,
+          "estimated_nutritions": {
+            "calories": 4.0,
+            "protein": 0.2,
+            "carbs": 0.9,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "visible slice"
+        },
+        {
+          "name": "Cheddar Cheese",
+          "vi_name": "Phô mai cheddar",
+          "estimated_weight_g": 25.0,
+          "estimated_nutritions": {
+            "calories": 98.25,
+            "protein": 5.35,
+            "carbs": 0.89,
+            "fat": 7.15
+          },
+          "confidence": 0.85,
+          "note": "visible melted cheese"
         }
+      ],
+      "total_estimated_weight_g": 250.0,
+      "total_estimated_nutritions": {
+        "calories": 588.65,
+        "protein": 34.99,
+        "carbs": 34.32,
+        "fat": 21.32
       },
-      {
-        "name": "bread",
-        "vi_name": "bánh mì",
-        "weight_g": 80.0,
-        "usda_100g": {
-          "calories": 146.0,
-          "protein": 3.57,
-          "fat": 0.0,
-          "carbs": 32.1
-        },
-        "nutrition": {
-          "calories": 116.8,
-          "protein": 2.856,
-          "carbs": 25.68,
-          "fat": 0.0
-        }
-      },
-      {
-        "name": "lettuce",
-        "vi_name": "xà lách",
-        "weight_g": 15.0,
-        "usda_100g": {
-          "calories": 20.0,
-          "protein": 0.92,
-          "fat": 0.1,
-          "carbs": 3.69
-        },
-        "nutrition": {
-          "calories": 3.0,
-          "protein": 0.138,
-          "carbs": 0.5535,
-          "fat": 0.015
-        }
-      },
-      {
-        "name": "onion",
-        "vi_name": "hành tây",
-        "weight_g": 10.0,
-        "usda_100g": {
-          "calories": 289.0,
-          "protein": 10.9,
-          "fat": 0.78,
-          "carbs": 59.4
-        },
-        "nutrition": {
-          "calories": 28.9,
-          "protein": 1.09,
-          "carbs": 5.94,
-          "fat": 0.078
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 313.7,
-      "protein": 24.484,
-      "carbs": 33.2335,
-      "fat": 8.193
+      "scale_reference_used": "plate size"
     },
-    "average_calories": 384.85
-  },
-  {
-    "name": "Fried Chicken",
-    "vi_name": "Gà rán",
-    "qwen_estimated_calories": 411.0,
-    "ingredients": [
-      {
-        "name": "chicken",
-        "vi_name": "gà",
-        "weight_g": 150.0,
-        "usda_100g": {
-          "calories": 107.0,
-          "protein": 21.4,
-          "fat": 1.79,
-          "carbs": 0.0
+    {
+      "name": "Fried Chicken Wings",
+      "vi_name": "Cánh gà rán",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Chicken Wings",
+          "vi_name": "Cánh gà",
+          "estimated_weight_g": 150.0,
+          "estimated_nutritions": {
+            "calories": 433.5,
+            "protein": 29.08,
+            "carbs": 8.94,
+            "fat": 30.36
+          },
+          "confidence": 0.9,
+          "note": "main ingredient"
         },
-        "nutrition": {
-          "calories": 160.5,
-          "protein": 32.1,
-          "carbs": 0.0,
-          "fat": 2.685
+        {
+          "name": "Vegetable Oil",
+          "vi_name": "Dầu thực vật",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 270.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 30.0
+          },
+          "confidence": 0.85,
+          "note": "inferred from frying"
         }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 160.5,
-      "protein": 32.1,
-      "carbs": 0.0,
-      "fat": 2.685
+      ],
+      "total_estimated_weight_g": 180.0,
+      "total_estimated_nutritions": {
+        "calories": 703.5,
+        "protein": 29.08,
+        "carbs": 8.94,
+        "fat": 60.36
+      },
+      "scale_reference_used": "no reference"
     },
-    "average_calories": 285.75
-  },
-  {
-    "name": "Pepperoni Pizza",
-    "vi_name": "Pizza pepperoni",
-    "qwen_estimated_calories": 530.0,
-    "ingredients": [
-      {
-        "name": "mozzarella cheese",
-        "vi_name": "phô mai mozzarella",
-        "weight_g": 80.0,
-        "usda_100g": {
-          "calories": 304.0,
-          "protein": 26.1,
-          "fat": 19.6,
-          "carbs": 4.35
+    {
+      "name": "Margherita Pizza",
+      "vi_name": "Pizza Margherita",
+      "confidence": 0.95,
+      "cooking_method": "baked",
+      "ingredients": [
+        {
+          "name": "Pizza Crust",
+          "vi_name": "Vỏ pizza",
+          "estimated_weight_g": 120.0,
+          "estimated_nutritions": {
+            "calories": 300.0,
+            "protein": 8.0,
+            "carbs": 50.0,
+            "fat": 3.0
+          },
+          "confidence": 0.85,
+          "note": "base structure"
         },
-        "nutrition": {
-          "calories": 243.2,
-          "protein": 20.88,
-          "carbs": 3.48,
-          "fat": 15.68
+        {
+          "name": "Tomato Sauce",
+          "vi_name": "Sốt cà chua",
+          "estimated_weight_g": 60.0,
+          "estimated_nutritions": {
+            "calories": 30.0,
+            "protein": 1.0,
+            "carbs": 7.0,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "visible red layer"
+        },
+        {
+          "name": "Mozzarella Cheese",
+          "vi_name": "Phô mai mozzarella",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 243.2,
+            "protein": 20.88,
+            "carbs": 3.48,
+            "fat": 15.68
+          },
+          "confidence": 0.9,
+          "note": "melted cheese topping"
+        },
+        {
+          "name": "Basil",
+          "vi_name": "Húng quế",
+          "estimated_weight_g": 5.0,
+          "estimated_nutritions": {
+            "calories": 1.0,
+            "protein": 0.1,
+            "carbs": 0.2,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "visible green leaves"
         }
+      ],
+      "total_estimated_weight_g": 300.0,
+      "total_estimated_nutritions": {
+        "calories": 574.2,
+        "protein": 30.0,
+        "carbs": 60.68,
+        "fat": 18.68
       },
-      {
-        "name": "pepperoni",
-        "vi_name": "pepperoni",
-        "weight_g": 30.0,
-        "usda_100g": {
-          "calories": 464.0,
-          "protein": 17.9,
-          "fat": 42.9,
-          "carbs": 3.57
-        },
-        "nutrition": {
-          "calories": 139.2,
-          "protein": 5.37,
-          "carbs": 1.071,
-          "fat": 12.87
-        }
-      },
-      {
-        "name": "bread",
-        "vi_name": "bánh mì",
-        "weight_g": 100.0,
-        "usda_100g": {
-          "calories": 146.0,
-          "protein": 3.57,
-          "fat": 0.0,
-          "carbs": 32.1
-        },
-        "nutrition": {
-          "calories": 146.0,
-          "protein": 3.57,
-          "carbs": 32.1,
-          "fat": 0.0
-        }
-      },
-      {
-        "name": "tomato",
-        "vi_name": "cà chua",
-        "weight_g": 20.0,
-        "usda_100g": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "fat": 0.0,
-          "carbs": 0.0
-        },
-        "nutrition": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "carbs": 0.0,
-          "fat": 0.0
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 528.4,
-      "protein": 29.82,
-      "carbs": 36.651,
-      "fat": 28.55
+      "scale_reference_used": "plate size"
     },
-    "average_calories": 529.2
-  },
-  {
-    "name": "Beef Wrap",
-    "vi_name": "Cuộn thịt bò",
-    "qwen_estimated_calories": 350.0,
-    "ingredients": [
-      {
-        "name": "beef",
-        "vi_name": "thịt bò",
-        "weight_g": 80.0,
-        "usda_100g": {
-          "calories": 129.0,
-          "protein": 20.0,
-          "fat": 5.88,
-          "carbs": 0.0
+    {
+      "name": "Beef Burrito",
+      "vi_name": "Burrito bò",
+      "confidence": 0.95,
+      "cooking_method": "mixed",
+      "ingredients": [
+        {
+          "name": "Beef",
+          "vi_name": "Thịt bò",
+          "estimated_weight_g": 70.0,
+          "estimated_nutritions": {
+            "calories": 90.3,
+            "protein": 14.0,
+            "carbs": 0.0,
+            "fat": 4.12
+          },
+          "confidence": 0.9,
+          "note": "main protein"
         },
-        "nutrition": {
-          "calories": 103.2,
-          "protein": 16.0,
-          "carbs": 0.0,
-          "fat": 4.704
+        {
+          "name": "Tortilla Wrap",
+          "vi_name": "Bánh tráng",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 200.0,
+            "protein": 5.0,
+            "carbs": 35.0,
+            "fat": 3.0
+          },
+          "confidence": 0.85,
+          "note": "wrapping base"
+        },
+        {
+          "name": "Lettuce",
+          "vi_name": "Xà lách",
+          "estimated_weight_g": 15.0,
+          "estimated_nutritions": {
+            "calories": 3.0,
+            "protein": 0.14,
+            "carbs": 0.55,
+            "fat": 0.01
+          },
+          "confidence": 0.85,
+          "note": "visible green"
+        },
+        {
+          "name": "Tomato",
+          "vi_name": "Cà chua",
+          "estimated_weight_g": 20.0,
+          "estimated_nutritions": {
+            "calories": 4.0,
+            "protein": 0.2,
+            "carbs": 0.9,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "visible red"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 25.0,
+          "estimated_nutritions": {
+            "calories": 98.25,
+            "protein": 5.35,
+            "carbs": 0.89,
+            "fat": 7.15
+          },
+          "confidence": 0.85,
+          "note": "melted cheese"
         }
+      ],
+      "total_estimated_weight_g": 220.0,
+      "total_estimated_nutritions": {
+        "calories": 495.55,
+        "protein": 24.69,
+        "carbs": 37.34,
+        "fat": 14.28
       },
-      {
-        "name": "tortilla",
-        "vi_name": "bánh tráng",
-        "weight_g": 60.0,
-        "usda_100g": {
-          "calories": 211.0,
-          "protein": 5.26,
-          "fat": 2.63,
-          "carbs": 44.7
-        },
-        "nutrition": {
-          "calories": 126.6,
-          "protein": 3.156,
-          "carbs": 26.82,
-          "fat": 1.578
-        }
-      },
-      {
-        "name": "lettuce",
-        "vi_name": "xà lách",
-        "weight_g": 10.0,
-        "usda_100g": {
-          "calories": 20.0,
-          "protein": 0.92,
-          "fat": 0.1,
-          "carbs": 3.69
-        },
-        "nutrition": {
-          "calories": 2.0,
-          "protein": 0.092,
-          "carbs": 0.369,
-          "fat": 0.01
-        }
-      },
-      {
-        "name": "tomato",
-        "vi_name": "cà chua",
-        "weight_g": 10.0,
-        "usda_100g": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "fat": 0.0,
-          "carbs": 0.0
-        },
-        "nutrition": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "carbs": 0.0,
-          "fat": 0.0
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 231.8,
-      "protein": 19.248,
-      "carbs": 27.189,
-      "fat": 6.292
+      "scale_reference_used": "no reference"
     },
-    "average_calories": 290.9
-  },
-  {
-    "name": "Nachos",
-    "vi_name": "Nachos",
-    "qwen_estimated_calories": 484.0,
-    "ingredients": [
-      {
-        "name": "nacho chips",
-        "vi_name": "khoai tây chiên",
-        "weight_g": 100.0,
-        "usda_100g": {
-          "calories": 519.0,
-          "protein": 7.36,
-          "fat": 27.4,
-          "carbs": 60.8
+    {
+      "name": "Nachos with Cheese and Salsa",
+      "vi_name": "Nachos phô mai và sốt",
+      "confidence": 0.95,
+      "cooking_method": "mixed",
+      "ingredients": [
+        {
+          "name": "Nacho Chips",
+          "vi_name": "Khoai tây chiên kiểu nacho",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 415.2,
+            "protein": 5.89,
+            "carbs": 48.64,
+            "fat": 21.92
+          },
+          "confidence": 0.9,
+          "note": "base chips"
         },
-        "nutrition": {
-          "calories": 519.0,
-          "protein": 7.36,
-          "carbs": 60.8,
-          "fat": 27.4
+        {
+          "name": "Cheese Sauce",
+          "vi_name": "Sốt phô mai",
+          "estimated_weight_g": 60.0,
+          "estimated_nutritions": {
+            "calories": 200.0,
+            "protein": 8.0,
+            "carbs": 5.0,
+            "fat": 15.0
+          },
+          "confidence": 0.85,
+          "note": "melted cheese topping"
+        },
+        {
+          "name": "Salsa",
+          "vi_name": "Sốt salsa",
+          "estimated_weight_g": 20.0,
+          "estimated_nutritions": {
+            "calories": 10.8,
+            "protein": 0.0,
+            "carbs": 1.43,
+            "fat": 0.71
+          },
+          "confidence": 0.85,
+          "note": "visible red sauce"
         }
+      ],
+      "total_estimated_weight_g": 200.0,
+      "total_estimated_nutritions": {
+        "calories": 626.0,
+        "protein": 13.89,
+        "carbs": 55.07,
+        "fat": 37.63
       },
-      {
-        "name": "cheese",
-        "vi_name": "phô mai",
-        "weight_g": 30.0,
-        "usda_100g": {
-          "calories": 331.0,
-          "protein": 21.1,
-          "fat": 24.6,
-          "carbs": 2.46
-        },
-        "nutrition": {
-          "calories": 99.3,
-          "protein": 6.33,
-          "carbs": 0.738,
-          "fat": 7.38
-        }
-      },
-      {
-        "name": "tomato",
-        "vi_name": "cà chua",
-        "weight_g": 10.0,
-        "usda_100g": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "fat": 0.0,
-          "carbs": 0.0
-        },
-        "nutrition": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "carbs": 0.0,
-          "fat": 0.0
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 618.3,
-      "protein": 13.69,
-      "carbs": 61.538,
-      "fat": 34.78
+      "scale_reference_used": "plate size"
     },
-    "average_calories": 551.15
-  },
-  {
-    "name": "French Fries",
-    "vi_name": "Khoai tây chiên",
-    "qwen_estimated_calories": 268.0,
-    "ingredients": [
-      {
-        "name": "potatoes",
-        "vi_name": "khoai tây",
-        "weight_g": 150.0,
-        "usda_100g": {
-          "calories": 74.0,
-          "protein": 2.03,
-          "fat": 0.0,
-          "carbs": 17.6
+    {
+      "name": "French Fries",
+      "vi_name": "Khoai tây chiên",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Potatoes",
+          "vi_name": "Khoai tây",
+          "estimated_weight_g": 120.0,
+          "estimated_nutritions": {
+            "calories": 88.8,
+            "protein": 2.44,
+            "carbs": 21.12,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "main ingredient"
         },
-        "nutrition": {
-          "calories": 111.0,
-          "protein": 3.045,
-          "carbs": 26.4,
-          "fat": 0.0
+        {
+          "name": "Vegetable Oil",
+          "vi_name": "Dầu thực vật",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 270.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 30.0
+          },
+          "confidence": 0.85,
+          "note": "inferred from frying"
         }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 111.0,
-      "protein": 3.045,
-      "carbs": 26.4,
-      "fat": 0.0
-    },
-    "average_calories": 189.5
-  },
-  {
-    "name": "Fried Shrimp",
-    "vi_name": "Tôm chiên",
-    "qwen_estimated_calories": 218.0,
-    "ingredients": [
-      {
-        "name": "shrimp",
-        "vi_name": "tôm",
-        "weight_g": 100.0,
-        "usda_100g": {
-          "calories": 47.0,
-          "protein": 11.8,
-          "fat": 0.0,
-          "carbs": 0.0
-        },
-        "nutrition": {
-          "calories": 47.0,
-          "protein": 11.8,
-          "carbs": 0.0,
-          "fat": 0.0
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 47.0,
-      "protein": 11.8,
-      "carbs": 0.0,
-      "fat": 0.0
-    },
-    "average_calories": 132.5
-  },
-  {
-    "name": "Grilled Cheese Sandwich with Egg",
-    "vi_name": "Bánh mì phô mai nướng với trứng",
-    "qwen_estimated_calories": 350.0,
-    "ingredients": [
-      {
-        "name": "bread",
-        "vi_name": "bánh mì",
-        "weight_g": 60.0,
-        "usda_100g": {
-          "calories": 146.0,
-          "protein": 3.57,
-          "fat": 0.0,
-          "carbs": 32.1
-        },
-        "nutrition": {
-          "calories": 87.6,
-          "protein": 2.142,
-          "carbs": 19.26,
-          "fat": 0.0
-        }
+      ],
+      "total_estimated_weight_g": 150.0,
+      "total_estimated_nutritions": {
+        "calories": 358.8,
+        "protein": 2.44,
+        "carbs": 21.12,
+        "fat": 30.0
       },
-      {
-        "name": "cheese",
-        "vi_name": "phô mai",
-        "weight_g": 30.0,
-        "usda_100g": {
-          "calories": 331.0,
-          "protein": 21.1,
-          "fat": 24.6,
-          "carbs": 2.46
-        },
-        "nutrition": {
-          "calories": 99.3,
-          "protein": 6.33,
-          "carbs": 0.738,
-          "fat": 7.38
-        }
-      },
-      {
-        "name": "egg",
-        "vi_name": "trứng",
-        "weight_g": 50.0,
-        "usda_100g": {
-          "calories": 513.0,
-          "protein": 6.41,
-          "fat": 28.8,
-          "carbs": 57.7
-        },
-        "nutrition": {
-          "calories": 256.5,
-          "protein": 3.205,
-          "carbs": 28.85,
-          "fat": 14.4
-        }
-      },
-      {
-        "name": "tomato",
-        "vi_name": "cà chua",
-        "weight_g": 10.0,
-        "usda_100g": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "fat": 0.0,
-          "carbs": 0.0
-        },
-        "nutrition": {
-          "calories": 0.0,
-          "protein": 0.0,
-          "carbs": 0.0,
-          "fat": 0.0
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 443.4,
-      "protein": 11.677,
-      "carbs": 48.848,
-      "fat": 21.78
+      "scale_reference_used": "plate size"
     },
-    "average_calories": 396.7
-  },
-  {
-    "name": "Bacon and Egg",
-    "vi_name": "Thịt xông khói và trứng",
-    "qwen_estimated_calories": 260.0,
-    "ingredients": [
-      {
-        "name": "bacon",
-        "vi_name": "thịt xông khói",
-        "weight_g": 30.0,
-        "usda_100g": {
-          "calories": 600.0,
-          "protein": 33.3,
-          "fat": 46.7,
-          "carbs": 0.0
+    {
+      "name": "Fried Shrimp",
+      "vi_name": "Tôm chiên",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Shrimp",
+          "vi_name": "Tôm",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 37.6,
+            "protein": 9.44,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "main ingredient"
         },
-        "nutrition": {
-          "calories": 180.0,
-          "protein": 9.99,
-          "carbs": 0.0,
-          "fat": 14.01
+        {
+          "name": "Vegetable Oil",
+          "vi_name": "Dầu thực vật",
+          "estimated_weight_g": 40.0,
+          "estimated_nutritions": {
+            "calories": 360.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 40.0
+          },
+          "confidence": 0.85,
+          "note": "inferred from frying"
         }
+      ],
+      "total_estimated_weight_g": 120.0,
+      "total_estimated_nutritions": {
+        "calories": 397.6,
+        "protein": 9.44,
+        "carbs": 0.0,
+        "fat": 40.0
       },
-      {
-        "name": "egg",
-        "vi_name": "trứng",
-        "weight_g": 50.0,
-        "usda_100g": {
-          "calories": 513.0,
-          "protein": 6.41,
-          "fat": 28.8,
-          "carbs": 57.7
-        },
-        "nutrition": {
-          "calories": 256.5,
-          "protein": 3.205,
-          "carbs": 28.85,
-          "fat": 14.4
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 436.5,
-      "protein": 13.195,
-      "carbs": 28.85,
-      "fat": 28.41
+      "scale_reference_used": "no reference"
     },
-    "average_calories": 348.25
-  },
-  {
-    "name": "Quesadilla",
-    "vi_name": "Quesadilla",
-    "qwen_estimated_calories": 357.0,
-    "ingredients": [
-      {
-        "name": "tortilla",
-        "vi_name": "bánh tráng",
-        "weight_g": 60.0,
-        "usda_100g": {
-          "calories": 211.0,
-          "protein": 5.26,
-          "fat": 2.63,
-          "carbs": 44.7
+    {
+      "name": "Breakfast Sandwich with Fried Egg and Bacon",
+      "vi_name": "Bánh mì sáng với trứng ốp la và thịt xông khói",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "Fried Egg",
+          "vi_name": "Trứng ốp la",
+          "estimated_weight_g": 50.0,
+          "estimated_nutritions": {
+            "calories": 90.0,
+            "protein": 6.0,
+            "carbs": 0.6,
+            "fat": 7.0
+          },
+          "confidence": 0.9,
+          "note": "visible egg"
         },
-        "nutrition": {
-          "calories": 126.6,
-          "protein": 3.156,
-          "carbs": 26.82,
-          "fat": 1.578
+        {
+          "name": "Bacon",
+          "vi_name": "Thịt xông khói",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 180.0,
+            "protein": 9.99,
+            "carbs": 0.0,
+            "fat": 14.01
+          },
+          "confidence": 0.9,
+          "note": "visible strips"
+        },
+        {
+          "name": "Bread",
+          "vi_name": "Bánh mì",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 218.4,
+            "protein": 8.94,
+            "carbs": 31.82,
+            "fat": 6.06
+          },
+          "confidence": 0.85,
+          "note": "sandwich bread"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 20.0,
+          "estimated_nutritions": {
+            "calories": 78.6,
+            "protein": 4.28,
+            "carbs": 0.71,
+            "fat": 5.72
+          },
+          "confidence": 0.85,
+          "note": "melted cheese"
         }
+      ],
+      "total_estimated_weight_g": 180.0,
+      "total_estimated_nutritions": {
+        "calories": 567.0,
+        "protein": 29.21,
+        "carbs": 33.13,
+        "fat": 32.79
       },
-      {
-        "name": "cheese",
-        "vi_name": "phô mai",
-        "weight_g": 40.0,
-        "usda_100g": {
-          "calories": 331.0,
-          "protein": 21.1,
-          "fat": 24.6,
-          "carbs": 2.46
-        },
-        "nutrition": {
-          "calories": 132.4,
-          "protein": 8.44,
-          "carbs": 0.984,
-          "fat": 9.84
-        }
-      }
-    ],
-    "total_nutrition": {
-      "calories": 259.0,
-      "protein": 11.596,
-      "carbs": 27.804,
-      "fat": 11.418
+      "scale_reference_used": "plate size"
     },
-    "average_calories": 308.0
-  }
-]
+    {
+      "name": "Grilled Cheese Sandwich with Egg and Bacon",
+      "vi_name": "Bánh mì phô mai nướng với trứng và thịt xông khói",
+      "confidence": 0.95,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Bread",
+          "vi_name": "Bánh mì",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 218.4,
+            "protein": 8.94,
+            "carbs": 31.82,
+            "fat": 6.06
+          },
+          "confidence": 0.85,
+          "note": "grilled bread"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 40.0,
+          "estimated_nutritions": {
+            "calories": 196.5,
+            "protein": 10.7,
+            "carbs": 1.78,
+            "fat": 14.3
+          },
+          "confidence": 0.9,
+          "note": "melted cheese"
+        },
+        {
+          "name": "Fried Egg",
+          "vi_name": "Trứng ốp la",
+          "estimated_weight_g": 50.0,
+          "estimated_nutritions": {
+            "calories": 90.0,
+            "protein": 6.0,
+            "carbs": 0.6,
+            "fat": 7.0
+          },
+          "confidence": 0.9,
+          "note": "visible egg"
+        },
+        {
+          "name": "Bacon",
+          "vi_name": "Thịt xông khói",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 180.0,
+            "protein": 9.99,
+            "carbs": 0.0,
+            "fat": 14.01
+          },
+          "confidence": 0.9,
+          "note": "visible strips"
+        }
+      ],
+      "total_estimated_weight_g": 200.0,
+      "total_estimated_nutritions": {
+        "calories": 684.9,
+        "protein": 35.63,
+        "carbs": 34.2,
+        "fat": 41.37
+      },
+      "scale_reference_used": "plate size"
+    },
+    {
+      "name": "Grilled Cheese Quesadilla",
+      "vi_name": "Quesadilla phô mai nướng",
+      "confidence": 0.95,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Tortilla",
+          "vi_name": "Bánh tráng",
+          "estimated_weight_g": 80.0,
+          "estimated_nutritions": {
+            "calories": 200.0,
+            "protein": 5.0,
+            "carbs": 35.0,
+            "fat": 3.0
+          },
+          "confidence": 0.85,
+          "note": "grilled tortilla"
+        },
+        {
+          "name": "Cheese",
+          "vi_name": "Phô mai",
+          "estimated_weight_g": 60.0,
+          "estimated_nutritions": {
+            "calories": 294.75,
+            "protein": 16.05,
+            "carbs": 2.67,
+            "fat": 21.45
+          },
+          "confidence": 0.9,
+          "note": "melted cheese"
+        },
+        {
+          "name": "Vegetable Oil",
+          "vi_name": "Dầu thực vật",
+          "estimated_weight_g": 20.0,
+          "estimated_nutritions": {
+            "calories": 180.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 20.0
+          },
+          "confidence": 0.85,
+          "note": "inferred from grilling"
+        }
+      ],
+      "total_estimated_weight_g": 160.0,
+      "total_estimated_nutritions": {
+        "calories": 674.75,
+        "protein": 21.05,
+        "carbs": 37.67,
+        "fat": 44.45
+      },
+      "scale_reference_used": "plate size"
+    }
+  ],
+  "image_quality": "good"
+}

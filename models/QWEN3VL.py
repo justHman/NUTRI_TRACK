@@ -1,12 +1,11 @@
 import boto3
-import base64
+from botocore.config import Config
 import json
 import os
+import re
 from typing import List, Optional, Type
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-import instructor
-from instructor import Mode
 from utils.processor import prepare_image_for_bedrock
 from config.logging_config import get_logger
 from config.prompt_config import FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT
@@ -24,21 +23,21 @@ logger.debug("Loaded nutrition_tool_config.json: %d tools", len(NUTRITION_TOOL_C
 
 
 # ─── Pydantic Schemas ────────────────────────────────────────────────────────
+class NutritionInfo(BaseModel):
+    """PCF of an ingredient"""
+    calories: float = Field(description="Calories value (kcal)")
+    protein: float = Field(description="Protein value (g)")
+    carbs: float = Field(description="Carbohydrate value (g)")
+    fat: float = Field(description="Fat value (g)")
 
 class Ingredient(BaseModel):
     """A single ingredient with detail"""
     name: str = Field(description="Name of the ingredient (in English)")
     vi_name: Optional[str] = Field(default=None, description="Name in Vietnamese if known")
     estimated_weight_g: Optional[float] = Field(default=None, description="Estimated weight in grams")
+    estimated_nutritions: Optional[NutritionInfo] = Field(default=None, description="Estimated nutrition")
     confidence: Optional[float] = Field(default=None, description="Confidence score 0.0 - 1.0")
     note: Optional[str] = Field(default=None, description="Optional note, e.g., 'inferred – typical pho garnish'")
-
-
-class CalorieRange(BaseModel):
-    """Min-max calorie range for a dish"""
-    min: float = Field(description="Minimum estimated calories")
-    max: float = Field(description="Maximum estimated calories")
-
 
 class FoodItem(BaseModel):
     """A dish with its ingredient names"""
@@ -47,16 +46,14 @@ class FoodItem(BaseModel):
     confidence: Optional[float] = Field(default=None, description="Confidence score for dish identification (0.0-1.0)")
     cooking_method: Optional[str] = Field(default=None, description="Cooking method: grilled | fried | steamed | boiled | raw | mixed")
     ingredients: List[Ingredient] = Field(description="List of detected ingredients")
-    total_estimated_calories: Optional[float] = Field(default=None, description="Total estimated calories (rounded to nearest 10)")
-    calorie_range: Optional[CalorieRange] = Field(default=None, description="Min-max calorie range estimate")
+    total_estimated_weight_g: Optional[float] = Field(default=None, description="Estimated weight in grams")
+    total_estimated_nutritions: Optional[NutritionInfo] = Field(default=None, description="Total estimated nutrition")
     scale_reference_used: Optional[str] = Field(default=None, description="What was used as scale reference: chopsticks visible | plate size | no reference")
-
 
 class FoodList(BaseModel):
     """List of food items detected in the image"""
-    items: List[FoodItem] = Field(description="List of dishes with their ingredients")
+    dishes: List[FoodItem] = Field(description="List of dishes with their ingredients")
     image_quality: Optional[str] = Field(default=None, description="Image quality: good | poor_lighting | blurry | partial_view")
-    error: Optional[str] = Field(default=None, description="Error message if no food detected, null otherwise")
 
 
 # ─── Qwen3 VL Client ─────────────────────────────────────────────────────────
@@ -81,47 +78,43 @@ class Qwen3VL:
         # trong biến môi trường hệ thống.
         self.client = boto3.client(
             "bedrock-runtime", 
-            region_name=self.region
+            region_name=self.region,
+            config=Config(read_timeout=300)
         )
         logger.debug("Bedrock runtime client created for region=%s", self.region)
 
         # Instructor client (chat.completions style)
         # Mode.BEDROCK_JSON: structured JSON output (no native tool calling required)
         # Qwen3-VL không hỗ trợ BEDROCK_TOOLS, dùng BEDROCK_JSON thay thế
-        self.instructor_client = instructor.from_bedrock(
-            client=self.client,
-            mode=Mode.BEDROCK_JSON
-        )
-        logger.debug("Instructor client created (mode=BEDROCK_JSON)")
+        # self.instructor_client = instructor.from_bedrock(
+        #     client=self.client,
+        #     mode=Mode.BEDROCK_JSON
+        # )
+        # logger.debug("Instructor client created (mode=BEDROCK_JSON)")
 
-        logger.info("Qwen3VL ready! (model=%s, region=%s)", model_id, self.region)
+        self.input_tokens = 0
+        self.output_tokens = 0
+
+    def reset_usage(self):
+        """Reset the token usage counters."""
+        self.input_tokens = 0
+        self.output_tokens = 0
+
+        logger.info("Qwen3VL ready! (model=%s, region=%s)", self.model_id, self.region)
 
     # ─── Method 1: Converse API (Manual JSON parsing) ────────────────────
 
-    def analyze(self, image_path: str, prompt: str, response_model: Type[BaseModel],
-                system_prompt: str = None) -> BaseModel:
-        """Generic image analysis with structured Pydantic output (Converse API)
-        
-        Uses 2-step approach:
-        1. Send image + JSON-formatted prompt to Bedrock Converse API
-        2. Parse the raw JSON response with Pydantic for validation
-        
-        Args:
-            image_path: Path to the image file
-            prompt: Text prompt describing what to extract
-            response_model: Pydantic BaseModel class for structured output
-            system_prompt: Optional system prompt for setting AI behavior/role
-        
-        Returns:
-            Instance of response_model with extracted data
-        """
-        if not os.path.exists(image_path):
-            logger.error("Image not found: %s", image_path)
-            raise FileNotFoundError(f"Image not found: {image_path}")
+    def analyze(self, image_path: Optional[str] = None, prompt: str = "", response_model: Type[BaseModel] = None,
+                system_prompt: str = None, image_bytes: Optional[bytes] = None, filename: str = None) -> BaseModel:
+        """Generic image analysis with structured Pydantic output (Converse API)"""
+        if image_bytes is None:
+            if not image_path or not os.path.exists(image_path):
+                logger.error("Image not found: %s", image_path)
+                raise FileNotFoundError(f"Image not found: {image_path}")
 
-        logger.info("[Converse] Loading image: %s", image_path)
-        image_bytes, img_format = prepare_image_for_bedrock(image_path)
-        logger.debug("[Converse] Image loaded: format=%s, size=%.2fMB",
+        logger.info("[Converse] Setup image processing...")
+        image_bytes, img_format = prepare_image_for_bedrock(image_path, image_bytes, filename)
+        logger.debug("[Converse] Image ready: format=%s, size=%.2fMB",
                      img_format, len(image_bytes) / 1024 / 1024)
 
         logger.info("[Converse] Analyzing with '%s' → %s...", self.model_id, response_model.__name__)
@@ -151,15 +144,28 @@ class Qwen3VL:
 
         response = self.client.converse(**converse_kwargs)
 
+        if "usage" in response:
+            self.input_tokens += response["usage"].get("inputTokens", 0)
+            self.output_tokens += response["usage"].get("outputTokens", 0)
+
         raw_text = response["output"]["message"]["content"][0]["text"]
         logger.debug("[Converse] Raw response length: %d chars", len(raw_text))
 
-        # Strip markdown code blocks if model wraps in ```json ... ```
+        # Robust JSON extraction
         clean = raw_text.strip()
-        if clean.startswith("```"):
-            clean = clean.split("\n", 1)[1]
-            clean = clean.rsplit("```", 1)[0].strip()
-            logger.debug("[Converse] Stripped markdown code blocks from response")
+        
+        # Try to find a JSON block ```json ... ```
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', clean, re.DOTALL)
+        if match:
+            clean = match.group(1).strip()
+            logger.debug("[Converse] Extracted JSON from markdown block")
+        else:
+            # If no markdown blocks, try finding the outermost {...}
+            start_idx = clean.find('{')
+            end_idx = clean.rfind('}')
+            if start_idx != -1 and end_idx != -1 and end_idx >= start_idx:
+                clean = clean[start_idx:end_idx+1]
+                logger.debug("[Converse] Guesstimated JSON boundaries from text")
 
         result = response_model.model_validate_json(clean)
         logger.info("[Converse] Successfully parsed response into %s", response_model.__name__)
@@ -169,97 +175,84 @@ class Qwen3VL:
 
     def analyze_with_instructor(self, image_path: str, prompt: str, response_model: Type[BaseModel],
                                 system_prompt: str = None) -> BaseModel:
-        """Generic image analysis with structured Pydantic output (Instructor + chat.completions)
+        # """Generic image analysis with structured Pydantic output (Instructor + chat.completions)
         
-        Uses instructor[bedrock] to automatically:
-        1. Inject Pydantic schema into the prompt
-        2. Parse and validate the response into the response_model
+        # Uses instructor[bedrock] to automatically:
+        # 1. Inject Pydantic schema into the prompt
+        # 2. Parse and validate the response into the response_model
         
-        Args:
-            image_path: Path to the image file
-            prompt: Text prompt describing what to extract
-            response_model: Pydantic BaseModel class for structured output
-            system_prompt: Optional system prompt for setting AI behavior/role
+        # Args:
+        #     image_path: Path to the image file
+        #     prompt: Text prompt describing what to extract
+        #     response_model: Pydantic BaseModel class for structured output
+        #     system_prompt: Optional system prompt for setting AI behavior/role
         
-        Returns:
-            Instance of response_model with extracted data
-        """
-        if not os.path.exists(image_path):
-            logger.error("Image not found: %s", image_path)
-            raise FileNotFoundError(f"Image not found: {image_path}")
+        # Returns:
+        #     Instance of response_model with extracted data
+        # """
+        # if not os.path.exists(image_path):
+        #     logger.error("Image not found: %s", image_path)
+        #     raise FileNotFoundError(f"Image not found: {image_path}")
 
-        logger.info("[Instructor] Loading image: %s", image_path)
-        image_bytes, img_format = prepare_image_for_bedrock(image_path)
-        logger.debug("[Instructor] Image loaded: format=%s, size=%.2fMB",
-                     img_format, len(image_bytes) / 1024 / 1024)
+        # logger.info("[Instructor] Loading image: %s", image_path)
+        # image_bytes, img_format = prepare_image_for_bedrock(image_path)
+        # logger.debug("[Instructor] Image loaded: format=%s, size=%.2fMB",
+        #              img_format, len(image_bytes) / 1024 / 1024)
 
-        logger.info("[Instructor] Analyzing with '%s' → %s...", self.model_id, response_model.__name__)
+        # logger.info("[Instructor] Analyzing with '%s' → %s...", self.model_id, response_model.__name__)
 
-        # Combine system prompt with user prompt for Instructor
-        # Bedrock's Converse API 'system' param might not be passed correctly by Instructor,
-        # so we merge it into the user prompt to be safe.
-        full_user_prompt = prompt
-        if system_prompt:
-            full_user_prompt = f"{system_prompt}\n\nUSER REQUEST: {prompt}"
-            logger.debug("[Instructor] System prompt merged into user prompt")
+        # # Combine system prompt with user prompt for Instructor
+        # # Bedrock's Converse API 'system' param might not be passed correctly by Instructor,
+        # # so we merge it into the user prompt to be safe.
+        # full_user_prompt = prompt
+        # if system_prompt:
+        #     full_user_prompt = f"{system_prompt}\n\nUSER REQUEST: {prompt}"
+        #     logger.debug("[Instructor] System prompt merged into user prompt")
 
-        # Build create kwargs — same structure as Converse API
-        create_kwargs = {
-            "modelId": self.model_id,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {
-                        "image": {
-                            "format": img_format,
-                            "source": {"bytes": image_bytes}
-                        }
-                    },
-                    {"text": full_user_prompt}
-                ]
-            }],
-            "response_model": response_model,
-            "inferenceConfig": {
-                "maxTokens": 8192,
-                "temperature": 0.2,
-                "topP": 0.9
-            }
-        }
+        # # Build create kwargs — same structure as Converse API
+        # create_kwargs = {
+        #     "modelId": self.model_id,
+        #     "messages": [{
+        #         "role": "user",
+        #         "content": [
+        #             {
+        #                 "image": {
+        #                     "format": img_format,
+        #                     "source": {"bytes": image_bytes}
+        #                 }
+        #             },
+        #             {"text": full_user_prompt}
+        #         ]
+        #     }],
+        #     "response_model": response_model,
+        #     "inferenceConfig": {
+        #         "maxTokens": 8192,
+        #         "temperature": 0.2,
+        #         "topP": 0.9
+        #     }
+        # }
 
-        result = self.instructor_client.create(**create_kwargs)
-        logger.info("[Instructor] Successfully parsed response into %s", response_model.__name__)
-        return result
+        # result = self.instructor_client.create(**create_kwargs)
+        # logger.info("[Instructor] Successfully parsed response into %s", response_model.__name__)
+        # return result
+        pass
 
 
     # ─── Method 3: Converse API + Tool Calling (Function Calling) ────────
 
     # Tool definition for USDA nutrition lookup
-    def analyze_with_tool_calling(self, image_path: str, prompt: str,
-                                   usda_client, system_prompt: str = None,
-                                   max_tool_rounds: int = 10) -> str:
-        """Image analysis with tool calling (Converse API + toolConfig)
+    def analyze_with_tool_calling(self, image_path: Optional[str] = None, prompt: str = "",
+                                   usda_client=None, system_prompt: str = None,
+                                   max_tool_rounds: int = 2, image_bytes: Optional[bytes] = None, filename: str = None) -> str:
+        """Image analysis with tool calling (Converse API + toolConfig)"""
+        if image_bytes is None:
+            if not image_path or not os.path.exists(image_path):
+                logger.error("Image not found: %s", image_path)
+                raise FileNotFoundError(f"Image not found: {image_path}")
 
-        The model can request to call USDA tools for each food item it detects.
-        3 tools available: get_PCF, get_ingredients, get_PCF_and_ingredients.
-        We handle the tool-use loop until the model produces a final text response.
-
-        Args:
-            image_path: Path to the image file
-            prompt: Text prompt for analysis
-            usda_client: USDAClient instance
-            system_prompt: Optional system prompt
-            max_tool_rounds: Max number of tool-use rounds to prevent infinite loops
-
-        Returns:
-            Final text response from the model (raw string, caller should parse)
-        """
-        if not os.path.exists(image_path):
-            logger.error("Image not found: %s", image_path)
-            raise FileNotFoundError(f"Image not found: {image_path}")
-
-        logger.info("[ToolCalling] Loading image: %s", image_path)
-        image_bytes, img_format = prepare_image_for_bedrock(image_path)
-        logger.debug("[ToolCalling] Image loaded: format=%s, size=%.2fMB",
+        logger.info("[ToolCalling] Setup image processing...")
+        image_bytes, img_format = prepare_image_for_bedrock(image_path, image_bytes, filename)
+        logger.debug("[ToolCalling] Image ready: format=%s, size=%.2fMB",
                      img_format, len(image_bytes) / 1024 / 1024)
 
         # Build initial messages
@@ -290,10 +283,16 @@ class Qwen3VL:
                     self.model_id, len(NUTRITION_TOOL_CONFIG.get("tools", [])))
 
         # ── Tool-use loop ──
-        for round_num in range(1, max_tool_rounds + 1):
+        for round_num in range(1, max_tool_rounds + 2):
             response = self.client.converse(**converse_kwargs)
+
+            if "usage" in response:
+                self.input_tokens += response["usage"].get("inputTokens", 0)
+                self.output_tokens += response["usage"].get("outputTokens", 0)
+
             stop_reason = response.get("stopReason", "end_turn")
             output_message = response["output"]["message"]
+            logger.info("[ToolCalling] Output message: %s", str(output_message)[:1000])
 
             logger.info("[ToolCalling] Round %d — stopReason: %s", round_num, stop_reason)
 
@@ -308,6 +307,23 @@ class Qwen3VL:
                 return final_text
 
             # Model requested tool use — process each tool call
+            # ── Sanitize assistant message to avoid ParamValidationError in next round ──
+            clean_content = []
+            for block in output_message.get("content", []):
+                if "toolUse" in block:
+                    if not block["toolUse"].get("name"):
+                        logger.warning("[ToolCalling] Dropping toolUse with empty name")
+                        continue
+                    tool_input = block["toolUse"].get("input", {})
+                    if "food_name" not in tool_input or "weight_g" not in tool_input:
+                        logger.warning("[ToolCalling] Dropping toolUse with missing food_name or weight_g: %s", tool_input)
+                        continue
+                    if not tool_input.get("food_name", "unknown") or not tool_input.get("weight_g", 0):
+                        logger.warning("[ToolCalling] Dropping toolUse with empty food_name or weight_g: %s", tool_input)
+                        continue
+                clean_content.append(block)
+            output_message["content"] = clean_content
+            
             messages.append(output_message)
 
             tool_results = []
@@ -327,30 +343,41 @@ class Qwen3VL:
                 try:
                     food_name = tool_input.get("food_name", "unknown")
                     
-                    if tool_name == "get_PCF":
-                        result = usda_client.get_PCF(food_name)
-                        logger.info("[ToolCalling] ✅ get_PCF('%s') → %s", food_name, result)
+                    # ── Robust name matching ──
+                    if tool_name.startswith("get_nutritions_and") and tool_name != "get_nutritions_and_ingredients_by_weight":
+                        logger.warning("[ToolCalling] Normalizing '%s' → 'get_nutritions_and_ingredients_by_weight'", tool_name)
+                        tool_name = "get_nutritions_and_ingredients_by_weight"
+
+                    if tool_name == "get_nutritions":
+                        result = usda_client.get_nutritions(food_name)
+                        if result is None:
+                            raise ValueError(f"No nutrition data found for '{food_name}'")
+                        logger.info("[ToolCalling] ✅ get_nutritions('%s') → %s", food_name, result)
                     
                     elif tool_name == "get_ingredients":
                         result = usda_client.get_ingredients(food_name)
-                        # Handle None → return empty list for model clarity
                         if result is None:
-                            result = {"ingredients": None, "note": "No ingredient data available for this item in USDA database"}
-                        else:
-                            result = {"ingredients": result}
+                            raise ValueError(f"No ingredient data available for '{food_name}'")
                         logger.info("[ToolCalling] ✅ get_ingredients('%s') → %d items",
                                     food_name, len(result.get("ingredients") or []))
                     
-                    elif tool_name == "get_PCF_and_ingredients":
-                        result = usda_client.get_PCF_and_ingredients(food_name)
+                    elif tool_name == "get_nutritions_and_ingredients":
+                        result = usda_client.get_nutritions_and_ingredients(food_name)
                         if result is None:
-                            result = {"error": f"No USDA data found for '{food_name}'"}
-                        logger.info("[ToolCalling] ✅ get_PCF_and_ingredients('%s') → %s",
-                                    food_name, result.get("description", "N/A") if isinstance(result, dict) else "error")
+                            raise ValueError(f"No USDA data found for '{food_name}'")
+                        logger.info("[ToolCalling] ✅ get_nutritions_and_ingredients('%s') → %s",
+                                    food_name, result.get("description", "N/A"))
                     
+                    elif tool_name == "get_nutritions_and_ingredients_by_weight":
+                        weight_g = tool_input.get("weight_g", 0.0)
+                        result = usda_client.get_nutritions_and_ingredients_by_weight(food_name, weight_g)
+                        if result is None:
+                            raise ValueError(f"No USDA data found for '{food_name}'")
+                        logger.info("[ToolCalling] ✅ get_nutritions_and_ingredients_by_weight('%s', %.2fg) → %s",
+                                    food_name, weight_g, result.get("description", "N/A"))
+
                     else:
-                        logger.warning("[ToolCalling] Unknown tool: %s", tool_name)
-                        result = {"error": f"Unknown tool: {tool_name}"}
+                        raise ValueError(f"Unknown tool: {tool_name}")
                     
                     tool_results.append({
                         "toolResult": {
@@ -373,32 +400,60 @@ class Qwen3VL:
             messages.append({"role": "user", "content": tool_results})
             converse_kwargs["messages"] = messages
 
-        logger.warning("[ToolCalling] Exceeded max tool rounds (%d)", max_tool_rounds)
-        return ""
+        # ── Final attempt to get response after exhausting rounds ──
+        logger.warning("[ToolCalling] Round limit reached (%d), attempting one final turn...", max_tool_rounds)
+        
+        max_tool_rounds_prompt = "SYSTEM INSTRUCTION: You have reached the maximum number of tool use rounds. Please provide the final JSON answer now based on the information you have gathered."
+        
+        # Append to the LAST message instead of creating a new one (to preserve alternating roles)
+        if messages and messages[-1]["role"] == "user":
+            messages[-1]["content"].append({"text": max_tool_rounds_prompt})
+            converse_kwargs["messages"] = messages
+            
+        # Optional: Disable tools for the last turn so it's forced to generate text/JSON
+        if "toolConfig" in converse_kwargs:
+            del converse_kwargs["toolConfig"]
+            
+        response = self.client.converse(**converse_kwargs)
+        if "usage" in response:
+            self.input_tokens += response["usage"].get("inputTokens", 0)
+            self.output_tokens += response["usage"].get("outputTokens", 0)
+            
+        output_message = response["output"]["message"]
+        final_text = ""
+        for block in output_message.get("content", []):
+            if "text" in block:
+                final_text += block["text"]
+        
+        logger.info("[ToolCalling] Final attempt received (%d chars)", len(final_text))
+        return final_text
 
     # ─── Food Analysis Wrappers ──────────────────────────────────────────
 
-    def analyze_food(self, image_path: str) -> FoodList:
+    def analyze_food(self, image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
         """Analyze food using Converse API (Method 1) with professional prompts"""
-        logger.info("analyze_food() called for image: %s", image_path)
+        logger.info("analyze_food() called for image: %s", image_path or filename)
         return self.analyze(
-            image_path,
+            image_path=image_path,
+            image_bytes=image_bytes,
+            filename=filename,
             prompt=FOOD_VISION_USER_PROMPT,
             response_model=FoodList,
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
         )
 
-    def analyze_food_with_instructor(self, image_path: str) -> FoodList:
+    def analyze_food_with_instructor(self, image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
         """Analyze food using Instructor + chat.completions (Method 2) with professional prompts"""
-        logger.info("analyze_food_with_instructor() called for image: %s", image_path)
-        return self.analyze_with_instructor(
-            image_path,
-            prompt=FOOD_VISION_USER_PROMPT,
-            response_model=FoodList,
-            system_prompt=FOOD_VISION_SYSTEM_PROMPT,
-        )
+        logger.info("analyze_food_with_instructor() called for image: %s", image_path or filename)
+        # return self.analyze_with_instructor(
+        #     image_path,
+        #     prompt=FOOD_VISION_USER_PROMPT,
+        #     response_model=FoodList,
+        #     system_prompt=FOOD_VISION_SYSTEM_PROMPT,
+        # )
+        pass
 
-    def analyze_food_with_tools(self, image_path: str, usda_client) -> FoodList:
+    def analyze_food_with_tools(self, image_path: Optional[str] = None, usda_client=None, max_tool_rounds: int = 2, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
         """Analyze food using Converse API + Tool Calling (Method 3)
 
         The model identifies food items from the image, then calls USDA tools:
@@ -406,18 +461,23 @@ class Qwen3VL:
         2. get_PCF for each ingredient (RAG hint for ingredient-level data)
         3. Compiles final FoodList JSON using all USDA data as reference
         """
-        logger.info("analyze_food_with_tools() called for image: %s", image_path)
+        logger.info("analyze_food_with_tools() called for image: %s", image_path or filename)
+
+        formatted_tools_prompt = FOOD_VISION_TOOLS_PROMPT.replace("{max_tool_rounds}", str(max_tool_rounds))
 
         # Combine user prompt + tool instructions (careful formatting)
-        tool_prompt = FOOD_VISION_USER_PROMPT + "\n" + FOOD_VISION_TOOLS_PROMPT
+        tool_prompt = FOOD_VISION_USER_PROMPT + "\n" + formatted_tools_prompt
 
         logger.debug("[ToolCalling] tool_prompt length: %d chars", len(tool_prompt))
 
         raw_response = self.analyze_with_tool_calling(
-            image_path,
+            image_path=image_path,
+            image_bytes=image_bytes,
+            filename=filename,
             prompt=tool_prompt,
             usda_client=usda_client,
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
+            max_tool_rounds=max_tool_rounds
         )
 
         # Parse the final response into FoodList
@@ -428,7 +488,7 @@ class Qwen3VL:
             logger.debug("[ToolCalling] Stripped markdown code blocks from response")
 
         result = FoodList.model_validate_json(clean)
-        logger.info("[ToolCalling] Successfully parsed response into FoodList (%d items)", len(result.items))
+        logger.info("[ToolCalling] Successfully parsed response into FoodList (%d dishes)", len(result.dishes))
         return result
 
 
