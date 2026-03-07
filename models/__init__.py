@@ -1,16 +1,16 @@
 """
 NutriTrack AI Models
 ====================
-    from models import Qwen3VL, SAM3Segmenter
+    from models import Qwen3VL
 
 Available models:
     - Qwen3VL: Multimodal Vision-Language (AWS Bedrock)
-    - SAM3Segmenter: Segment Anything Model 3 (Ultralytics, GPU)
 
 Pydantic schemas:
-    - Ingredient: (name, vi_name, estimated_weight_g, confidence)
-    - FoodItem: (name, vi_name, ingredients: List[Ingredient], total_estimated_calories)
-    - FoodList: (dishes: List[FoodItem])
+    - NutritionInfo: (calories, protein, carbs, fat)
+    - Ingredient: (name, vi_name, estimated_weight_g, estimated_nutritions, confidence, note)
+    - FoodItem: (name, vi_name, confidence, cooking_method, ingredients, total_estimated_weight_g, total_estimated_nutritions, scale_reference_used)
+    - FoodList: (dishes: List[FoodItem], image_quality)
 """
 
 from models.QWEN3VL import (
@@ -19,4 +19,3 @@ from models.QWEN3VL import (
     FoodItem,
     FoodList,
 )
-from models.SAM3 import SAM3Segmenter

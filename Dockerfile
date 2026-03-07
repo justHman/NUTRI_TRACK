@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements và cài đặt python dependencies
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy toàn bộ mã nguồn vào container
