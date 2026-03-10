@@ -382,7 +382,8 @@ class Qwen3VL:
                     tool_results.append({
                         "toolResult": {
                             "toolUseId": tool_use_id,
-                            "content": [{"json": result}]
+                            "content": [{"json": result}],
+                            "status": "success"
                         }
                     })
 

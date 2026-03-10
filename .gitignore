@@ -27,6 +27,9 @@ Thumbs.db
 
 # Project Specific (Weights, models)
 data/weights/
+data/output/
+data/tests/
+docs/
 *.pt
 *.pth
 *.onnx
