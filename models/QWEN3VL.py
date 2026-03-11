@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from utils.processor import prepare_image_for_bedrock
 from config.logging_config import get_logger
-from config.prompt_config import FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT
+from config.prompt_config import (FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT,
+                                  LABEL_VISION_SYSTEM_PROMPT, LABEL_VISION_USER_PROMPT)
 
 logger = get_logger(__name__)
 
@@ -82,15 +83,6 @@ class Qwen3VL:
             config=Config(read_timeout=300)
         )
         logger.debug("Bedrock runtime client created for region=%s", self.region)
-
-        # Instructor client (chat.completions style)
-        # Mode.BEDROCK_JSON: structured JSON output (no native tool calling required)
-        # Qwen3-VL không hỗ trợ BEDROCK_TOOLS, dùng BEDROCK_JSON thay thế
-        # self.instructor_client = instructor.from_bedrock(
-        #     client=self.client,
-        #     mode=Mode.BEDROCK_JSON
-        # )
-        # logger.debug("Instructor client created (mode=BEDROCK_JSON)")
 
         self.input_tokens = 0
         self.output_tokens = 0
@@ -171,74 +163,7 @@ class Qwen3VL:
         logger.info("[Converse] Successfully parsed response into %s", response_model.__name__)
         return result
 
-    # ─── Method 2: Instructor + chat.completions (Auto Pydantic) ─────────
-
-    def analyze_with_instructor(self, image_path: str, prompt: str, response_model: Type[BaseModel],
-                                system_prompt: str = None) -> BaseModel:
-        # """Generic image analysis with structured Pydantic output (Instructor + chat.completions)
-        
-        # Uses instructor[bedrock] to automatically:
-        # 1. Inject Pydantic schema into the prompt
-        # 2. Parse and validate the response into the response_model
-        
-        # Args:
-        #     image_path: Path to the image file
-        #     prompt: Text prompt describing what to extract
-        #     response_model: Pydantic BaseModel class for structured output
-        #     system_prompt: Optional system prompt for setting AI behavior/role
-        
-        # Returns:
-        #     Instance of response_model with extracted data
-        # """
-        # if not os.path.exists(image_path):
-        #     logger.error("Image not found: %s", image_path)
-        #     raise FileNotFoundError(f"Image not found: {image_path}")
-
-        # logger.info("[Instructor] Loading image: %s", image_path)
-        # image_bytes, img_format = prepare_image_for_bedrock(image_path)
-        # logger.debug("[Instructor] Image loaded: format=%s, size=%.2fMB",
-        #              img_format, len(image_bytes) / 1024 / 1024)
-
-        # logger.info("[Instructor] Analyzing with '%s' → %s...", self.model_id, response_model.__name__)
-
-        # # Combine system prompt with user prompt for Instructor
-        # # Bedrock's Converse API 'system' param might not be passed correctly by Instructor,
-        # # so we merge it into the user prompt to be safe.
-        # full_user_prompt = prompt
-        # if system_prompt:
-        #     full_user_prompt = f"{system_prompt}\n\nUSER REQUEST: {prompt}"
-        #     logger.debug("[Instructor] System prompt merged into user prompt")
-
-        # # Build create kwargs — same structure as Converse API
-        # create_kwargs = {
-        #     "modelId": self.model_id,
-        #     "messages": [{
-        #         "role": "user",
-        #         "content": [
-        #             {
-        #                 "image": {
-        #                     "format": img_format,
-        #                     "source": {"bytes": image_bytes}
-        #                 }
-        #             },
-        #             {"text": full_user_prompt}
-        #         ]
-        #     }],
-        #     "response_model": response_model,
-        #     "inferenceConfig": {
-        #         "maxTokens": 8192,
-        #         "temperature": 0.2,
-        #         "topP": 0.9
-        #     }
-        # }
-
-        # result = self.instructor_client.create(**create_kwargs)
-        # logger.info("[Instructor] Successfully parsed response into %s", response_model.__name__)
-        # return result
-        pass
-
-
-    # ─── Method 3: Converse API + Tool Calling (Function Calling) ────────
+    # ─── Method 2: Converse API + Tool Calling (Function Calling) ────────
 
     # Tool definition for USDA nutrition lookup
     def analyze_with_tool_calling(self, image_path: Optional[str] = None, prompt: str = "",
@@ -443,16 +368,21 @@ class Qwen3VL:
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
         )
 
-    def analyze_food_with_instructor(self, image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
-        """Analyze food using Instructor + chat.completions (Method 2) with professional prompts"""
-        logger.info("analyze_food_with_instructor() called for image: %s", image_path or filename)
-        # return self.analyze_with_instructor(
-        #     image_path,
-        #     prompt=FOOD_VISION_USER_PROMPT,
-        #     response_model=FoodList,
-        #     system_prompt=FOOD_VISION_SYSTEM_PROMPT,
-        # )
-        pass
+    def analyze_label(self, image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
+        """Analyze nutrition label on product packaging using OCR (Method 1 Converse API)
+        
+        Returns FoodList with product as dish and nutritional info as ingredients.
+        If no label detected, returns FoodList with empty dishes list.
+        """
+        logger.info("analyze_label() called for image: %s", image_path or filename)
+        return self.analyze(
+            image_path=image_path,
+            image_bytes=image_bytes,
+            filename=filename,
+            prompt=LABEL_VISION_USER_PROMPT,
+            response_model=FoodList,
+            system_prompt=LABEL_VISION_SYSTEM_PROMPT,
+        )
 
     def analyze_food_with_tools(self, image_path: Optional[str] = None, usda_client=None, max_tool_rounds: int = 2, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
         """Analyze food using Converse API + Tool Calling (Method 3)

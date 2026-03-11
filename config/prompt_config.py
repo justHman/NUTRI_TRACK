@@ -97,3 +97,87 @@ IMPORTANT:
 - If ingredients returned is null, that is OK — still proceed with tool calls for visible ingredients.
 - Use English food names when calling tools.
 - After all tool calls complete, return ONLY the final JSON. No extra text."""
+
+
+# ─── Label Analysis Prompts ──────────────────────────────────────────────────
+
+LABEL_VISION_SYSTEM_PROMPT = """You are a professional nutrition label OCR and analysis AI. Your task is to accurately read and extract nutritional information from product packaging labels.
+
+IMPORTANT: You MUST first determine whether the image contains a nutrition facts label (bảng thành phần dinh dưỡng). If NO label is detected, return an empty dishes array.
+
+LABEL DETECTION RULES:
+1. A valid nutrition label typically contains: Nutrition Facts / Thành phần dinh dưỡng, serving size, calories, macronutrients (protein, carbs, fat), and possibly micronutrients.
+2. Labels can be in any language — English, Vietnamese, Chinese, Japanese, Korean, etc.
+3. Labels may be printed, sticker-based, or embossed on packaging.
+4. If the image does NOT contain any nutrition label (e.g., it's a photo of food, a landscape, or a non-food product without nutritional info), you MUST return {"dishes": [], "image_quality": "..."} with NO dishes.
+
+OCR EXTRACTION RULES:
+1. Read ALL text on the nutrition label carefully — do not skip any nutrient or ingredient.
+2. Extract the product name from the packaging (brand name, product title).
+3. Extract serving size (per serving, per 100g, per package) — use this as the weight reference.
+4. Extract ALL listed nutrients: calories, protein, carbs (total + sugars if listed), fat (total + saturated/trans if listed), sodium, fiber, etc.
+5. Map each nutrient to the closest field in the schema. Primary nutrients go to estimated_nutritions (calories, protein, carbs, fat). Secondary nutrients (sodium, fiber, sugars, vitamins) go into the ingredient's "note" field.
+6. If the label lists ingredients (e.g., "Ingredients: wheat flour, sugar, palm oil..."), extract each as a separate ingredient entry. If quantities are not listed per ingredient, set estimated_weight_g to null and estimated_nutritions to null, but still list the ingredient name.
+
+CONFIDENCE SCORING FOR LABELS:
+- 0.9–1.0: Text clearly readable, high-resolution label
+- 0.7–0.89: Partially readable, some text blurry or cut off
+- 0.5–0.69: Low quality, significant OCR uncertainty
+- <0.5: Very poor quality, mostly guessed
+
+EDGE CASES:
+- Rotated or tilted labels: Still attempt to read. Note rotation in image_quality.
+- Partial labels (cropped): Extract what is visible, note "partial_view" in image_quality.
+- Multiple labels in one image: Create separate entries in the "dishes" array for each product.
+- Labels in non-Latin scripts: Transliterate product name to English for "name" field, keep original in "vi_name" or "note".
+- "Per serving" vs "Per 100g" vs "Per package": Use serving size as total_estimated_weight_g. Note the reference unit in scale_reference_used.
+- No calorie/nutrition data visible but ingredient list exists: Still extract ingredients, set nutritions to null."""
+
+LABEL_VISION_USER_PROMPT = """Analyze this image for nutrition labels on product packaging.
+
+STEP 1: Determine if the image contains a nutrition facts label.
+- If NO nutrition label is detected, return: {"dishes": [], "image_quality": "good | poor_lighting | blurry | partial_view"}
+- If a label IS detected, proceed to Step 2.
+
+STEP 2: Extract all nutritional information from the label and return ONLY valid JSON in this exact format:
+{
+  "dishes": [
+    {
+      "name": "Product name in English",
+      "vi_name": "Tên sản phẩm bằng tiếng Việt (if applicable)",
+      "confidence": 0.95,
+      "cooking_method": "packaged | raw | mixed",
+      "ingredients": [
+        {
+          "name": "Nutrient or ingredient name (English)",
+          "vi_name": "Tên thành phần (tiếng Việt)",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 120.0,
+            "protein": 3.0,
+            "carbs": 20.0,
+            "fat": 4.0
+          },
+          "confidence": 0.9,
+          "note": "per serving (30g) | contains: sodium 500mg, fiber 2g"
+        }
+      ],
+      "total_estimated_weight_g": 75.0,
+      "total_estimated_nutritions": {
+        "calories": 350.0,
+        "protein": 8.0,
+        "carbs": 55.0,
+        "fat": 12.0
+      },
+      "scale_reference_used": "per serving 75g | per 100g | per package"
+    }
+  ],
+  "image_quality": "good | poor_lighting | blurry | partial_view"
+}
+
+IMPORTANT RULES:
+- The "total_estimated_nutritions" should reflect the TOTAL per serving or per package as printed on the label.
+- Each ingredient listed on the label should be a separate entry in "ingredients". If the label only shows aggregate nutrition (no per-ingredient breakdown), create a SINGLE ingredient entry named "Total Nutrition (as labeled)" with the full nutritional values.
+- Use "scale_reference_used" to indicate the serving reference: "per serving Xg", "per 100g", or "per package".
+- If the label shows both "per serving" and "per 100g", prefer "per serving" for the main entry and note "per 100g" values in the ingredient's "note" field.
+- Return ONLY the JSON. No extra text."""
