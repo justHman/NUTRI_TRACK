@@ -1,0 +1,76 @@
+{
+  "dishes": [
+    {
+      "name": "Com Tam (Broken Rice with Grilled Pork)",
+      "vi_name": "Cơm Tấm",
+      "confidence": 0.95,
+      "cooking_method": "mixed",
+      "ingredients": [
+        {
+          "name": "White rice",
+          "vi_name": "Cơm trắng",
+          "estimated_weight_g": 150.0,
+          "confidence": 0.9,
+          "note": "main component of the dish"
+        },
+        {
+          "name": "Grilled pork chop",
+          "vi_name": "Sườn nướng",
+          "estimated_weight_g": 120.0,
+          "confidence": 0.95,
+          "note": "glazed and charred, main protein"
+        },
+        {
+          "name": "Fried egg",
+          "vi_name": "Trứng ốp la",
+          "estimated_weight_g": 60.0,
+          "confidence": 0.9,
+          "note": "sunny-side up, on top of rice"
+        },
+        {
+          "name": "Pickled vegetables",
+          "vi_name": "Dưa chua",
+          "estimated_weight_g": 30.0,
+          "confidence": 0.85,
+          "note": "shredded carrot and daikon"
+        },
+        {
+          "name": "Cucumber slices",
+          "vi_name": "Dưa leo cắt lát",
+          "estimated_weight_g": 20.0,
+          "confidence": 0.8,
+          "note": "raw garnish"
+        },
+        {
+          "name": "Tomato slices",
+          "vi_name": "Cà chua cắt lát",
+          "estimated_weight_g": 25.0,
+          "confidence": 0.85,
+          "note": "raw garnish"
+        },
+        {
+          "name": "Scallion oil",
+          "vi_name": "Dầu hành",
+          "estimated_weight_g": 5.0,
+          "confidence": 0.7,
+          "note": "inferred – typical topping on rice"
+        },
+        {
+          "name": "Pork meatloaf",
+          "vi_name": "Chả lụa",
+          "estimated_weight_g": 40.0,
+          "confidence": 0.8,
+          "note": "yellowish slice, likely pork loaf"
+        }
+      ],
+      "total_estimated_calories": 520.0,
+      "calorie_range": {
+        "min": 480.0,
+        "max": 560.0
+      },
+      "scale_reference_used": "plate size"
+    }
+  ],
+  "image_quality": "good",
+  "error": null
+}

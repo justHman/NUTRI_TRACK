@@ -18,7 +18,6 @@ env/
 ENV/
 
 # IDE / Editor
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -28,10 +27,6 @@ ENV/
 Thumbs.db
 
 # Project Specific (Data, Weights, Logs)
-data/weights/
-data/output/
-data/tests/
-data/usda_cache.json
 logs/
 *.log
 *.pt
@@ -42,13 +37,9 @@ logs/
 
 # Notebooks & Docs
 .ipynb_checkpoints/
-*.ipynb
-docs/
-*.md
 
 # Tests & CI
-tests/
-.github/
 
-# Git
+# Docker & Git
 .git
+

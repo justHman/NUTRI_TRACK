@@ -1,0 +1,53 @@
+digraph "NutriTrack ECS Deployment Architecture" {
+	graph [fontcolor="#2D3436" fontname="Sans-Serif" fontsize=15 label="NutriTrack ECS Deployment Architecture" nodesep=0.60 pad=2.0 rankdir=LR ranksep=0.75 splines=ortho]
+	node [fixedsize=true fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13 height=1.4 imagescale=true labelloc=b shape=box style=rounded width=1.4]
+	edge [color="#7B8894"]
+	"970d4b25ffdc4903bd02cf345bba5238" [label="Client
+(Web/Mobile/Postman)" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/general\user.png" shape=none]
+	subgraph "cluster_AWS Cloud" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="AWS Cloud" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		subgraph "cluster_VPC (Default)" {
+			graph [bgcolor="#EBF3E7" fontname="Sans-Serif" fontsize=12 label="VPC (Default)" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			subgraph "cluster_Public Subnet (Auto-assign IP)" {
+				graph [bgcolor="#ECE8F6" fontname="Sans-Serif" fontsize=12 label="Public Subnet (Auto-assign IP)" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+				subgraph "cluster_Security Group
+(Port 8000: 0.0.0.0/0)" {
+					graph [bgcolor="#FDF7E3" fontname="Sans-Serif" fontsize=12 label="Security Group
+(Port 8000: 0.0.0.0/0)" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+					"280a115c82524459972315f7fbdc6690" [label="NutriTrack API Task
+(FastAPI Container)" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/compute\fargate.png" shape=none]
+				}
+			}
+		}
+		subgraph "cluster_Task Execution Role
+(ecsTaskExecutionRole)" {
+			graph [bgcolor="#EBF3E7" fontname="Sans-Serif" fontsize=12 label="Task Execution Role
+(ecsTaskExecutionRole)" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			c3fd08ddb79a48cea53d6e476f4365ed [label="ECR Registry
+(nutritrack-api:latest)" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/compute\ec2-container-registry.png" shape=none]
+			"3731216da3524b4fa8d70341c1a6966e" [label="CloudWatch Logs" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/management\cloudwatch-logs.png" shape=none]
+			"855e118f4cc0426c8ac4d7264e899d68" [label="Secrets Manager
+(USDA_API_KEY)" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/security\secrets-manager.png" shape=none]
+			"1873bfcdcb1940eda8120e1afd9e03fd" [label="Task Execution Role" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/security\identity-and-access-management-iam-role.png" shape=none]
+		}
+		subgraph "cluster_Task Role
+(ecsTaskRole)" {
+			graph [bgcolor="#EBF3E7" fontname="Sans-Serif" fontsize=12 label="Task Role
+(ecsTaskRole)" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			bba2c200f1e046259548ef25b1e38ff0 [label="Amazon Bedrock
+(Qwen3-VL)" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/ml\bedrock.png" shape=none]
+			"6c7a09352e0f41848a91973ffe0035c6" [label="S3 Cache Bucket
+(AWS_S3_CACHE_BUCKET)" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/storage\simple-storage-service-s3.png" shape=none]
+			"4ae1b2ecdc8c4a639480f7d4c864e67a" [label="Task Role" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\8LPDTjIj-CNOFHW-V9-2V\Lib\site-packages\resources/aws/security\identity-and-access-management-iam-role.png" shape=none]
+		}
+	}
+	"970d4b25ffdc4903bd02cf345bba5238" -> "280a115c82524459972315f7fbdc6690" [label="HTTP Request
+(:8000/analyze)" dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"280a115c82524459972315f7fbdc6690" -> "1873bfcdcb1940eda8120e1afd9e03fd" [label=assumes dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13 style=dotted]
+	"1873bfcdcb1940eda8120e1afd9e03fd" -> c3fd08ddb79a48cea53d6e476f4365ed [label="Pulls Image" dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"1873bfcdcb1940eda8120e1afd9e03fd" -> "855e118f4cc0426c8ac4d7264e899d68" [label="Gets Secret" dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"1873bfcdcb1940eda8120e1afd9e03fd" -> "3731216da3524b4fa8d70341c1a6966e" [label="Writes stdout" dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"280a115c82524459972315f7fbdc6690" -> "4ae1b2ecdc8c4a639480f7d4c864e67a" [label=assumes dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13 style=dotted]
+	"4ae1b2ecdc8c4a639480f7d4c864e67a" -> bba2c200f1e046259548ef25b1e38ff0 [label=InvokeModel dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"4ae1b2ecdc8c4a639480f7d4c864e67a" -> "6c7a09352e0f41848a91973ffe0035c6" [label="Get/Put Object" dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+}

@@ -1,0 +1,112 @@
+{
+  "dishes": [
+    {
+      "name": "Broken Rice with Grilled Pork",
+      "vi_name": "Cơm Tấm Sườn Nướng",
+      "confidence": 0.98,
+      "cooking_method": "mixed",
+      "ingredients": [
+        {
+          "name": "Grilled pork chop",
+          "vi_name": "Sườn nướng",
+          "estimated_weight_g": 180.0,
+          "estimated_nutritions": {
+            "calories": 342.0,
+            "protein": 33.07,
+            "carbs": 14.08,
+            "fat": 16.27
+          },
+          "confidence": 0.95,
+          "note": "main protein component"
+        },
+        {
+          "name": "White rice",
+          "vi_name": "Cơm tấm",
+          "estimated_weight_g": 150.0,
+          "estimated_nutritions": {
+            "calories": 534.0,
+            "protein": 10.0,
+            "carbs": 120.0,
+            "fat": 0.0
+          },
+          "confidence": 0.95,
+          "note": "base of the dish"
+        },
+        {
+          "name": "Fried egg",
+          "vi_name": "Trứng ốp la",
+          "estimated_weight_g": 60.0,
+          "estimated_nutritions": {
+            "calories": 117.6,
+            "protein": 8.16,
+            "carbs": 0.5,
+            "fat": 8.88
+          },
+          "confidence": 0.95,
+          "note": "topping"
+        },
+        {
+          "name": "Vietnamese pork roll",
+          "vi_name": "Chả lụa",
+          "estimated_weight_g": 70.0,
+          "estimated_nutritions": {
+            "calories": 230.3,
+            "protein": 9.15,
+            "carbs": 3.14,
+            "fat": 19.87
+          },
+          "confidence": 0.9,
+          "note": "slice on the side"
+        },
+        {
+          "name": "Pickled vegetables",
+          "vi_name": "Dưa chua",
+          "estimated_weight_g": 40.0,
+          "estimated_nutritions": {
+            "calories": 10.0,
+            "protein": 0.43,
+            "carbs": 2.43,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "carrot and daikon pickles"
+        },
+        {
+          "name": "Cucumber slices",
+          "vi_name": "Dưa leo",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 10.2,
+            "protein": 0.15,
+            "carbs": 2.04,
+            "fat": 0.04
+          },
+          "confidence": 0.85,
+          "note": "fresh garnish"
+        },
+        {
+          "name": "Tomato slices",
+          "vi_name": "Cà chua",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 27.0,
+            "protein": 1.31,
+            "carbs": 3.81,
+            "fat": 0.71
+          },
+          "confidence": 0.85,
+          "note": "fresh garnish"
+        }
+      ],
+      "total_estimated_weight_g": 550.0,
+      "total_estimated_nutritions": {
+        "calories": 1271.1,
+        "protein": 62.27,
+        "carbs": 146.0,
+        "fat": 45.77
+      },
+      "scale_reference_used": "plate size"
+    }
+  ],
+  "image_quality": "good"
+}

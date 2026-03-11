@@ -1,0 +1,5 @@
+method,image,status,time_s,dishes,ingredients,bedrock_calls,usda_calls,usda_cache_hits,token_input,price_input,token_output,price_output,notes
+tools,steak,✅ PASS,32.0,1,4,3,6,0,7698,0.0041,917,0.0024,
+manual,steak,✅ PASS,20.2,1,6,1,5,1,1389,0.0007,849,0.0023,
+tools,fast_food,✅ PASS,131.2,11,36,3,23,1,11372,0.006,6463,0.0172,
+manual,fast_food,✅ PASS,128.4,12,46,1,22,24,1517,0.0008,6373,0.017,

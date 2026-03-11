@@ -1,0 +1,99 @@
+{
+  "dishes": [
+    {
+      "name": "Grilled Ribeye Steak with Mashed Potatoes and Roasted Vegetables",
+      "vi_name": "Thịt bò nướng sốt cùng khoai tây nghiền và rau củ nướng",
+      "confidence": 0.98,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "Ribeye steak",
+          "vi_name": "Thịt bò thăn",
+          "estimated_weight_g": 250.0,
+          "estimated_nutritions": {
+            "calories": 420.0,
+            "protein": 48.75,
+            "carbs": 0.0,
+            "fat": 26.5
+          },
+          "confidence": 0.95,
+          "note": "main protein component, clearly visible sear marks"
+        },
+        {
+          "name": "Mashed potatoes",
+          "vi_name": "Khoai tây nghiền",
+          "estimated_weight_g": 120.0,
+          "estimated_nutritions": {
+            "calories": 120.0,
+            "protein": 2.0,
+            "carbs": 25.0,
+            "fat": 0.5
+          },
+          "confidence": 0.9,
+          "note": "creamy texture and color consistent with mashed potatoes"
+        },
+        {
+          "name": "Roasted carrots",
+          "vi_name": "Cà rốt nướng",
+          "estimated_weight_g": 40.0,
+          "estimated_nutritions": {
+            "calories": 17.6,
+            "protein": 0.35,
+            "carbs": 3.87,
+            "fat": 0.1
+          },
+          "confidence": 0.85,
+          "note": "visible orange pieces with caramelized edges"
+        },
+        {
+          "name": "Roasted parsnips or turnips",
+          "vi_name": "Củ cải vàng hoặc củ cải trắng nướng",
+          "estimated_weight_g": 30.0,
+          "estimated_nutritions": {
+            "calories": 27.6,
+            "protein": 0.39,
+            "carbs": 4.94,
+            "fat": 0.85
+          },
+          "confidence": 0.75,
+          "note": "inferred from pale root vegetable pieces mixed with carrots"
+        },
+        {
+          "name": "Rosemary sprig",
+          "vi_name": "Nhánh hương thảo",
+          "estimated_weight_g": 2.0,
+          "estimated_nutritions": {
+            "calories": 10.66,
+            "protein": 0.0,
+            "carbs": 0.13,
+            "fat": 1.13
+          },
+          "confidence": 0.9,
+          "note": "garnish, visible on top of steak"
+        },
+        {
+          "name": "Pan sauce / jus",
+          "vi_name": "Sốt nồi",
+          "estimated_weight_g": 15.0,
+          "estimated_nutritions": {
+            "calories": 2.4,
+            "protein": 0.18,
+            "carbs": 0.38,
+            "fat": 0.03
+          },
+          "confidence": 0.8,
+          "note": "visible brown liquid drizzled on plate and steak"
+        }
+      ],
+      "total_estimated_weight_g": 457.0,
+      "total_estimated_nutritions": {
+        "calories": 688.0,
+        "protein": 51.67,
+        "carbs": 34.32,
+        "fat": 33.48
+      },
+      "scale_reference_used": "plate size"
+    }
+  ],
+  "image_quality": "good"
+}

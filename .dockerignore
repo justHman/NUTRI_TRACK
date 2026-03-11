@@ -28,10 +28,7 @@ ENV/
 Thumbs.db
 
 # Project Specific (Data, Weights, Logs)
-data/weights/
-data/output/
-data/tests/
-data/usda_cache.json
+data/
 logs/
 *.log
 *.pt
@@ -56,3 +53,6 @@ tests/
 Dockerfile
 .dockerignore
 apprunner.yaml
+
+# AI
+.claude/
