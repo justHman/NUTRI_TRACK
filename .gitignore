@@ -1,13 +1,15 @@
-# Environments
+# Environments & Secrets
 .env
+config/.env
 
-# Byte-compiled / optimized / DLL files
+# Python & Cache
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Notebooks
-.ipynb_checkpoints/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 
 # Virtual environments
 .venv/
@@ -25,17 +27,28 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Project Specific (Weights, models)
+# Project Specific (Data, Weights, Logs)
 data/weights/
 data/output/
 data/tests/
-docs/
+data/usda_cache.json
+logs/
+*.log
 *.pt
 *.pth
 *.onnx
 *.bin
 *.h5
 
-# Logs
-*.log
-logs/
+# Notebooks & Docs
+.ipynb_checkpoints/
+*.ipynb
+docs/
+*.md
+
+# Tests & CI
+tests/
+.github/
+
+# Git
+.git

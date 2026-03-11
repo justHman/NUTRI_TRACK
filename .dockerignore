@@ -1,13 +1,58 @@
+# Environments & Secrets
 .env
+config/.env
+
+# Python & Cache
 __pycache__/
+*.py[cod]
+*$py.class
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual environments
 .venv/
 venv/
-logs/
-tests/
+env/
+ENV/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Project Specific (Data, Weights, Logs)
 data/weights/
 data/output/
 data/tests/
+data/usda_cache.json
+logs/
+*.log
+*.pt
+*.pth
+*.onnx
+*.bin
+*.h5
+
+# Notebooks & Docs
+.ipynb_checkpoints/
+*.ipynb
 docs/
-.pytest_cache/
+*.md
+
+# Tests & CI
+tests/
 .github/
+
+# Docker & Git
+.git
+.gitignore
+Dockerfile
+.dockerignore
+apprunner.yaml
