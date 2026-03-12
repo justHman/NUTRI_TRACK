@@ -1,5 +1,5 @@
 method,image,status,time_s,dishes,ingredients,bedrock_calls,usda_calls,usda_cache_hits,token_input,price_input,token_output,price_output,notes
-tools,steak,✅ PASS,32.0,1,4,3,6,0,7698,0.0041,917,0.0024,
-manual,steak,✅ PASS,20.2,1,6,1,5,1,1389,0.0007,849,0.0023,
-tools,fast_food,✅ PASS,131.2,11,36,3,23,1,11372,0.006,6463,0.0172,
-manual,fast_food,✅ PASS,128.4,12,46,1,22,24,1517,0.0008,6373,0.017,
+tools,com_tam,pass,40.9,1,7,0,6,5,7208,0.0252,1263,0.0177,"1 dish(es), 7 ingredient(s)"
+manual,com_tam,pass,63.74,1,12,0,7,11,1250,0.0044,1463,0.0205,"1 dish(es), 12 ingredient(s)"
+tools,fast_food,pass,136.68,11,37,0,11,18,9273,0.0325,5961,0.0835,"11 dish(es), 37 ingredient(s)"
+manual,fast_food,pass,134.26,12,45,0,26,29,1517,0.0053,6280,0.0879,"12 dish(es), 45 ingredient(s)"

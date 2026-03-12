@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import requests
+import logging as _stdlib_logging
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -16,6 +17,23 @@ if project_root not in sys.path:
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# ── Console-silence helpers ──────────────────────────────────────────────────
+
+def _silence_console():
+    root = _stdlib_logging.getLogger()
+    saved = []
+    for h in root.handlers:
+        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
+            saved.append((h, h.level))
+            h.setLevel(_stdlib_logging.WARNING)
+    return saved
+
+
+def _restore_console(saved):
+    for h, level in saved:
+        h.setLevel(level)
 
 BASE_URL = "http://localhost:8000"
 LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "hao_hao.jpg")
@@ -247,50 +265,72 @@ def run_all() -> list:
     Returns:
         List of result dicts
     """
-    logger.info("Running API endpoint tests...")
-    results = []
+    _saved = _silence_console()
+    try:
+        print("\n─── API Endpoint Tests ───────────────────────────────────────────────────")
+        all_results = []
 
-    # Test 1: Health check
-    logger.info("API Test 1: GET /health")
-    results.append(_test_health())
+        def _to_case(r):
+            ep = r.get("endpoint", "")
+            img = r.get("image", "")
+            qm  = r.get("query_method", "")
+            label = ep
+            if img:  label += f" / {img}"
+            if qm:   label += f" ({qm})"
+            detail = r.get("notes", "")
+            if r.get("status_code"):  detail += f"  [HTTP {r['status_code']}]"
+            if r.get("time_s"):       detail += f"  [{r['time_s']}s]"
+            return (r["success"], label, detail)
 
-    # Test 2: Root endpoint
-    logger.info("API Test 2: GET /")
-    results.append(_test_root())
+        def _print_group(tag, cases):
+            print(f"\n  ─────[{tag}]─────", flush=True)
+            for i, (ok, label, detail) in enumerate(cases, 1):
+                icon = "✅" if ok else "❌"
+                print(f"    {i}. {label}: {detail} ({icon})", flush=True)
+            passed = sum(ok for ok, _, _ in cases)
+            total = len(cases)
+            s_icon = "✅" if passed == total else "❌"
+            print(f"    {passed}/{total} passed {s_icon}", flush=True)
 
-    # Test 3: Analyze food with tools method (com_tam)
-    logger.info("API Test 3: POST /analyze-food (method=tools, com_tam)")
-    results.append(_test_analyze_food(FOOD_IMG, "com_tam", method="tools"))
+        # ─ HEALTH
+        r = _test_health()
+        all_results.append(r)
+        _print_group("HEALTH TEST", [_to_case(r)])
 
-    # Test 4: Analyze food with manual method (com_tam)
-    logger.info("API Test 4: POST /analyze-food (method=manual, com_tam)")
-    results.append(_test_analyze_food(FOOD_IMG, "com_tam", method="manual"))
+        # ─ ROOT
+        r = _test_root()
+        all_results.append(r)
+        _print_group("ROOT TEST", [_to_case(r)])
 
-    # Test 5: Analyze food with tools method (fast_food)
-    logger.info("API Test 5: POST /analyze-food (method=tools, fast_food)")
-    results.append(_test_analyze_food(FAST_FOOD_IMG, "fast_food", method="tools"))
+        # ─ FOOD endpoint (5 cases)
+        food_cases = []
+        for args in [
+            (FOOD_IMG,      "com_tam",   "tools"),
+            (FOOD_IMG,      "com_tam",   "manual"),
+            (FAST_FOOD_IMG, "fast_food", "tools"),
+        ]:
+            r = _test_analyze_food(*args)
+            all_results.append(r); food_cases.append(_to_case(r))
+        r = _test_analyze_food_invalid_method()
+        all_results.append(r); food_cases.append(_to_case(r))
+        r = _test_analyze_food_invalid_file()
+        all_results.append(r); food_cases.append(_to_case(r))
+        _print_group("FOOD ENDPOINT TESTS", food_cases)
 
-    # Test 6: Invalid method → 400
-    logger.info("API Test 6: POST /analyze-food (invalid method)")
-    results.append(_test_analyze_food_invalid_method())
+        # ─ LABEL endpoint (3 cases)
+        label_cases = []
+        r = _test_analyze_label(LABEL_IMG, "hao_hao", expect_label=True)
+        all_results.append(r); label_cases.append(_to_case(r))
+        r = _test_analyze_label(FOOD_IMG, "com_tam", expect_label=False)
+        all_results.append(r); label_cases.append(_to_case(r))
+        r = _test_analyze_label_invalid_file()
+        all_results.append(r); label_cases.append(_to_case(r))
+        _print_group("LABEL ENDPOINT TESTS", label_cases)
 
-    # Test 7: Invalid file → 400
-    logger.info("API Test 7: POST /analyze-food (non-image file)")
-    results.append(_test_analyze_food_invalid_file())
-
-    # Test 8: Analyze label image (expect label)
-    logger.info("API Test 8: POST /analyze-label (label image)")
-    results.append(_test_analyze_label(LABEL_IMG, "hao_hao", expect_label=True))
-
-    # Test 9: Analyze non-label image (expect no label)
-    logger.info("API Test 9: POST /analyze-label (non-label image)")
-    results.append(_test_analyze_label(FOOD_IMG, "com_tam", expect_label=False))
-
-    # Test 10: Analyze label with non-image file → 400
-    logger.info("API Test 10: POST /analyze-label (non-image file)")
-    results.append(_test_analyze_label_invalid_file())
-
-    passed = sum(1 for r in results if r.get("success"))
-    logger.info("API tests: %d/%d passed", passed, len(results))
-
-    return results
+        passed = sum(1 for r in all_results if r.get("success"))
+        icon = "✅" if passed == len(all_results) else "❌"
+        print(f"\n───────────────────────────────────────────────────────────────────────", flush=True)
+        print(f"  {passed}/{len(all_results)} passed {icon}\n", flush=True)
+        return all_results
+    finally:
+        _restore_console(_saved)

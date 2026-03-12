@@ -70,7 +70,7 @@ def _analyze_with_tools(image_path: str, image_bytes: bytes, filename: str,
     logger.title("Pipeline Mode: Tool Calling")
 
     step_start = time.time()
-    food_list: FoodList = qwen.analyze_food_with_tools(image_path=image_path, image_bytes=image_bytes, filename=filename, usda_client=usda_client, max_tool_rounds=2)
+    food_list: FoodList = qwen.analyze_food_with_tools(image_path=image_path, image_bytes=image_bytes, filename=filename, usda_client=usda_client, max_tool_rounds=1)
     logger.info("Tool-calling analysis complete: %d dish(es) in %.1fs",
                 len(food_list.dishes), time.time() - step_start)
 

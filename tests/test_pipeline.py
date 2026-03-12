@@ -9,6 +9,7 @@ Tests the high-level analyze_nutrition() pipeline with both methods:
 import os
 import sys
 import time
+import logging as _stdlib_logging
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -21,14 +22,31 @@ from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+# ── Console-silence helpers ──────────────────────────────────────────────────
+
+def _silence_console():
+    root = _stdlib_logging.getLogger()
+    saved = []
+    for h in root.handlers:
+        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
+            saved.append((h, h.level))
+            h.setLevel(_stdlib_logging.WARNING)
+    return saved
+
+
+def _restore_console(saved):
+    for h, level in saved:
+        h.setLevel(level)
+
 # Test images
 COM_TAM_IMG = os.path.join(project_root, "..", "data", "images", "food", "com_tam.jpg")
 FAST_FOOD_IMG = os.path.join(project_root, "..", "data", "images", "food", "fast_food.jpg")
 STEAK_IMG = os.path.join(project_root, "..", "data", "images", "food", "steak.png")
 
 # Bedrock pricing (approximate — adjust as needed)
-PRICE_PER_1K_INPUT = 0.0035
-PRICE_PER_1K_OUTPUT = 0.014
+PRICE_PER_1K_INPUT = 0.00053
+PRICE_PER_1K_OUTPUT = 0.00266
 
 
 def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: str) -> dict:
@@ -54,7 +72,6 @@ def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: 
 
     if not os.path.exists(image_path):
         result["notes"] = f"Image not found: {image_path}"
-        logger.warning("Pipeline test skipped: %s", result["notes"])
         return result
 
     try:
@@ -126,26 +143,49 @@ def run_all(qwen, usda_client) -> list:
     Returns:
         List of result dicts (4 tests: 2 methods × 2 images)
     """
-    logger.info("Running pipeline tests...")
-    results = []
+    _saved = _silence_console()
+    try:
+        print("\n─── Pipeline Tests ───────────────────────────────────────────────────────")
+        all_results = []
 
-    # Test 1: Tools method with com_tam
-    logger.info("Pipeline Test 1: method=tools, image=com_tam")
-    results.append(_test_pipeline(qwen, usda_client, COM_TAM_IMG, "com_tam", "tools"))
+        TEST_IMAGES = [
+            (COM_TAM_IMG,   "com_tam"),
+            (FAST_FOOD_IMG, "fast_food"),
+        ]
 
-    # Test 2: Manual method with com_tam
-    logger.info("Pipeline Test 2: method=manual, image=com_tam")
-    results.append(_test_pipeline(qwen, usda_client, COM_TAM_IMG, "com_tam", "manual"))
+        METHODS = [
+            ("tools",  "TOOLS PIPELINE"),
+            ("manual", "MANUAL PIPELINE"),
+        ]
 
-    # Test 3: Tools method with fast_food
-    logger.info("Pipeline Test 3: method=tools, image=fast_food")
-    results.append(_test_pipeline(qwen, usda_client, FAST_FOOD_IMG, "fast_food", "tools"))
+        def _to_case(r):
+            detail = r.get("notes", "")
+            if r.get("time_s"):
+                detail += f"  [{r['time_s']}s]"
+            return (r["success"], r["image"], detail)
 
-    # Test 4: Manual method with fast_food
-    logger.info("Pipeline Test 4: method=manual, image=fast_food")
-    results.append(_test_pipeline(qwen, usda_client, FAST_FOOD_IMG, "fast_food", "manual"))
+        def _print_group(tag, cases):
+            print(f"\n  ─────[{tag}]─────", flush=True)
+            for i, (ok, label, detail) in enumerate(cases, 1):
+                icon = "✅" if ok else "❌"
+                print(f"    {i}. {label}: {detail} ({icon})", flush=True)
+            passed = sum(ok for ok, _, _ in cases)
+            total = len(cases)
+            s_icon = "✅" if passed == total else "❌"
+            print(f"    {passed}/{total} passed {s_icon}", flush=True)
 
-    passed = sum(1 for r in results if r.get("success", False))
-    logger.info("Pipeline tests: %d/%d passed", passed, len(results))
+        for method, group_tag in METHODS:
+            group_cases = []
+            for img_path, img_name in TEST_IMAGES:
+                r = _test_pipeline(qwen, usda_client, img_path, img_name, method)
+                all_results.append(r)
+                group_cases.append(_to_case(r))
+            _print_group(group_tag, group_cases)
 
-    return results
+        passed = sum(1 for r in all_results if r.get("success", False))
+        icon = "✅" if passed == len(all_results) else "❌"
+        print(f"\n───────────────────────────────────────────────────────────────────────", flush=True)
+        print(f"  {passed}/{len(all_results)} passed {icon}\n", flush=True)
+        return all_results
+    finally:
+        _restore_console(_saved)

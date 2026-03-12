@@ -7,6 +7,7 @@ Tests the label analysis pipeline with label and non-label images.
 import os
 import sys
 import time
+import logging as _stdlib_logging
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -15,6 +16,23 @@ if project_root not in sys.path:
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# ── Console-silence helpers ──────────────────────────────────────────────────
+
+def _silence_console():
+    root = _stdlib_logging.getLogger()
+    saved = []
+    for h in root.handlers:
+        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
+            saved.append((h, h.level))
+            h.setLevel(_stdlib_logging.WARNING)
+    return saved
+
+
+def _restore_console(saved):
+    for h, level in saved:
+        h.setLevel(level)
 
 # Test images
 LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "hao_hao.jpg")
@@ -37,7 +55,6 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
 
     if not os.path.exists(image_path):
         result["notes"] = f"Image not found: {image_path}"
-        logger.warning("Test skipped: %s", result["notes"])
         return result
 
     try:
@@ -91,18 +108,41 @@ def run_all(qwen) -> list:
     Returns:
         List of result dicts
     """
-    logger.info("Running label analyzer tests...")
-    results = []
+    _saved = _silence_console()
+    try:
+        print("\n─── Label Analyzer Tests ─────────────────────────────────────────────────")
+        all_results = []
+        group_cases = []
 
-    # Test 1: Label image — should detect label
-    logger.info("Test 1: Label image (hao_hao.jpg)")
-    results.append(_test_label_image(qwen, LABEL_IMG, "hao_hao", expect_label=True))
+        TEST_CASES = [
+            (LABEL_IMG,     "hao_hao", True),
+            (NON_LABEL_IMG, "com_tam", False),
+        ]
 
-    # Test 2: Non-label image — should return empty dishes
-    logger.info("Test 2: Non-label image (com_tam.jpg)")
-    results.append(_test_label_image(qwen, NON_LABEL_IMG, "com_tam", expect_label=False))
+        def _print_group(tag, cases):
+            print(f"\n  ─────[{tag}]─────", flush=True)
+            for i, (ok, label, detail) in enumerate(cases, 1):
+                icon = "✅" if ok else "❌"
+                print(f"    {i}. {label}: {detail} ({icon})", flush=True)
+            passed = sum(ok for ok, _, _ in cases)
+            total = len(cases)
+            s_icon = "✅" if passed == total else "❌"
+            print(f"    {passed}/{total} passed {s_icon}", flush=True)
 
-    passed = sum(1 for r in results if r.get("success"))
-    logger.info("Label analyzer tests: %d/%d passed", passed, len(results))
+        for img_path, img_name, expect_label in TEST_CASES:
+            r = _test_label_image(qwen, img_path, img_name, expect_label)
+            all_results.append(r)
+            detail = r.get("notes", "")
+            if r.get("time_s"):
+                detail += f"  [{r['time_s']}s]"
+            group_cases.append((r["success"], img_name, detail))
 
-    return results
+        _print_group("LABEL OCR TESTS", group_cases)
+
+        passed = sum(1 for r in all_results if r.get("success"))
+        icon = "✅" if passed == len(all_results) else "❌"
+        print(f"\n───────────────────────────────────────────────────────────────────────", flush=True)
+        print(f"  {passed}/{len(all_results)} passed {icon}\n", flush=True)
+        return all_results
+    finally:
+        _restore_console(_saved)

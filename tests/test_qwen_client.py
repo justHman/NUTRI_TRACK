@@ -10,6 +10,7 @@ Tests the 3 analysis methods of Qwen3VL against food images.
 import os
 import sys
 import time
+import logging as _stdlib_logging
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -21,6 +22,23 @@ load_dotenv(os.path.join(project_root, "config", ".env"))
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# ── Console-silence helpers ──────────────────────────────────────────────────
+
+def _silence_console():
+    root = _stdlib_logging.getLogger()
+    saved = []
+    for h in root.handlers:
+        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
+            saved.append((h, h.level))
+            h.setLevel(_stdlib_logging.WARNING)
+    return saved
+
+
+def _restore_console(saved):
+    for h, level in saved:
+        h.setLevel(level)
 
 # Test images
 COM_TAM_IMG = os.path.join(project_root, "data", "images", "dishes", "com_tam.jpg")
@@ -58,7 +76,6 @@ def _test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
 
     if not os.path.exists(image_path):
         result["notes"] = f"Image not found: {image_path}"
-        logger.warning("Test skipped: %s", result["notes"])
         return result
 
     try:
@@ -128,7 +145,6 @@ def _test_method2_instructor(qwen, image_path: str, image_name: str) -> dict:
     except Exception as e:
         result["status"] = "expected_fail"
         result["notes"] = f"Expected failure (instructor): {str(e)[:200]}"
-        logger.info("Method 2 (instructor) expected failure for %s: %s", image_name, e)
 
     return result
 
@@ -139,7 +155,6 @@ def _test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
 
     if not os.path.exists(image_path):
         result["notes"] = f"Image not found: {image_path}"
-        logger.warning("Test skipped: %s", result["notes"])
         return result
 
     try:
@@ -197,28 +212,57 @@ def run_all(qwen) -> list:
     Returns:
         List of result dicts (6 tests: 3 methods × 2 images)
     """
-    logger.info("Running Qwen3VL model tests...")
-    results = []
+    _saved = _silence_console()
+    try:
+        print("\n─── Qwen3VL Model Tests ───────────────────────────────────────────────")
+        all_results = []
 
-    test_images = [
-        (COM_TAM_IMG, "com_tam"),
-        (FAST_FOOD_IMG, "fast_food"),
-    ]
+        TEST_IMAGES = [
+            (COM_TAM_IMG,   "com_tam"),
+            (FAST_FOOD_IMG, "fast_food"),
+        ]
 
-    for image_path, image_name in test_images:
-        # Method 1: Converse API
-        logger.info("Test: Method 1 (Converse) with %s", image_name)
-        results.append(_test_method1_converse(qwen, image_path, image_name))
+        METHOD_GROUPS = [
+            ("method1", "CONVERSE METHOD",   _test_method1_converse),
+            ("method2", "INSTRUCTOR METHOD", _test_method2_instructor),
+            ("method3", "TOOLS METHOD",      _test_method3_tools),
+        ]
 
-        # Method 2: Instructor (expected to fail)
-        logger.info("Test: Method 2 (Instructor) with %s", image_name)
-        results.append(_test_method2_instructor(qwen, image_path, image_name))
+        def _to_case(r):
+            if r["status"] in ("skip", "expected_fail"):
+                ok = None
+            elif r["success"]:
+                ok = True
+            else:
+                ok = False
+            detail = r.get("notes", "")
+            if r.get("time_s"):
+                detail += f"  [{r['time_s']}s]"
+            return (ok, r["image"], detail)
 
-        # Method 3: Tool Calling
-        logger.info("Test: Method 3 (Tool Calling) with %s", image_name)
-        results.append(_test_method3_tools(qwen, image_path, image_name))
+        def _print_group(tag, cases):
+            print(f"\n  ─────[{tag}]─────", flush=True)
+            for i, (ok, label, detail) in enumerate(cases, 1):
+                icon = "⏭️ " if ok is None else ("✅" if ok else "❌")
+                print(f"    {i}. {label}: {detail} ({icon})", flush=True)
+            passed = sum(1 for ok, _, _ in cases if ok)
+            total = len(cases)
+            s_icon = "✅" if passed == total else "❌"
+            note = "  (skips expected)" if any(ok is None for ok, _, _ in cases) else ""
+            print(f"    {passed}/{total} passed {s_icon}{note}", flush=True)
 
-    passed = sum(1 for r in results if r.get("success", False))
-    logger.info("Qwen3VL tests: %d/%d passed", passed, len(results))
+        for _mkey, group_tag, test_fn in METHOD_GROUPS:
+            group_cases = []
+            for img_path, img_name in TEST_IMAGES:
+                r = test_fn(qwen, img_path, img_name)
+                all_results.append(r)
+                group_cases.append(_to_case(r))
+            _print_group(group_tag, group_cases)
 
-    return results
+        passed = sum(1 for r in all_results if r.get("success", False))
+        icon = "✅" if passed == len(all_results) else "❌"
+        print(f"\n───────────────────────────────────────────────────────────────────────", flush=True)
+        print(f"  {passed}/{len(all_results)} passed {icon}  (instructor skip is expected)\n", flush=True)
+        return all_results
+    finally:
+        _restore_console(_saved)

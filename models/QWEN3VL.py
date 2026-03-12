@@ -168,7 +168,7 @@ class Qwen3VL:
     # Tool definition for USDA nutrition lookup
     def analyze_with_tool_calling(self, image_path: Optional[str] = None, prompt: str = "",
                                    usda_client=None, system_prompt: str = None,
-                                   max_tool_rounds: int = 2, image_bytes: Optional[bytes] = None, filename: str = None) -> str:
+                                   max_tool_rounds: int = 1, image_bytes: Optional[bytes] = None, filename: str = None) -> str:
         """Image analysis with tool calling (Converse API + toolConfig)"""
         if image_bytes is None:
             if not image_path or not os.path.exists(image_path):
@@ -384,7 +384,7 @@ class Qwen3VL:
             system_prompt=LABEL_VISION_SYSTEM_PROMPT,
         )
 
-    def analyze_food_with_tools(self, image_path: Optional[str] = None, usda_client=None, max_tool_rounds: int = 2, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
+    def analyze_food_with_tools(self, image_path: Optional[str] = None, usda_client=None, max_tool_rounds: int = 1, image_bytes: Optional[bytes] = None, filename: str = None) -> FoodList:
         """Analyze food using Converse API + Tool Calling (Method 3)
 
         The model identifies food items from the image, then calls USDA tools:

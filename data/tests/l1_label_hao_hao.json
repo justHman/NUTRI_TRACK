@@ -1,0 +1,34 @@
+{
+  "dishes": [
+    {
+      "name": "Doraemon Instant Noodles",
+      "vi_name": "Mì Ăn Liền Doraemon",
+      "confidence": 0.95,
+      "cooking_method": "packaged",
+      "ingredients": [
+        {
+          "name": "Total Nutrition (as labeled)",
+          "vi_name": "Thành phần dinh dưỡng",
+          "estimated_weight_g": 75.0,
+          "estimated_nutritions": {
+            "calories": 350.0,
+            "protein": 6.9,
+            "carbs": 51.4,
+            "fat": 13.0
+          },
+          "confidence": 0.9,
+          "note": "per serving (75g); contains: sodium (from ingredients), preservatives (BHA, BHT), flavor enhancers (monosodium glutamate, disodium inosinate, disodium guanylate), acidity regulators, coloring (curcumin), sweetener (aspartame)"
+        }
+      ],
+      "total_estimated_weight_g": 75.0,
+      "total_estimated_nutritions": {
+        "calories": 350.0,
+        "protein": 6.9,
+        "carbs": 51.4,
+        "fat": 13.0
+      },
+      "scale_reference_used": "per serving 75g"
+    }
+  ],
+  "image_quality": "good"
+}

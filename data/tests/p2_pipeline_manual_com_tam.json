@@ -1,8 +1,8 @@
 {
   "dishes": [
     {
-      "name": "Grilled Pork Chop with Rice and Egg",
-      "vi_name": "Sườn nướng cơm trắng trứng ốp la",
+      "name": "Vietnamese Pork Chop Rice",
+      "vi_name": "Cơm Tấm Sườn Nướng",
       "confidence": 0.98,
       "cooking_method": "grilled",
       "ingredients": [
@@ -17,11 +17,11 @@
             "fat": 16.27
           },
           "confidence": 0.95,
-          "note": "visible charred edges and glaze indicate grilling"
+          "note": "main protein component, glazed with marinade"
         },
         {
-          "name": "Steamed white rice",
-          "vi_name": "Cơm trắng",
+          "name": "Steamed broken rice",
+          "vi_name": "Cơm tấm",
           "estimated_weight_g": 150.0,
           "estimated_nutritions": {
             "calories": 226.5,
@@ -29,8 +29,8 @@
             "carbs": 50.85,
             "fat": 0.41
           },
-          "confidence": 0.9,
-          "note": "mounded rice with green onion and fried shallots on top"
+          "confidence": 0.95,
+          "note": "base of the dish, typical broken rice texture"
         },
         {
           "name": "Fried egg",
@@ -43,59 +43,33 @@
             "fat": 8.88
           },
           "confidence": 0.95,
-          "note": "sunny-side up with runny yolk"
+          "note": "sunny-side up, visible yolk"
         },
         {
-          "name": "Fried shallots",
-          "vi_name": "Hành phi",
-          "estimated_weight_g": 5.0,
+          "name": "Pork meatloaf slice",
+          "vi_name": "Chả trứng",
+          "estimated_weight_g": 50.0,
           "estimated_nutritions": {
-            "calories": 3.6,
-            "protein": 0.12,
-            "carbs": 0.84,
-            "fat": 0.01
-          },
-          "confidence": 0.85,
-          "note": "scattered on rice"
-        },
-        {
-          "name": "Chopped green onion",
-          "vi_name": "Hành lá cắt nhỏ",
-          "estimated_weight_g": 3.0,
-          "estimated_nutritions": {
-            "calories": 0.99,
-            "protein": 0.1,
-            "carbs": 0.0,
-            "fat": 0.0
+            "calories": 108.5,
+            "protein": 5.88,
+            "carbs": 14.37,
+            "fat": 3.08
           },
           "confidence": 0.9,
-          "note": "garnish on rice"
+          "note": "yellow-tinted, likely egg-based meatloaf"
         },
         {
-          "name": "Pickled carrots and daikon",
-          "vi_name": "Củ cải cà rốt muối chua",
+          "name": "Pickled vegetables (carrot & daikon)",
+          "vi_name": "Đồ chua (cà rốt, củ cải)",
           "estimated_weight_g": 30.0,
           "estimated_nutritions": {
-            "calories": 11.4,
-            "protein": 0.0,
-            "carbs": 2.31,
+            "calories": 7.5,
+            "protein": 0.32,
+            "carbs": 1.82,
             "fat": 0.0
           },
           "confidence": 0.9,
-          "note": "julienned, bright orange and white"
-        },
-        {
-          "name": "Tomato slices",
-          "vi_name": "Cà chua cắt lát",
-          "estimated_weight_g": 25.0,
-          "estimated_nutritions": {
-            "calories": 22.5,
-            "protein": 1.09,
-            "carbs": 3.17,
-            "fat": 0.59
-          },
-          "confidence": 0.9,
-          "note": "arranged in rose shape"
+          "note": "shredded, vinegar-pickled"
         },
         {
           "name": "Cucumber slices",
@@ -108,20 +82,46 @@
             "fat": 0.03
           },
           "confidence": 0.9,
-          "note": "green, round slices"
+          "note": "fresh, raw garnish"
         },
         {
-          "name": "Vietnamese pork roll (chả lụa)",
-          "vi_name": "Chả lụa",
-          "estimated_weight_g": 50.0,
+          "name": "Tomato slices (rose-shaped)",
+          "vi_name": "Cà chua cắt hoa",
+          "estimated_weight_g": 25.0,
           "estimated_nutritions": {
-            "calories": 164.5,
-            "protein": 6.54,
-            "carbs": 2.25,
-            "fat": 14.2
+            "calories": 22.5,
+            "protein": 1.09,
+            "carbs": 3.17,
+            "fat": 0.59
+          },
+          "confidence": 0.9,
+          "note": "decorative cut, raw"
+        },
+        {
+          "name": "Fried shallots",
+          "vi_name": "Hành phi",
+          "estimated_weight_g": 5.0,
+          "estimated_nutritions": {
+            "calories": 3.6,
+            "protein": 0.12,
+            "carbs": 0.84,
+            "fat": 0.01
           },
           "confidence": 0.85,
-          "note": "yellowish slice with visible texture"
+          "note": "sprinkled on rice, typical topping"
+        },
+        {
+          "name": "Scallion oil",
+          "vi_name": "Dầu hành",
+          "estimated_weight_g": 5.0,
+          "estimated_nutritions": {
+            "calories": 1.6,
+            "protein": 0.09,
+            "carbs": 0.37,
+            "fat": 0.01
+          },
+          "confidence": 0.8,
+          "note": "inferred from green garnish on rice"
         },
         {
           "name": "Fresh lettuce",
@@ -134,40 +134,24 @@
             "fat": 0.02
           },
           "confidence": 0.9,
-          "note": "leafy greens on side"
+          "note": "served on side, raw"
         },
         {
-          "name": "Red chili pepper",
+          "name": "Chili pepper",
           "vi_name": "Ớt đỏ",
-          "estimated_weight_g": 2.0,
+          "estimated_weight_g": 3.0,
           "estimated_nutritions": {
-            "calories": 0.8,
-            "protein": 0.04,
-            "carbs": 0.18,
-            "fat": 0.01
+            "calories": 3.0,
+            "protein": 0.0,
+            "carbs": 0.3,
+            "fat": 0.0
           },
-          "confidence": 0.8,
-          "note": "whole, placed on pickled vegetables"
-        }
-      ],
-      "total_estimated_weight_g": 575.0,
-      "total_estimated_nutritions": {
-        "calories": 1035.79,
-        "protein": 54.2,
-        "carbs": 76.28,
-        "fat": 46.48
-      },
-      "scale_reference_used": "plate size"
-    },
-    {
-      "name": "Fish Sauce Dip",
-      "vi_name": "Nước mắm chấm",
-      "confidence": 0.9,
-      "cooking_method": "mixed",
-      "ingredients": [
+          "confidence": 0.9,
+          "note": "whole, raw garnish"
+        },
         {
-          "name": "Fish sauce",
-          "vi_name": "Nước mắm",
+          "name": "Fish sauce (dipping sauce)",
+          "vi_name": "Nước mắm chấm",
           "estimated_weight_g": 15.0,
           "estimated_nutritions": {
             "calories": 5.25,
@@ -175,57 +159,18 @@
             "carbs": 0.55,
             "fat": 0.0
           },
-          "confidence": 0.9,
-          "note": "in small white bowl, reddish hue suggests chili added"
-        },
-        {
-          "name": "Chili",
-          "vi_name": "Ớt",
-          "estimated_weight_g": 2.0,
-          "estimated_nutritions": {
-            "calories": 2.04,
-            "protein": 0.14,
-            "carbs": 0.14,
-            "fat": 0.1
-          },
           "confidence": 0.85,
-          "note": "visible red flecks in sauce"
-        },
-        {
-          "name": "Sugar",
-          "vi_name": "Đường",
-          "estimated_weight_g": 5.0,
-          "estimated_nutritions": {
-            "calories": 18.75,
-            "protein": 0.0,
-            "carbs": 5.0,
-            "fat": 0.0
-          },
-          "confidence": 0.8,
-          "note": "inferred – typical in Vietnamese dipping sauce"
-        },
-        {
-          "name": "Lime juice",
-          "vi_name": "Nước cốt chanh",
-          "estimated_weight_g": 5.0,
-          "estimated_nutritions": {
-            "calories": 0.0,
-            "protein": 0.0,
-            "carbs": 0.33,
-            "fat": 0.0
-          },
-          "confidence": 0.75,
-          "note": "inferred – common ingredient in nuoc cham"
+          "note": "in small bowl, typical accompaniment"
         }
       ],
-      "total_estimated_weight_g": 27.0,
+      "total_estimated_weight_g": 598.0,
       "total_estimated_nutritions": {
-        "calories": 26.04,
-        "protein": 0.9,
-        "carbs": 6.02,
-        "fat": 0.1
+        "calories": 976.18,
+        "protein": 54.57,
+        "carbs": 88.95,
+        "fat": 33.7
       },
-      "scale_reference_used": "small bowl size"
+      "scale_reference_used": "plate size"
     }
   ],
   "image_quality": "good"
