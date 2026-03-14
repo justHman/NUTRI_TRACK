@@ -3,6 +3,8 @@ import os
 from io import BytesIO
 from PIL import Image
 from typing import Tuple
+import re
+import unicodedata
 
 from config.logging_config import get_logger
 
@@ -13,6 +15,42 @@ logger = get_logger(__name__)
 # Base64 encoding adds ~33% overhead. Set limit to 3MB to be absolutely safe.
 BEDROCK_MAX_RAW_BYTES = 3_000_000
 
+def normalize_query(query: str) -> str:
+    """
+    Robust multilingual normalize:
+    - lowercase, strip
+    - remove accents (Vietnamese, French, German, etc.)
+    - extract prefix before parentheses (if ≥2 chars)
+    - replace hyphens/underscores with spaces
+    - remove punctuation
+    - collapse multiple spaces
+    """
+    if not query:
+        logger.debug("_normalize_query: empty input, returning ''")
+        return ""
+
+    original = query
+    query = str(query).strip().lower()
+
+    # Remove accents
+    query = unicodedata.normalize('NFKD', query)
+    query = ''.join([c for c in query if not unicodedata.combining(c)])
+
+    # Extract prefix before parentheses
+    match = re.match(r"^(.*?)\s*\(.*?\)", query)
+    if match:
+        prefix = match.group(1).strip()
+        if len(prefix) >= 2:
+            query = prefix
+            logger.debug("_normalize_query: extracted prefix '%s' from '%s'", prefix, original)
+
+    query = re.sub(r"[-_]", " ", query)
+    query = re.sub(r"[()]", "", query)
+    query = re.sub(r"[^\w\s]", "", query)
+    query = re.sub(r"\s+", " ", query).strip()
+
+    logger.debug("_normalize_query: '%s' → '%s'", original, query)
+    return query
 
 def load_image_bytes(image_path: str) -> bytes:
     """Load raw bytes from an image file.

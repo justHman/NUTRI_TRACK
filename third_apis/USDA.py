@@ -98,15 +98,21 @@ def _load_disk_cache() -> dict:
                 logger.warning("Failed to download cache from S3: %s", e)
 
     if not os.path.exists(_CACHE_FILE):
-        return {}
+        return {"foods": {}, "barcodes": {}}
     try:
         with open(_CACHE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        logger.debug("L2 cache loaded: %d entries from %s", len(data), _CACHE_FILE)
+            raw = json.load(f)
+        data = {
+            "foods":    raw.get("foods",    {}),
+            "barcodes": raw.get("barcodes", {}),
+        }
+        total = len(data["foods"]) + len(data["barcodes"])
+        logger.debug("L2 cache loaded: %d entries (%d foods, %d barcodes) from %s",
+                     total, len(data["foods"]), len(data["barcodes"]), _CACHE_FILE)
         return data
     except Exception as e:
         logger.warning("L2 cache load failed (%s), starting fresh", e)
-        return {}
+        return {"foods": {}, "barcodes": {}}
 
 
 def _save_disk_cache(cache: dict):
@@ -115,7 +121,9 @@ def _save_disk_cache(cache: dict):
         os.makedirs(_CACHE_DIR, exist_ok=True)
         with open(_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
-        logger.debug("L2 cache saved: %d entries to %s", len(cache), _CACHE_FILE)
+        total = len(cache.get("foods", {})) + len(cache.get("barcodes", {}))
+        logger.debug("L2 cache saved: %d entries (%d foods, %d barcodes) to %s",
+                     total, len(cache.get("foods", {})), len(cache.get("barcodes", {})), _CACHE_FILE)
         
         # Sync to S3 if configured
         s3_bucket = os.getenv("AWS_S3_CACHE_BUCKET")
@@ -296,8 +304,8 @@ class USDAClient:
             return l1_hit
 
         # ── Level 2: Disk JSON ────────────────────────────────────────────
-        if normalized_query in _l2:
-            entry = _l2[normalized_query]
+        if normalized_query in _l2["foods"]:
+            entry = _l2["foods"][normalized_query]
             if not _is_expired(entry):
                 food = entry.get("food")
                 logger.info("search_best: L2 HIT (disk) for '%s' → '%s'",
@@ -320,7 +328,7 @@ class USDAClient:
         if not foods:
             # Cache the None result to avoid repeat calls for queries with 0 results
             _l1.set(normalized_query, None)
-            _l2[normalized_query] = {"food": None, "_ts": _now_ts()}
+            _l2["foods"][normalized_query] = {"food": None, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return None
 
@@ -330,7 +338,7 @@ class USDAClient:
 
         # Save to L1 + L2
         _l1.set(normalized_query, best_food)
-        _l2[normalized_query] = {"food": best_food, "_ts": _now_ts()}
+        _l2["foods"][normalized_query] = {"food": best_food, "_ts": _now_ts()}
         _save_disk_cache(_l2)
 
         return best_food
@@ -353,21 +361,27 @@ class USDAClient:
         Use for full reset / test fixture teardown.
         """
         _l1.clear()
-        _l2.clear()
+        _l2["foods"].clear()
+        _l2["barcodes"].clear()
         _save_disk_cache(_l2)
         logger.info("All caches cleared (L1 + L2)")
 
     @staticmethod
     def cache_stats() -> dict:
         """Return current cache statistics."""
-        expired = sum(1 for e in _l2.values() if _is_expired(e))
+        foods    = _l2["foods"]
+        barcodes = _l2["barcodes"]
+        expired  = sum(1 for e in foods.values()    if _is_expired(e)) \
+                 + sum(1 for e in barcodes.values() if _is_expired(e))
         return {
-            "l1_entries": len(_l1),
-            "l1_maxsize": _L1_MAXSIZE,
-            "l2_entries": len(_l2),
-            "l2_expired": expired,
-            "l2_file": _CACHE_FILE,
-            "ttl_days": _CACHE_TTL_DAYS,
+            "l1_entries":         len(_l1),
+            "l1_maxsize":         _L1_MAXSIZE,
+            "l2_food_entries":    len(foods),
+            "l2_barcode_entries": len(barcodes),
+            "l2_entries":         len(foods) + len(barcodes),
+            "l2_expired":         expired,
+            "l2_file":            _CACHE_FILE,
+            "ttl_days":           _CACHE_TTL_DAYS,
         }
 
     # ─────────────────────────────────────────────────────────────────────
@@ -427,6 +441,27 @@ class USDAClient:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
             return None
 
+        l1_key = f"barcode:{barcode}"
+
+        # Level 1: RAM cache
+        l1_hit = _l1.get(l1_key)
+        if l1_hit is not _MISSING:
+            logger.info("search_by_barcode: L1 HIT (RAM) for code='%s'", barcode)
+            logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
+            return l1_hit
+
+        # Level 2: Disk cache
+        if barcode in _l2["barcodes"]:
+            entry = _l2["barcodes"][barcode]
+            if not _is_expired(entry):
+                cached = entry.get("food")
+                logger.info("search_by_barcode: L2 HIT (disk) for code='%s'", barcode)
+                logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
+                _l1.set(l1_key, cached)
+                return cached
+            logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
+                        barcode, _CACHE_TTL_DAYS)
+
         search_url = f"{self.base_url}/foods/search"
         params = {
             "query": barcode,
@@ -444,6 +479,9 @@ class USDAClient:
             data = resp.json()
             logger.debug("USDA barcode API: status=%d, totalHits=%s",
                          resp.status_code, data.get("totalHits", "N/A"))
+            _l1.set(l1_key, data)
+            _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
+            _save_disk_cache(_l2)
             return data
         except requests.exceptions.Timeout:
             logger.error("USDA barcode API timeout for code='%s'", barcode)

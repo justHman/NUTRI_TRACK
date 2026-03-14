@@ -42,6 +42,7 @@ QUERIES = [
     {"query": "white rice cooked", "expect_calories_gt": 0},
     {"query": "egg fried", "expect_calories_gt": 0},
     {"query": "cơm tấm", "expect_calories_gt": 0},  # Vietnamese — tests normalize
+    {"query": "chocolate", "expect_calories_gt": 0}
 ]
 
 
@@ -138,7 +139,7 @@ def _test_cache_l2_hit(client) -> list:
             },
             "ingredients_text": "CHICKEN BREAST, SALT, WATER",
         }
-        _l2[query] = {"food": fake_food, "_ts": _now_ts()}
+        _l2["foods"][query] = {"food": fake_food, "_ts": _now_ts()}
         OpenFoodFactsClient.clear_l1_cache()
         assert _l1.get(query) is _MISSING
         start = time.time()
@@ -152,7 +153,7 @@ def _test_cache_l2_hit(client) -> list:
         return [(False, "synthetic inject+promote", str(e))]
     finally:
         from third_apis.OpenFoodFacts import _l2, OpenFoodFactsClient
-        _l2.pop("__l2_test_chicken_off__", None)
+        _l2["foods"].pop("__l2_test_chicken_off__", None)
         OpenFoodFactsClient.clear_l1_cache()
 
 
@@ -213,8 +214,9 @@ def _test_normalize_query(client) -> list:
 
 
 def _test_search_by_barcode(client) -> list:
-    """Test search_by_barcode() returns raw Open Food Facts JSON response shape."""
+    """Test search_by_barcode() returns the compact parsed Open Food Facts response shape."""
     cases = [
+        ("8934563138165", True),
         ("abc", False),
     ]
     results = []
@@ -235,9 +237,101 @@ def _test_search_by_barcode(client) -> list:
                 continue
 
             assert isinstance(raw, dict), f"expected dict, got {type(raw).__name__}"
-            results.append((True, f"'{code}'", f"got response dict"))
+            assert raw.get("barcode") == code
+            assert isinstance(raw.get("found"), bool)
+            if raw.get("found"):
+                assert raw.get("product_name")
+                assert isinstance(raw.get("nutritions"), dict)
+                assert "calories" in raw["nutritions"]
+            results.append((True, f"'{code}'",
+                            f"found={raw.get('found')} name={raw.get('product_name', 'N/A')}"))
         except Exception as e:
             results.append((False, f"'{code}'", str(e)))
+
+    return results
+
+
+def _test_barcode_parser_fixture(client) -> list:
+    """Validate the compact barcode parser against the local fixture payload."""
+    fixture_path = os.path.join(project_root, "data", "tests", "openfoodfacts_8934563138165.json")
+
+    try:
+        import json
+
+        with open(fixture_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+
+        parsed = client._parse_barcode_response(payload, "8934563138165")
+        assert parsed["barcode"] == "8934563138165"
+        assert parsed["found"] is True
+        assert parsed["product_name"] == "Hao Hao Mi Tom Chua Cay (hot Sour Shrimp Flavor Noodle)"
+        assert parsed["brands"] == "Vina acecook"
+        assert parsed["quantity"] == "75 g"
+        assert parsed["category"] == "instant noodles"
+        assert parsed["allergens"] == ["crustaceans", "fish", "gluten"]
+        assert parsed["labels"]["nova_group"] == 4
+        assert parsed["labels"]["ecoscore"] == "b"
+        assert parsed["nutritions"]["calories"] == 455.0
+        assert parsed["nutritions"]["protein"] == 10.39
+        assert parsed["images"]["front"].startswith("https://")
+        return [(True, "fixture barcode parse",
+                 f"{parsed['product_name']} | {parsed['category']} | cal={parsed['nutritions']['calories']:.1f}")]
+    except Exception as e:
+        return [(False, "fixture barcode parse", str(e))]
+
+
+def _test_barcode_cache(client) -> list:
+    """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
+    results = []
+    from third_apis import OpenFoodFacts as off_module
+    from third_apis.OpenFoodFacts import _l1, _l2, _now_ts, _MISSING, OpenFoodFactsClient
+
+    barcode = "8934563138165"
+    l1_key  = f"barcode:{barcode}"
+
+    try:
+        # L2 hit should promote to L1
+        fake_l2 = {
+            "barcode": barcode,
+            "found": True,
+            "product_name": "Barcode L2 OFF",
+            "nutritions": {"calories": 455.0, "protein": 10.0, "fat": 18.0, "carbs": 63.0},
+        }
+        _l2["barcodes"][barcode] = {"food": fake_l2, "_ts": _now_ts()}
+        OpenFoodFactsClient.clear_l1_cache()
+        assert _l1.get(l1_key) is _MISSING
+
+        got_l2 = client.search_by_barcode(barcode)
+        assert got_l2 == fake_l2
+        promoted = _l1.get(l1_key)
+        assert promoted is not _MISSING and promoted == fake_l2
+        results.append((True, "L2->L1 promotion", "barcode cache promoted successfully"))
+
+        # L1 hit should not call network
+        fake_l1 = {
+            "barcode": barcode,
+            "found": True,
+            "product_name": "Barcode L1 OFF",
+            "nutritions": {"calories": 455.0, "protein": 10.0, "fat": 18.0, "carbs": 63.0},
+        }
+        _l1.set(l1_key, fake_l1)
+        original_get = off_module.requests.get
+
+        def _blocked_get(*args, **kwargs):
+            raise AssertionError("network called during L1 cache hit")
+
+        off_module.requests.get = _blocked_get
+        try:
+            got_l1 = client.search_by_barcode(barcode)
+            assert got_l1 == fake_l1
+            results.append((True, "L1 hit no network", "returned from RAM cache"))
+        finally:
+            off_module.requests.get = original_get
+    except Exception as e:
+        results.append((False, "barcode cache", str(e)))
+    finally:
+        _l2["barcodes"].pop(barcode, None)
+        OpenFoodFactsClient.clear_l1_cache()
 
     return results
 
@@ -270,6 +364,8 @@ def run_all(client) -> list:
 
     try:
         print("\n─── OpenFoodFacts Client Tests ────────────────────────────────────────", flush=True)
+        group_results.append(_print_group("BARCODE TEST",     _test_search_by_barcode(client)))
+        group_results.append(_print_group("BARCODE PARSE TEST", _test_barcode_parser_fixture(client)))
         group_results.append(_print_group("NUTRITION TESTS",  _test_get_nutritions(client)))
         group_results.append(_print_group("INGREDIENTS TEST", _test_get_ingredients(client)))
         group_results.append(_print_group("NUTR+ING TEST",    _test_nutritions_and_ingredients(client)))
@@ -277,7 +373,7 @@ def run_all(client) -> list:
         group_results.append(_print_group("CACHE L1 TEST",    _test_cache_l1_hit(client)))
         group_results.append(_print_group("CACHE STATS TEST", _test_cache_stats(client)))
         group_results.append(_print_group("NORMALIZE TESTS",  _test_normalize_query(client)))
-        group_results.append(_print_group("BARCODE TEST",     _test_search_by_barcode(client)))
+        group_results.append(_print_group("BARCODE CACHE TEST", _test_barcode_cache(client)))
         group_results.append(_print_group("CACHE L2 TEST",    _test_cache_l2_hit(client)))
         group_results.append(_print_group("MOCK TEST",        _test_mock_data(client)))
 

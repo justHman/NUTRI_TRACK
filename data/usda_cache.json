@@ -1,4 +1,5 @@
 {
+  "foods": {
   "grilled steak": {
     "food": {
       "fdcId": 167670,
@@ -49151,5 +49152,30 @@
       "foodVersionIds": []
     },
     "_ts": 1773394809.4315176
+  }
+},
+  "barcodes": {
+    "8934563138165": {
+      "food": {
+        "totalHits": 0,
+        "currentPage": 1,
+        "totalPages": 0,
+        "pageList": [],
+        "foodSearchCriteria": {
+          "query": "8934563138165",
+          "generalSearchInput": "8934563138165",
+          "pageNumber": 1,
+          "numberOfResultsPerPage": 50,
+          "pageSize": 50,
+          "requireAllWords": false
+        },
+        "foods": [],
+        "aggregations": {
+          "dataType": {},
+          "nutrients": {}
+        }
+      },
+      "_ts": 1773511414.262879
+    }
   }
 }

@@ -94,15 +94,21 @@ def _load_disk_cache() -> dict:
                 logger.warning("Failed to download cache from S3: %s", e)
 
     if not os.path.exists(_CACHE_FILE):
-        return {}
+        return {"foods": {}, "barcodes": {}}
     try:
         with open(_CACHE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        logger.debug("L2 cache loaded: %d entries from %s", len(data), _CACHE_FILE)
+            raw = json.load(f)
+        data = {
+            "foods":    raw.get("foods",    {}),
+            "barcodes": raw.get("barcodes", {}),
+        }
+        total = len(data["foods"]) + len(data["barcodes"])
+        logger.debug("L2 cache loaded: %d entries (%d foods, %d barcodes) from %s",
+                     total, len(data["foods"]), len(data["barcodes"]), _CACHE_FILE)
         return data
     except Exception as e:
         logger.warning("L2 cache load failed (%s), starting fresh", e)
-        return {}
+        return {"foods": {}, "barcodes": {}}
 
 
 def _save_disk_cache(cache: dict):
@@ -111,7 +117,9 @@ def _save_disk_cache(cache: dict):
         os.makedirs(_CACHE_DIR, exist_ok=True)
         with open(_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
-        logger.debug("L2 cache saved: %d entries to %s", len(cache), _CACHE_FILE)
+        total = len(cache.get("foods", {})) + len(cache.get("barcodes", {}))
+        logger.debug("L2 cache saved: %d entries (%d foods, %d barcodes) to %s",
+                     total, len(cache.get("foods", {})), len(cache.get("barcodes", {})), _CACHE_FILE)
 
         s3_bucket = os.getenv("AWS_S3_CACHE_BUCKET")
         if s3_bucket:
@@ -161,7 +169,7 @@ class AvocavoNutritionClient:
     # Public API
     # ─────────────────────────────────────────────────────────────────────
 
-    def get_nutritions(self, query: str, pageSize: int = 5) -> Dict[str, float]:
+    def get_nutritions(self, query: str) -> Dict[str, float]:
         """
         Return Protein/Calories/Fat/Carbs nutrition data per 100g.
         Uses two-tier cache before calling Avocavo Nutrition API.
@@ -174,24 +182,30 @@ class AvocavoNutritionClient:
             logger.info("get_nutritions: using mock data (api_key=%s)", self.api_key or "None")
             return self._get_mock_nutrition(query)
 
-        best = self.search_best(normalized_query, pageSize)
+        best = self.search_best(normalized_query)
         if best:
             return self._parse_100g_nutritions(best)
 
         logger.warning("get_nutritions: no result for '%s', falling back to mock", normalized_query)
         return self._get_mock_nutrition(query)
 
-    def get_ingredients(self, query: str, pageSize: int = 5) -> Optional[List[str]]:
+    def get_ingredients(self, query: str) -> Optional[List[str]]:
         """
         Return ingredient list for a food item.
         Note: Avocavo Nutrition API does not provide ingredient lists.
         Returns None.
         """
         logger.debug("get_ingredients() called with query='%s'", query)
+        normalized_query = self._normalize_query(query)
+
+        best = self.search_best(normalized_query) if (self.api_key and self.api_key != "DEMO_KEY") else None
+        if best:
+            return self._parse_ingredient_string(best)
+
         logger.info("get_ingredients: Avocavo Nutrition API does not provide ingredient data")
         return None
 
-    def get_nutritions_and_ingredients(self, query: str, pageSize: int = 5) -> Optional[Dict]:
+    def get_nutritions_and_ingredients(self, query: str) -> Optional[Dict]:
         """
         Return both PCF nutrition data and ingredients in one dict.
         Note: Avocavo Nutrition API does not provide ingredient lists, so ingredients will be None.
@@ -210,7 +224,7 @@ class AvocavoNutritionClient:
                 "ingredients": None,
             }
 
-        best = self.search_best(normalized_query, pageSize)
+        best = self.search_best(normalized_query)
         if not best:
             logger.warning("get_nutritions_and_ingredients: no result for '%s'", normalized_query)
             return None
@@ -218,7 +232,7 @@ class AvocavoNutritionClient:
         description = (best.get("ingredient")
                        or best.get("parsing", {}).get("ingredient_name", "N/A")).lower()
         nutritions  = self._parse_100g_nutritions(best)
-        ingredients = None  # Avocavo Nutrition API does not provide ingredients
+        ingredients = self._parse_ingredient_string(best)
 
         result = {
             "description": description,
@@ -230,14 +244,14 @@ class AvocavoNutritionClient:
         logger.debug("get_nutritions_and_ingredients result: %s", result)
         return result
 
-    def get_nutritions_and_ingredients_by_weight(self, query: str, weight_g: float, pageSize: int = 5) -> Optional[Dict]:
+    def get_nutritions_and_ingredients_by_weight(self, query: str, weight_g: float) -> Optional[Dict]:
         """
         Return actual PCF nutrition data calculated by weight and ingredients in one dict.
         Calls get_nutritions_and_ingredients to get 100g reference and calculates actual nutritions.
         """
         logger.debug("get_nutritions_and_ingredients_by_weight() called with query='%s', weight_g=%.2f", query, weight_g)
 
-        result = self.get_nutritions_and_ingredients(query, pageSize)
+        result = self.get_nutritions_and_ingredients(query)
         if not result:
             return None
 
@@ -254,7 +268,7 @@ class AvocavoNutritionClient:
     # Cache-aware search  (two-tier lookup happens here)
     # ─────────────────────────────────────────────────────────────────────
 
-    def search_best(self, normalized_query: str, pageSize: int = 5) -> Optional[dict]:
+    def search_best(self, normalized_query: str) -> Optional[dict]:
         """
         Return the best-matching food item for a query.
 
@@ -273,8 +287,8 @@ class AvocavoNutritionClient:
             return l1_hit
 
         # ── Level 2: Disk JSON ────────────────────────────────────────────
-        if normalized_query in _l2:
-            entry = _l2[normalized_query]
+        if normalized_query in _l2["foods"]:
+            entry = _l2["foods"][normalized_query]
             if not _is_expired(entry):
                 food = entry.get("food")
                 _name = (food.get("ingredient") or food.get("parsing", {}).get("ingredient_name", "None")) if food else "None"
@@ -292,7 +306,7 @@ class AvocavoNutritionClient:
 
         if not foods:
             _l1.set(normalized_query, None)
-            _l2[normalized_query] = {"food": None, "_ts": _now_ts()}
+            _l2["foods"][normalized_query] = {"food": None, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return None
 
@@ -301,7 +315,7 @@ class AvocavoNutritionClient:
         logger.debug("search_best: best='%s'", best_food.get("ingredient") or best_food.get("parsing", {}).get("ingredient_name", "N/A"))
 
         _l1.set(normalized_query, best_food)
-        _l2[normalized_query] = {"food": best_food, "_ts": _now_ts()}
+        _l2["foods"][normalized_query] = {"food": best_food, "_ts": _now_ts()}
         _save_disk_cache(_l2)
 
         return best_food
@@ -320,21 +334,27 @@ class AvocavoNutritionClient:
     def clear_all_caches():
         """Clear both L1 (RAM) and L2 (disk) caches."""
         _l1.clear()
-        _l2.clear()
+        _l2["foods"].clear()
+        _l2["barcodes"].clear()
         _save_disk_cache(_l2)
         logger.info("All caches cleared (L1 + L2)")
 
     @staticmethod
     def cache_stats() -> dict:
         """Return current cache statistics."""
-        expired = sum(1 for e in _l2.values() if _is_expired(e))
+        foods    = _l2["foods"]
+        barcodes = _l2["barcodes"]
+        expired  = sum(1 for e in foods.values()    if _is_expired(e)) \
+                 + sum(1 for e in barcodes.values() if _is_expired(e))
         return {
-            "l1_entries": len(_l1),
-            "l1_maxsize": _L1_MAXSIZE,
-            "l2_entries": len(_l2),
-            "l2_expired": expired,
-            "l2_file": _CACHE_FILE,
-            "ttl_days": _CACHE_TTL_DAYS,
+            "l1_entries":         len(_l1),
+            "l1_maxsize":         _L1_MAXSIZE,
+            "l2_food_entries":    len(foods),
+            "l2_barcode_entries": len(barcodes),
+            "l2_entries":         len(foods) + len(barcodes),
+            "l2_expired":         expired,
+            "l2_file":            _CACHE_FILE,
+            "ttl_days":           _CACHE_TTL_DAYS,
         }
 
     # ─────────────────────────────────────────────────────────────────────
@@ -355,22 +375,24 @@ class AvocavoNutritionClient:
         }
         We wrap the single result in a list for consistency.
         """
-        search_url = f"{self.base_url}/nutrition/"
-        headers = {"X-Api-Key": self.api_key}
+        search_url = f"{self.base_url}/nutrition/ingredient"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Api-Key": self.api_key
+        }
 
         try:
             logger.info("Avocavo Nutrition API search: query='%s'", normalized_query)
             # Try POST with JSON body (Avocavo preferred format)
             resp = requests.post(
                 search_url,
-                json={"ingredient": normalized_query},
-                headers={**headers, "Content-Type": "application/json"},
+                json={
+                    "ingredient": normalized_query
+                },
+                headers=headers,
                 timeout=10
             )
-            if resp.status_code == 405:
-                # Fallback: try GET with ingredient param
-                resp = requests.get(search_url, params={"ingredient": normalized_query},
-                                    headers=headers, timeout=10)
+
             resp.raise_for_status()
             data = resp.json()
             logger.debug("Avocavo Nutrition API: status=%d", resp.status_code)
@@ -393,7 +415,7 @@ class AvocavoNutritionClient:
 
     def search_by_barcode(self, code: str) -> Optional[Dict]:
         """
-        Search Avocavo Nutrition by barcode and return raw JSON response.
+        Search Avocavo Nutrition by UPC/barcode and return raw JSON response.
 
         Args:
             code: Barcode string (e.g. "0885909456017").
@@ -406,25 +428,64 @@ class AvocavoNutritionClient:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
             return None
 
-        search_url = f"{self.base_url}/nutrition/{barcode}/"
-        headers = {"X-Api-Key": self.api_key}
+        l1_key = f"barcode:{barcode}"
+
+        # Level 1: RAM cache
+        l1_hit = _l1.get(l1_key)
+        if l1_hit is not _MISSING:
+            logger.info("search_by_barcode: L1 HIT (RAM) for upc='%s'", barcode)
+            logger.info("search_by_barcode: Cache HIT for upc='%s'", barcode)
+            return l1_hit
+
+        # Level 2: Disk cache
+        if barcode in _l2["barcodes"]:
+            entry = _l2["barcodes"][barcode]
+            if not _is_expired(entry):
+                cached = entry.get("food")
+                logger.info("search_by_barcode: L2 HIT (disk) for upc='%s'", barcode)
+                logger.info("search_by_barcode: Cache HIT for upc='%s'", barcode)
+                _l1.set(l1_key, cached)
+                return cached
+            logger.info("search_by_barcode: L2 EXPIRED for upc='%s' (age > %d days)",
+                        barcode, _CACHE_TTL_DAYS)
+
+        # Spec: POST /api/v2/upc/ingredient with JSON body {"upc": "..."}
+        search_url = f"{self.base_url}/upc/ingredient"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Api-Key": self.api_key,
+        }
 
         try:
-            logger.info("Avocavo Nutrition API barcode search: code='%s'", barcode)
-            resp = requests.get(search_url, headers=headers, timeout=10)
+            logger.info("Avocavo Nutrition API UPC search: upc='%s'", barcode)
+            resp = requests.post(
+                search_url,
+                json={
+                    "upc": barcode
+                },
+                headers=headers,
+                timeout=10,
+            )
             logger.debug("Avocavo barcode API: status=%d body=%s",
                          resp.status_code, resp.text[:120])
             if resp.status_code == 404:
-                logger.info("Avocavo barcode API: barcode '%s' not found (404)", barcode)
+                logger.info("Avocavo barcode API: upc '%s' not found (404)", barcode)
+                _l1.set(l1_key, None)
+                _l2["barcodes"][barcode] = {"food": None, "_ts": _now_ts()}
+                _save_disk_cache(_l2)
                 return None
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            _l1.set(l1_key, data)
+            _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
+            _save_disk_cache(_l2)
+            return data
         except requests.exceptions.Timeout:
-            logger.error("Avocavo Nutrition barcode API timeout for code='%s'", barcode)
+            logger.error("Avocavo Nutrition UPC API timeout for upc='%s'", barcode)
         except requests.exceptions.HTTPError as e:
-            logger.error("Avocavo Nutrition barcode API HTTP error: %s (code='%s')", e, barcode)
+            logger.error("Avocavo Nutrition UPC API HTTP error: %s (upc='%s')", e, barcode)
         except Exception as e:
-            logger.error("Avocavo Nutrition barcode API unexpected error: %s (code='%s')", e, barcode, exc_info=True)
+            logger.error("Avocavo Nutrition UPC API unexpected error: %s (upc='%s')", e, barcode, exc_info=True)
 
         return None
 
@@ -439,26 +500,56 @@ class AvocavoNutritionClient:
         Avocavo response structure:
           food["nutrition"]  → {calories, protein, total_fat, carbohydrates, ...}
           food["parsing"]    → {estimated_grams, ingredient_name}
+          food["metadata"]["portion_info"]["original_usda_per_100g"] → bool
 
-        Values in response are per serving (estimated_grams), so we scale to 100g.
+        When original_usda_per_100g is True (the USDA source data is already per 100g
+        and scaling_factor == 1.0), nutrition values are already per 100g — no scaling.
+        Otherwise, values are per estimated_grams serving and must be scaled to 100g.
         """
         ingredient_name = (food.get("ingredient")
                            or food.get("parsing", {}).get("ingredient_name", "N/A"))
-        estimated_g = float(food.get("parsing", {}).get("estimated_grams", 100.0) or 100.0)
-        logger.info("_parse_100g_nutritions: '%s' (estimated_g=%.1f)", ingredient_name, estimated_g)
+
+        portion_info    = food.get("metadata", {}).get("portion_info", {})
+        original_per_100g = portion_info.get("original_usda_per_100g", False)
+        scaling_factor  = float(portion_info.get("scaling_factor", 1.0) or 1.0)
+        estimated_g     = float(food.get("parsing", {}).get("estimated_grams", 100.0) or 100.0)
+
+        logger.info(
+            "_parse_100g_nutritions: '%s' (estimated_g=%.1f, original_per_100g=%s, scaling_factor=%.3f)",
+            ingredient_name, estimated_g, original_per_100g, scaling_factor,
+        )
 
         nut = food.get("nutrition", {})
-        ratio = 100.0 / estimated_g if estimated_g > 0 else 1.0
+
+        # If the API already returned per-100g values (USDA base), no normalization needed.
+        # Otherwise divide out the portion scaling to recover per-100g values.
+        if original_per_100g and scaling_factor == 1.0:
+            ratio = 1.0
+        else:
+            ratio = 100.0 / estimated_g if estimated_g > 0 else 1.0
 
         result = {
             "calories": round(float(nut.get("calories", 0) or 0) * ratio, 2),
-            "protein":  round(float(nut.get("protein", 0) or 0) * ratio, 2),
+            "protein":  round(float(nut.get("protein",  0) or 0) * ratio, 2),
             "fat":      round(float(nut.get("total_fat", 0) or 0) * ratio, 2),
             "carbs":    round(float(nut.get("carbohydrates", 0) or 0) * ratio, 2),
         }
 
         logger.debug("_parse_100g_nutritions result: %s", result)
         return result
+
+    def _parse_ingredient_string(self, food: dict) -> Optional[List[str]]:
+        """
+        Avocavo Nutrition API does not include an ingredient list in its response.
+        Always returns None.
+        """
+        ingredient_name = (food.get("ingredient")
+                           or food.get("parsing", {}).get("ingredient_name", "N/A"))
+        logger.info(
+            "_parse_ingredient_string: Avocavo API does not provide ingredient data for '%s'",
+            ingredient_name,
+        )
+        return None
 
     # ─────────────────────────────────────────────────────────────────────
     # Helpers

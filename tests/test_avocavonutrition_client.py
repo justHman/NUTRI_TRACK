@@ -143,7 +143,7 @@ def _test_cache_l2_hit(client) -> list:
             },
             "parsing": {"estimated_grams": 150.0, "ingredient_name": "Test Chicken L2 Avocavo"},
         }
-        _l2[query] = {"food": fake_food, "_ts": _now_ts()}
+        _l2["foods"][query] = {"food": fake_food, "_ts": _now_ts()}
         AvocavoNutritionClient.clear_l1_cache()
         assert _l1.get(query) is _MISSING
         start = time.time()
@@ -157,14 +157,14 @@ def _test_cache_l2_hit(client) -> list:
         return [(False, "synthetic inject+promote", str(e))]
     finally:
         from third_apis.AvocavoNutrition import _l2, AvocavoNutritionClient
-        _l2.pop("__l2_test_chicken_avocavo__", None)
+        _l2["foods"].pop("__l2_test_chicken_avocavo__", None)
         AvocavoNutritionClient.clear_l1_cache()
 
 
 def _test_search_by_barcode(client) -> list:
     """Test search_by_barcode() — invalid barcode returns None; valid returns dict (or None if not in DB)."""
     cases = [
-        ("0885909456017", True),   # numeric barcode → attempt API call
+        ("8934563138165", True),   # numeric barcode → attempt API call
         ("abc",           False),  # non-numeric → must return None immediately
     ]
     results = []
@@ -182,9 +182,55 @@ def _test_search_by_barcode(client) -> list:
                 results.append((True, f"'{code}'", "404 not in DB → None handled correctly ✓"))
             else:
                 assert isinstance(raw, dict)
-                results.append((True, f"'{code}'", f"success={raw.get('success', '?')}"))
+                results.append((True, f"'{code}'", f"success={raw.get('success', '?')}, resp={raw}"))
         except Exception as e:
             results.append((False, f"'{code}'", str(e)))
+    return results
+
+
+def _test_barcode_cache(client) -> list:
+    """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
+    results = []
+    from third_apis import AvocavoNutrition as av_module
+    from third_apis.AvocavoNutrition import _l1, _l2, _now_ts, _MISSING, AvocavoNutritionClient
+
+    barcode = "8801234567890"
+    l1_key  = f"barcode:{barcode}"
+
+    try:
+        # L2 hit should promote to L1
+        fake_l2 = {"success": True, "ingredient": "Barcode L2 Avocavo"}
+        _l2["barcodes"][barcode] = {"food": fake_l2, "_ts": _now_ts()}
+        AvocavoNutritionClient.clear_l1_cache()
+        assert _l1.get(l1_key) is _MISSING
+
+        got_l2 = client.search_by_barcode(barcode)
+        assert got_l2 == fake_l2
+        promoted = _l1.get(l1_key)
+        assert promoted is not _MISSING and promoted == fake_l2
+        results.append((True, "L2->L1 promotion", "barcode cache promoted successfully"))
+
+        # L1 hit should not call network
+        fake_l1 = {"success": True, "ingredient": "Barcode L1 Avocavo"}
+        _l1.set(l1_key, fake_l1)
+        original_post = av_module.requests.post
+
+        def _blocked_post(*args, **kwargs):
+            raise AssertionError("network called during L1 cache hit")
+
+        av_module.requests.post = _blocked_post
+        try:
+            got_l1 = client.search_by_barcode(barcode)
+            assert got_l1 == fake_l1
+            results.append((True, "L1 hit no network", "returned from RAM cache"))
+        finally:
+            av_module.requests.post = original_post
+    except Exception as e:
+        results.append((False, "barcode cache", str(e)))
+    finally:
+        _l2["barcodes"].pop(barcode, None)
+        AvocavoNutritionClient.clear_l1_cache()
+
     return results
 
 
@@ -279,6 +325,7 @@ def run_all(client) -> list:
         group_results.append(_print_group("CACHE STATS TEST", _test_cache_stats(client)))
         group_results.append(_print_group("NORMALIZE TESTS",  _test_normalize_query(client)))
         group_results.append(_print_group("BARCODE TEST",     _test_search_by_barcode(client)))
+        group_results.append(_print_group("BARCODE CACHE TEST", _test_barcode_cache(client)))
         group_results.append(_print_group("CACHE L2 TEST",    _test_cache_l2_hit(client)))
         group_results.append(_print_group("MOCK TEST",        _test_mock_data(client)))
 
