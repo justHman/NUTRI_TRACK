@@ -1,0 +1,26 @@
+{
+  "chicken breast": {
+    "food": null,
+    "_ts": 1773429520.5953279
+  },
+  "white rice cooked": {
+    "food": null,
+    "_ts": 1773429530.9651363
+  },
+  "egg fried": {
+    "food": null,
+    "_ts": 1773429541.9054034
+  },
+  "com tam": {
+    "food": null,
+    "_ts": 1773429553.3516264
+  },
+  "nutella": {
+    "food": null,
+    "_ts": 1773429564.004393
+  },
+  "xyznonexistentfood12345": {
+    "food": null,
+    "_ts": 1773429574.4408257
+  }
+}

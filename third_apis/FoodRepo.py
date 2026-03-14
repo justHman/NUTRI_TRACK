@@ -15,12 +15,12 @@ logger = get_logger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Disk Cache Path  (Level 2 — Persistent)
-# Lives at:  app/data/usda_cache.json
+# Lives at:  app/data/foodrepo_cache.json
 # Swap to S3/DynamoDB later by replacing _load_disk_cache / _save_disk_cache.
 # ─────────────────────────────────────────────────────────────────────────────
 _CACHE_DIR  = os.path.join(os.path.dirname(__file__), "..", "data")
-_CACHE_FILE = os.path.join(_CACHE_DIR, "usda_cache.json")
-_CACHE_TTL_DAYS = 30        # Re-fetch from USDA after this many days
+_CACHE_FILE = os.path.join(_CACHE_DIR, "foodrepo_cache.json")
+_CACHE_TTL_DAYS = 30        # Re-fetch after this many days
 _L1_MAXSIZE     = 256       # RAM LRU max entries
 
 
@@ -34,7 +34,6 @@ class _LRUCache:
     def get(self, key: str):
         if key not in self._cache:
             return _MISSING
-        # Move to end (most-recently used)
         self._cache.move_to_end(key)
         return self._cache[key]
 
@@ -60,7 +59,7 @@ class _LRUCache:
 
 _MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
 
-# Module-level L1 cache (shared across all USDAClient instances in one process)
+# Module-level L1 cache (shared across all FoodRepoClient instances in one process)
 _l1: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
 
 
@@ -74,20 +73,17 @@ def _is_expired(entry: dict) -> bool:
 
 
 def _load_disk_cache() -> dict:
-    """Load Level-2 disk cache from JSON file, with optional S3 syncing.
-    Pulls from S3 first (if configured), then loads from disk.
-    """
+    """Load Level-2 disk cache from JSON file, with optional S3 syncing."""
     s3_bucket = os.getenv("AWS_S3_CACHE_BUCKET")
     if s3_bucket:
         try:
             import boto3
-            from botocore.exceptions import ClientError
-            
-            s3_key = "usda_cache.json"
+
+            s3_key = "foodrepo_cache.json"
             logger.info("Syncing L2 cache from S3: s3://%s/%s", s3_bucket, s3_key)
             region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
             s3 = boto3.client('s3', region_name=region)
-            
+
             os.makedirs(_CACHE_DIR, exist_ok=True)
             s3.download_file(s3_bucket, s3_key, _CACHE_FILE)
             logger.debug("Successfully downloaded cache from S3 to %s", _CACHE_FILE)
@@ -116,18 +112,17 @@ def _save_disk_cache(cache: dict):
         with open(_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
         logger.debug("L2 cache saved: %d entries to %s", len(cache), _CACHE_FILE)
-        
-        # Sync to S3 if configured
+
         s3_bucket = os.getenv("AWS_S3_CACHE_BUCKET")
         if s3_bucket:
             import boto3
-            s3_key = "usda_cache.json"
+            s3_key = "foodrepo_cache.json"
             logger.info("Uploading L2 cache to S3: s3://%s/%s", s3_bucket, s3_key)
             region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
             s3 = boto3.client('s3', region_name=region)
             s3.upload_file(_CACHE_FILE, s3_bucket, s3_key)
             logger.debug("Successfully uploaded cache to S3")
-            
+
     except Exception as e:
         logger.warning("L2 cache save/sync failed: %s", e)
 
@@ -136,34 +131,37 @@ def _save_disk_cache(cache: dict):
 _l2: dict = _load_disk_cache()
 
 
-class USDAClient:
+class FoodRepoClient:
     """
-    USDA FoodData Central API Client — Two-Tier Cache Edition
-    ──────────────────────────────────────────────────────────
+    FoodRepo API Client — Two-Tier Cache Edition
+    ─────────────────────────────────────────────
     Cache hierarchy (fast → slow):
 
-    ┌──────────────────────────────────────────────────────────┐
-    │ Level 1 │ RAM LRU  │ maxsize=256  │ per-process lifetime │
-    ├──────────────────────────────────────────────────────────┤
-    │ Level 2 │ JSON file│ TTL=30 days  │ persists across runs │
-    ├──────────────────────────────────────────────────────────┤
-    │ Level 3 │ USDA API │ real network │ only on full miss    │
-    └──────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────────┐
+    │ Level 1 │ RAM LRU  │ maxsize=256  │ per-process lifetime    │
+    ├──────────────────────────────────────────────────────────────┤
+    │ Level 2 │ JSON file│ TTL=30 days  │ persists across runs    │
+    ├──────────────────────────────────────────────────────────────┤
+    │ Level 3 │ API call │ real network │ only on full miss       │
+    └──────────────────────────────────────────────────────────────┘
 
-    Swap Level 2 to S3/DynamoDB by replacing _load_disk_cache / _save_disk_cache.
+    API docs: https://www.foodrepo.org/api-docs
+    Base URL: https://www.foodrepo.org/api/v3
+    Auth: Authorization header with API token
     """
 
-    ENERGY_NUMBERS = {"208", "2047", "2048"}  # kcal only
-    TARGET_NUTRIENTS = {
-        "203": "protein",   # Protein
-        "204": "fat",       # Total lipid (fat)
-        "205": "carbs",     # Carbohydrate, by difference
+    # FoodRepo nutrient IDs (per their API)
+    NUTRIENT_MAP = {
+        "energy":        "calories",
+        "protein":       "protein",
+        "fat":           "fat",
+        "carbohydrates": "carbs",
     }
 
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = "https://api.nal.usda.gov/fdc/v1"
-        logger.info("USDAClient initialized (api_key=%s)", "DEMO_KEY" if api_key == "DEMO_KEY" else "***")
+        self.base_url = "https://www.foodrepo.org/api/v3"
+        logger.info("FoodRepoClient initialized (api_key=%s)", "DEMO_KEY" if api_key == "DEMO_KEY" else "***")
         logger.debug("L1 cache size: %d / %d   |   L2 disk entries: %d",
                      len(_l1), _L1_MAXSIZE, len(_l2))
 
@@ -173,8 +171,8 @@ class USDAClient:
 
     def get_nutritions(self, query: str, pageSize: int = 5) -> Dict[str, float]:
         """
-        Return Protein/Calories/Fat nutrition data per 100g.
-        Uses two-tier cache before calling USDA API.
+        Return Protein/Calories/Fat/Carbs nutrition data per 100g.
+        Uses two-tier cache before calling FoodRepo API.
         Falls back to mock values if api_key is DEMO_KEY.
         """
         logger.debug("get_nutritions() called with query='%s'", query)
@@ -194,7 +192,7 @@ class USDAClient:
     def get_ingredients(self, query: str, pageSize: int = 5) -> Optional[List[str]]:
         """
         Return ingredient list for a food item.
-        Uses two-tier cache before calling USDA API.
+        Uses two-tier cache before calling FoodRepo API.
         """
         logger.debug("get_ingredients() called with query='%s'", query)
         normalized_query = self._normalize_query(query)
@@ -204,7 +202,7 @@ class USDAClient:
 
         best = self.search_best(normalized_query, pageSize)
         if not best:
-            logger.warning("get_ingredients: no USDA result for '%s'", normalized_query)
+            logger.warning("get_ingredients: no FoodRepo result for '%s'", normalized_query)
             return None
 
         ingredients = self._parse_ingredient_string(best)
@@ -223,14 +221,22 @@ class USDAClient:
             logger.warning("get_nutritions_and_ingredients: empty query")
             return None
 
+        if not self.api_key or self.api_key == "DEMO_KEY":
+            logger.info("get_nutritions_and_ingredients: using mock data (api_key=%s)", self.api_key or "None")
+            return {
+                "description": normalized_query,
+                "nutritions": self._get_mock_nutrition(query),
+                "ingredients": None,
+            }
+
         best = self.search_best(normalized_query, pageSize)
         if not best:
-            logger.warning("get_nutritions_and_ingredients: no USDA result for '%s'", normalized_query)
+            logger.warning("get_nutritions_and_ingredients: no FoodRepo result for '%s'", normalized_query)
             return None
 
-        description = best.get("description", "N/A").lower()
-        nutritions     = self._parse_100g_nutritions(best)
-        ingredients  = self._parse_ingredient_string(best)
+        description = self._get_product_name(best).lower()
+        nutritions  = self._parse_100g_nutritions(best)
+        ingredients = self._parse_ingredient_string(best)
 
         result = {
             "description": description,
@@ -248,17 +254,17 @@ class USDAClient:
         Calls get_nutritions_and_ingredients to get 100g reference and calculates actual nutritions.
         """
         logger.debug("get_nutritions_and_ingredients_by_weight() called with query='%s', weight_g=%.2f", query, weight_g)
-        
+
         result = self.get_nutritions_and_ingredients(query, pageSize)
         if not result:
             return None
-            
+
         nutritions_100g = result["nutritions"]
         actual_nutritions = calculate_ingredient_nutrition(nutritions_100g, weight_g)
-        
+
         result["nutritions"] = actual_nutritions
         result["weight_g"] = weight_g
-        
+
         logger.debug("get_nutritions_and_ingredients_by_weight actual result: %s", result)
         return result
 
@@ -268,31 +274,22 @@ class USDAClient:
 
     def search_best(self, normalized_query: str, pageSize: int = 5) -> Optional[dict]:
         """
-        Return the highest-scored food entry for a query.
+        Return the best-matching product for a query.
 
         Cache lookup order:
           1. L1 RAM (LRU dict, 256 entries max)              — fastest
           2. L2 Disk (JSON file, 30-day TTL)                 — across restarts
-          3. USDA API                                         — real network call
+          3. FoodRepo API                                     — real network call
              → result saved to both L1 + L2 on success
-
-        Args:
-            normalized_query: Already-normalized food name.
-            pageSize: Max candidates to consider.
-
-        Returns:
-            Best-matching food dict, or None if no result.
         """
         # ── Level 1: RAM LRU ──────────────────────────────────────────────
         l1_hit = _l1.get(normalized_query)
         if l1_hit is not _MISSING:
+            desc = self._get_product_name(l1_hit) if l1_hit else "None"
             logger.info("search_best: L1 HIT (RAM) for '%s' → '%s'",
-                        normalized_query,
-                        l1_hit.get("description", "None") if l1_hit else "None")
-            # Log as "Cache HIT" so existing log parsers in tests still count it
+                        normalized_query, desc)
             logger.info("search_best: Cache HIT for '%s' → '%s'",
-                        normalized_query,
-                        l1_hit.get("description", "None") if l1_hit else "None")
+                        normalized_query, desc)
             return l1_hit
 
         # ── Level 2: Disk JSON ────────────────────────────────────────────
@@ -300,35 +297,31 @@ class USDAClient:
             entry = _l2[normalized_query]
             if not _is_expired(entry):
                 food = entry.get("food")
+                desc = self._get_product_name(food) if food else "None"
                 logger.info("search_best: L2 HIT (disk) for '%s' → '%s'",
-                            normalized_query,
-                            food.get("description", "None") if food else "None")
+                            normalized_query, desc)
                 logger.info("search_best: Cache HIT for '%s' → '%s'",
-                            normalized_query,
-                            food.get("description", "None") if food else "None")
-                # Promote to L1
+                            normalized_query, desc)
                 _l1.set(normalized_query, food)
                 return food
             else:
                 logger.info("search_best: L2 EXPIRED for '%s' (age > %d days)",
                             normalized_query, _CACHE_TTL_DAYS)
 
-        # ── Level 3: USDA API ─────────────────────────────────────────────
-        logger.debug("search_best: Cache MISS for '%s' → calling USDA API", normalized_query)
-        foods = self.search(normalized_query, pageSize)
+        # ── Level 3: FoodRepo API ─────────────────────────────────────────
+        logger.debug("search_best: Cache MISS for '%s' → calling FoodRepo API", normalized_query)
+        products = self.search(normalized_query, pageSize)
 
-        if not foods:
-            # Cache the None result to avoid repeat calls for queries with 0 results
+        if not products:
             _l1.set(normalized_query, None)
             _l2[normalized_query] = {"food": None, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return None
 
-        best_food = max(foods, key=lambda x: x.get("score", 0))
-        logger.debug("search_best: best='%s' (score=%.1f)",
-                     best_food.get("description", "N/A"), best_food.get("score", 0))
+        # Pick the first product (best match from FoodRepo)
+        best_food = products[0]
+        logger.debug("search_best: best='%s'", self._get_product_name(best_food))
 
-        # Save to L1 + L2
         _l1.set(normalized_query, best_food)
         _l2[normalized_query] = {"food": best_food, "_ts": _now_ts()}
         _save_disk_cache(_l2)
@@ -341,17 +334,13 @@ class USDAClient:
 
     @staticmethod
     def clear_l1_cache():
-        """Clear Level-1 (RAM) cache only.
-        Call at start of each isolated test to get a fair cold-start measurement.
-        """
+        """Clear Level-1 (RAM) cache only."""
         _l1.clear()
         logger.info("L1 RAM cache cleared")
 
     @staticmethod
     def clear_all_caches():
-        """Clear both L1 (RAM) and L2 (disk) caches.
-        Use for full reset / test fixture teardown.
-        """
+        """Clear both L1 (RAM) and L2 (disk) caches."""
         _l1.clear()
         _l2.clear()
         _save_disk_cache(_l2)
@@ -371,86 +360,103 @@ class USDAClient:
         }
 
     # ─────────────────────────────────────────────────────────────────────
-    # USDA network search
+    # FoodRepo network search
     # ─────────────────────────────────────────────────────────────────────
 
     def search(self, normalized_query: str, pageSize: int = 5) -> Optional[list]:
         """
-        Send a search request to USDA FoodData Central API.
+        Send a search request to FoodRepo API.
         This is the ONLY function that makes real HTTP requests.
+
+        FoodRepo response structure:
+        {
+          "data": [
+            {
+              "id": 123,
+              "display_name_translations": {"en": "...", "fr": "..."},
+              "ingredients_translations": {"en": "...", "fr": "..."},
+              "nutrients": {
+                "energy": {"per_hundred": 250, "unit": "kcal"},
+                "protein": {"per_hundred": 8.5, "unit": "g"},
+                ...
+              },
+              "barcode": "...",
+              ...
+            }
+          ]
+        }
         """
-        search_url = f"{self.base_url}/foods/search"
+        search_url = f"{self.base_url}/products"
         params = {
-            "query": normalized_query,
-            "pageSize": pageSize,
-            "api_key": self.api_key,
+            "q": normalized_query,
+            "page_size": pageSize,
+        }
+        headers = {
+            "Authorization": f"Token token={self.api_key}",
+            "Accept": "application/json",
         }
 
         try:
-            logger.info("USDA API search: query='%s'", normalized_query)
-            resp = requests.get(search_url, params=params, timeout=10)
+            logger.info("FoodRepo API search: query='%s'", normalized_query)
+            resp = requests.get(search_url, params=params, headers=headers, timeout=10)
             resp.raise_for_status()
             data = resp.json()
-            logger.debug("USDA API: status=%d, totalHits=%s",
-                         resp.status_code, data.get("totalHits", "N/A"))
+            logger.debug("FoodRepo API: status=%d", resp.status_code)
 
-            foods = data.get("foods", [])
-            if not foods:
-                logger.warning("USDA returned 0 results for '%s'", normalized_query)
+            products = data.get("data", [])
+            if not products:
+                logger.warning("FoodRepo returned 0 results for '%s'", normalized_query)
                 return None
 
-            logger.info("USDA found %d result(s) for '%s'", len(foods), normalized_query)
-            return foods
+            logger.info("FoodRepo found %d result(s) for '%s'", len(products), normalized_query)
+            return products
 
         except requests.exceptions.Timeout:
-            logger.error("USDA API timeout for query='%s'", normalized_query)
+            logger.error("FoodRepo API timeout for query='%s'", normalized_query)
         except requests.exceptions.HTTPError as e:
-            logger.error("USDA API HTTP error: %s (query='%s')", e, normalized_query)
+            logger.error("FoodRepo API HTTP error: %s (query='%s')", e, normalized_query)
         except Exception as e:
-            logger.error("USDA API unexpected error: %s (query='%s')", e, normalized_query, exc_info=True)
+            logger.error("FoodRepo API unexpected error: %s (query='%s')", e, normalized_query, exc_info=True)
 
         return None
 
     def search_by_barcode(self, code: str) -> Optional[Dict]:
         """
-        Search USDA FoodData Central by barcode and return raw JSON response.
+        Search FoodRepo by barcode and return raw JSON response.
 
         Args:
             code: Barcode string decoded from image (e.g. "8938505974191").
-            pageSize: Number of results to request from USDA.
 
         Returns:
-            Raw JSON dict from USDA API, or None on error/invalid input.
+            Raw JSON dict from FoodRepo API, or None on error/invalid input.
         """
         barcode = re.sub(r"\D", "", str(code or "")).strip()
         if not barcode:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
             return None
 
-        search_url = f"{self.base_url}/foods/search"
-        params = {
-            "query": barcode,
-            # "pageSize": pageSize,
-            "api_key": self.api_key,
+        search_url = f"{self.base_url}/products"
+        params = {"barcodes": barcode}
+        headers = {
+            "Authorization": f"Token token={self.api_key}",
+            "Accept": "application/json",
         }
 
         try:
-            logger.info("USDA API barcode search: code='%s'", barcode)
-            resp = requests.get(search_url, params=params, timeout=10)
-            logger.debug(resp)
-            logger.debug("USDA barcode API raw response: status=%d, content=%s",
-                         resp.status_code, resp.text)  # Log first 200 chars
+            logger.info("FoodRepo API barcode search: code='%s'", barcode)
+            resp = requests.get(search_url, params=params, headers=headers, timeout=10)
+            logger.debug("FoodRepo barcode API raw response: status=%d, content=%s",
+                         resp.status_code, resp.text)
             resp.raise_for_status()
             data = resp.json()
-            logger.debug("USDA barcode API: status=%d, totalHits=%s",
-                         resp.status_code, data.get("totalHits", "N/A"))
+            logger.debug("FoodRepo barcode API: status=%d", resp.status_code)
             return data
         except requests.exceptions.Timeout:
-            logger.error("USDA barcode API timeout for code='%s'", barcode)
+            logger.error("FoodRepo barcode API timeout for code='%s'", barcode)
         except requests.exceptions.HTTPError as e:
-            logger.error("USDA barcode API HTTP error: %s (code='%s')", e, barcode)
+            logger.error("FoodRepo barcode API HTTP error: %s (code='%s')", e, barcode)
         except Exception as e:
-            logger.error("USDA barcode API unexpected error: %s (code='%s')", e, barcode, exc_info=True)
+            logger.error("FoodRepo barcode API unexpected error: %s (code='%s')", e, barcode, exc_info=True)
 
         return None
 
@@ -460,12 +466,18 @@ class USDAClient:
 
     def _parse_100g_nutritions(self, food: dict) -> Dict[str, float]:
         """
-        Extract calories, protein, fat, carbs per 100g from a USDA food dict.
+        Extract calories, protein, fat, carbs per 100g from a FoodRepo product dict.
+
+        FoodRepo stores nutrients under:
+        food["nutrients"] = {
+            "energy":        {"per_hundred": 250.0, "unit": "kcal"},
+            "protein":       {"per_hundred": 8.5,   "unit": "g"},
+            "fat":           {"per_hundred": 12.0,  "unit": "g"},
+            "carbohydrates": {"per_hundred": 30.0,  "unit": "g"},
+        }
         """
-        logger.info("_parse_100g_nutritions: '%s' (fdcId=%s, score=%.1f)",
-                    food.get("description", "N/A"),
-                    food.get("fdcId", "N/A"),
-                    food.get("score", 0))
+        name = self._get_product_name(food)
+        logger.info("_parse_100g_nutritions: '%s' (id=%s)", name, food.get("id", "N/A"))
 
         result = {
             "calories": 0.0,
@@ -474,35 +486,35 @@ class USDAClient:
             "carbs": 0.0,
         }
 
-        for n in food.get("foodNutrients", []):
-            nutrient_number = str(n.get("nutrientNumber", "")).strip()
-            unit  = str(n.get("unitName", "")).upper()
-            value = n.get("value")
+        nutrients = food.get("nutrients", {})
+        if not nutrients:
+            logger.warning("_parse_100g_nutritions: no nutrients data for '%s'", name)
+            return result
 
-            if value is None:
-                continue
-
-            if nutrient_number in self.ENERGY_NUMBERS and unit == "KCAL":
-                result["calories"] = float(value)
-            elif nutrient_number in self.TARGET_NUTRIENTS:
-                result[self.TARGET_NUTRIENTS[nutrient_number]] = float(value)
+        for api_key, result_key in self.NUTRIENT_MAP.items():
+            nutrient = nutrients.get(api_key, {})
+            value = nutrient.get("per_hundred")
+            if value is not None:
+                result[result_key] = float(value)
 
         logger.debug("_parse_100g_nutritions result: %s", result)
         return result
 
     def _parse_ingredient_string(self, food: dict) -> Optional[List[str]]:
         """
-        Parse a USDA ingredients raw string into a clean list.
+        Parse FoodRepo ingredients into a clean list.
+
+        FoodRepo stores ingredients under:
+        food["ingredients_translations"] = {"en": "SUGAR, MILK, ...", "fr": "..."}
 
         Handles nested parentheses by splitting only on top-level commas.
-        Example:
-            "MILK CHOCOLATE (SUGAR, COCOA BUTTER), PEANUTS, SALT"
-            → ["milk chocolate", "peanuts", "salt"]
         """
-        raw_ingredients = food.get("ingredients", "")
+        translations = food.get("ingredients_translations", {})
+        raw_ingredients = translations.get("en") or translations.get("fr") or translations.get("de", "")
+
         if not raw_ingredients:
-            logger.info("_parse_ingredient_string: no 'ingredients' for '%s' (fdcId=%s)",
-                        food.get("description", "N/A"), food.get("fdcId", "N/A"))
+            logger.info("_parse_ingredient_string: no ingredients for '%s' (id=%s)",
+                        self._get_product_name(food), food.get("id", "N/A"))
             return None
 
         tokens = []
@@ -524,12 +536,10 @@ class USDAClient:
             else:
                 current.append(char)
 
-        # Last token (no trailing comma)
         token = "".join(current).strip()
         if token:
             tokens.append(token)
 
-        # Strip parenthetical sub-lists, lowercase
         cleaned = []
         for tok in tokens:
             name = re.sub(r"\s*\(.*", "", tok).strip().lower()
@@ -541,6 +551,13 @@ class USDAClient:
     # ─────────────────────────────────────────────────────────────────────
     # Helpers
     # ─────────────────────────────────────────────────────────────────────
+
+    def _get_product_name(self, food: dict) -> str:
+        """Extract product name from FoodRepo display_name_translations."""
+        if not food:
+            return "N/A"
+        translations = food.get("display_name_translations", {})
+        return translations.get("en") or translations.get("fr") or translations.get("de") or "N/A"
 
     def _normalize_query(self, query: str) -> str:
         """
@@ -559,11 +576,9 @@ class USDAClient:
         original = query
         query = str(query).strip().lower()
 
-        # Remove accents
         query = unicodedata.normalize('NFKD', query)
         query = ''.join([c for c in query if not unicodedata.combining(c)])
 
-        # Extract prefix before parentheses
         match = re.match(r"^(.*?)\s*\(.*?\)", query)
         if match:
             prefix = match.group(1).strip()
