@@ -59,8 +59,9 @@ class _LRUCache:
 
 _MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
 
-# Module-level L1 cache (shared across all AvocavoNutritionClient instances in one process)
-_l1: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
+# Module-level L1 caches (shared across all AvocavoNutritionClient instances in one process)
+_l1_foods: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
+_l1_barcodes: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
 
 
 def _now_ts() -> float:
@@ -162,8 +163,10 @@ class AvocavoNutritionClient:
         self.api_key = api_key
         self.base_url = "https://app.avocavo.app/api/v2"
         logger.info("AvocavoNutritionClient initialized (api_key=%s)", "DEMO_KEY" if api_key == "DEMO_KEY" else "***")
+        l2_entries = len(_l2["foods"]) + len(_l2["barcodes"])
+        l1_entries = len(_l1_foods) + len(_l1_barcodes)
         logger.debug("L1 cache size: %d / %d   |   L2 disk entries: %d",
-                     len(_l1), _L1_MAXSIZE, len(_l2))
+                 l1_entries, _L1_MAXSIZE * 2, l2_entries)
 
     # ─────────────────────────────────────────────────────────────────────
     # Public API
@@ -279,7 +282,7 @@ class AvocavoNutritionClient:
              → result saved to both L1 + L2 on success
         """
         # ── Level 1: RAM LRU ──────────────────────────────────────────────
-        l1_hit = _l1.get(normalized_query)
+        l1_hit = _l1_foods.get(normalized_query)
         if l1_hit is not _MISSING:
             _name = (l1_hit.get("ingredient") or l1_hit.get("parsing", {}).get("ingredient_name", "None")) if l1_hit else "None"
             logger.info("search_best: L1 HIT (RAM) for '%s' → '%s'", normalized_query, _name)
@@ -294,7 +297,7 @@ class AvocavoNutritionClient:
                 _name = (food.get("ingredient") or food.get("parsing", {}).get("ingredient_name", "None")) if food else "None"
                 logger.info("search_best: L2 HIT (disk) for '%s' → '%s'", normalized_query, _name)
                 logger.info("search_best: Cache HIT for '%s' → '%s'", normalized_query, _name)
-                _l1.set(normalized_query, food)
+                _l1_foods.set(normalized_query, food)
                 return food
             else:
                 logger.info("search_best: L2 EXPIRED for '%s' (age > %d days)",
@@ -305,7 +308,7 @@ class AvocavoNutritionClient:
         foods = self.search(normalized_query)
 
         if not foods:
-            _l1.set(normalized_query, None)
+            _l1_foods.set(normalized_query, None)
             _l2["foods"][normalized_query] = {"food": None, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return None
@@ -314,7 +317,7 @@ class AvocavoNutritionClient:
         best_food = foods[0]
         logger.debug("search_best: best='%s'", best_food.get("ingredient") or best_food.get("parsing", {}).get("ingredient_name", "N/A"))
 
-        _l1.set(normalized_query, best_food)
+        _l1_foods.set(normalized_query, best_food)
         _l2["foods"][normalized_query] = {"food": best_food, "_ts": _now_ts()}
         _save_disk_cache(_l2)
 
@@ -327,13 +330,15 @@ class AvocavoNutritionClient:
     @staticmethod
     def clear_l1_cache():
         """Clear Level-1 (RAM) cache only."""
-        _l1.clear()
+        _l1_foods.clear()
+        _l1_barcodes.clear()
         logger.info("L1 RAM cache cleared")
 
     @staticmethod
     def clear_all_caches():
         """Clear both L1 (RAM) and L2 (disk) caches."""
-        _l1.clear()
+        _l1_foods.clear()
+        _l1_barcodes.clear()
         _l2["foods"].clear()
         _l2["barcodes"].clear()
         _save_disk_cache(_l2)
@@ -347,7 +352,9 @@ class AvocavoNutritionClient:
         expired  = sum(1 for e in foods.values()    if _is_expired(e)) \
                  + sum(1 for e in barcodes.values() if _is_expired(e))
         return {
-            "l1_entries":         len(_l1),
+            "l1_food_entries":    len(_l1_foods),
+            "l1_barcode_entries": len(_l1_barcodes),
+            "l1_entries":         len(_l1_foods) + len(_l1_barcodes),
             "l1_maxsize":         _L1_MAXSIZE,
             "l2_food_entries":    len(foods),
             "l2_barcode_entries": len(barcodes),
@@ -415,23 +422,23 @@ class AvocavoNutritionClient:
 
     def search_by_barcode(self, code: str) -> Optional[Dict]:
         """
-        Search Avocavo Nutrition by UPC/barcode and return raw JSON response.
+        Search Avocavo Nutrition by UPC/barcode and return a compact parsed response.
 
         Args:
             code: Barcode string (e.g. "0885909456017").
 
         Returns:
-            Raw JSON dict from Avocavo API, or None on error/invalid input.
+            Parsed product dict from Avocavo API, or None on error/invalid input.
         """
         barcode = re.sub(r"\D", "", str(code or "")).strip()
         if not barcode:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
             return None
 
-        l1_key = f"barcode:{barcode}"
+        l1_key = barcode
 
         # Level 1: RAM cache
-        l1_hit = _l1.get(l1_key)
+        l1_hit = _l1_barcodes.get(l1_key)
         if l1_hit is not _MISSING:
             logger.info("search_by_barcode: L1 HIT (RAM) for upc='%s'", barcode)
             logger.info("search_by_barcode: Cache HIT for upc='%s'", barcode)
@@ -444,7 +451,7 @@ class AvocavoNutritionClient:
                 cached = entry.get("food")
                 logger.info("search_by_barcode: L2 HIT (disk) for upc='%s'", barcode)
                 logger.info("search_by_barcode: Cache HIT for upc='%s'", barcode)
-                _l1.set(l1_key, cached)
+                _l1_barcodes.set(l1_key, cached)
                 return cached
             logger.info("search_by_barcode: L2 EXPIRED for upc='%s' (age > %d days)",
                         barcode, _CACHE_TTL_DAYS)
@@ -470,13 +477,19 @@ class AvocavoNutritionClient:
                          resp.status_code, resp.text[:120])
             if resp.status_code == 404:
                 logger.info("Avocavo barcode API: upc '%s' not found (404)", barcode)
-                _l1.set(l1_key, None)
-                _l2["barcodes"][barcode] = {"food": None, "_ts": _now_ts()}
+                data = {
+                    "barcode": barcode,
+                    "found": False,
+                    "message": "product not found",
+                }
+                _l1_barcodes.set(l1_key, data)
+                _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
                 _save_disk_cache(_l2)
-                return None
+                return data
             resp.raise_for_status()
-            data = resp.json()
-            _l1.set(l1_key, data)
+            raw_data = resp.json()
+            data = self._parse_barcode_response(raw_data, barcode)
+            _l1_barcodes.set(l1_key, data)
             _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return data
@@ -492,6 +505,132 @@ class AvocavoNutritionClient:
     # ─────────────────────────────────────────────────────────────────────
     # Private: Parse
     # ─────────────────────────────────────────────────────────────────────
+
+    def _parse_barcode_response(self, raw: dict, barcode: str) -> Dict:
+        """Reduce verbose Avocavo barcode payloads to a compact, app-friendly schema."""
+        if not isinstance(raw, dict):
+            logger.warning("_parse_barcode_response: invalid payload type for '%s': %s",
+                           barcode, type(raw).__name__)
+            return {
+                "barcode": barcode,
+                "found": False,
+                "message": "invalid payload",
+            }
+
+        product = raw.get("product") or {}
+        nutrition = raw.get("nutrition") or {}
+        per_100g = ((nutrition.get("data") or {}).get("per_100g") or {})
+
+        found = bool(raw.get("success")) and isinstance(product, dict) and bool(product)
+        if not found:
+            return {
+                "barcode": barcode,
+                "found": False,
+                "message": "product not found",
+            }
+
+        nutritions = {
+            "calories": float(per_100g.get("calories", 0) or 0),
+            "protein":  float(per_100g.get("protein", 0) or 0),
+            "fat":      float(per_100g.get("fat", 0) or 0),
+            "carbs":    float(per_100g.get("carbohydrates", 0) or 0),
+            "fiber":    float(per_100g.get("fiber", 0) or 0),
+            "sodium":   float(per_100g.get("sodium", 0) or 0),
+            "sugar":    float(per_100g.get("sugars", 0) or 0),
+        }
+
+        labels = {
+            "source": self._normalize_metadata_value(nutrition.get("source")),
+            "coverage": self._normalize_metadata_value(nutrition.get("coverage")),
+        }
+        labels = {key: value for key, value in labels.items() if value is not None}
+
+        parsed = {
+            "barcode": product.get("upc") or raw.get("upc") or barcode,
+            "found": True,
+            "product_name": (product.get("name")
+                             or product.get("description")
+                             or product.get("ingredient")
+                             or "N/A"),
+            "brands": product.get("brand") or None,
+            "quantity": product.get("quantity") or None,
+            "category": self._extract_primary_category(product.get("categories")),
+            "ingredients_text": product.get("ingredients") or None,
+            "ingredients": self._parse_barcode_ingredient_string(product.get("ingredients")),
+            "nutritions": nutritions,
+            "labels": labels or None,
+            "images": {"front": product.get("image_url")} if product.get("image_url") else None,
+        }
+
+        compact = {key: value for key, value in parsed.items() if value is not None}
+        logger.debug("_parse_barcode_response: compact fields for '%s' -> %s",
+                     barcode, list(compact.keys()))
+        return compact
+
+    def _extract_primary_category(self, categories) -> Optional[str]:
+        """Return a compact primary category from a category list/string."""
+        if not categories:
+            return None
+
+        if isinstance(categories, list):
+            for item in categories:
+                value = str(item).strip()
+                if value:
+                    return value.lower()
+            return None
+
+        if isinstance(categories, str):
+            value = categories.strip()
+            return value.lower() if value else None
+
+        return None
+
+    def _parse_barcode_ingredient_string(self, raw_ingredients: Optional[str]) -> Optional[List[str]]:
+        """Parse a raw ingredient string into compact ingredient tokens."""
+        if not raw_ingredients:
+            return None
+
+        tokens = []
+        depth = 0
+        current = []
+        for char in raw_ingredients:
+            if char in "([":
+                depth += 1
+                current.append(char)
+            elif char in ")]":
+                depth -= 1
+                current.append(char)
+            elif char in ",;" and depth == 0:
+                token = "".join(current).strip()
+                if token:
+                    tokens.append(token)
+                current = []
+            else:
+                current.append(char)
+
+        token = "".join(current).strip()
+        if token:
+            tokens.append(token)
+
+        cleaned = []
+        seen = set()
+        for tok in tokens:
+            item = re.sub(r'\s*[\(\[][^)\]]*[\)\]]\s*', ' ', tok)
+            item = re.sub(r'\s*\d+[,.]?\d*%\s*', ' ', item)
+            item = re.sub(r'(?<![A-Za-z0-9])\d+[,.]?\d*(?![A-Za-z0-9])', ' ', item)
+            item = re.sub(r'[^\w\s\-\']', ' ', item)
+            item = re.sub(r'\s+', ' ', item).strip().lower()
+            if item and item not in seen:
+                seen.add(item)
+                cleaned.append(item)
+
+        return cleaned if cleaned else None
+
+    def _normalize_metadata_value(self, value):
+        """Normalize optional metadata values, dropping placeholders like 'unknown'."""
+        if value in (None, "", "unknown"):
+            return None
+        return value
 
     def _parse_100g_nutritions(self, food: dict) -> Dict[str, float]:
         """

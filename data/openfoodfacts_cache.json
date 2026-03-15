@@ -1020,16 +1020,14 @@
           "geschmacksverstärker",
           "säureregulator",
           "e500",
-          "e501 suppenpulver",
-          "salz",
+          "e501",
+          "suppenpulver",
           "gewürze",
-          "geschmacksverstärker",
           "e627",
-          "e631 säureregulator",
-          "getrocknete frühlingszwiebel würzöl",
-          "gewürze",
-          "fischsauce",
-          "salz",
+          "e631",
+          "garnelenpulver",
+          "getrocknete frühlingszwiebel",
+          "würzöl",
           "aroma",
           "farbstoff"
         ],
@@ -1058,7 +1056,7 @@
           "nutrition": "https://images.openfoodfacts.org/images/products/893/456/313/8165/nutrition_vi.23.400.jpg"
         }
       },
-      "_ts": 1773512638.1097007
+      "_ts": 1773587954.3362162
     }
   }
 }

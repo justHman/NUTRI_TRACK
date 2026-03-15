@@ -132,7 +132,7 @@ def _test_cache_l1_hit(client) -> list:
 
 def _test_cache_l2_hit(client) -> list:
     try:
-        from third_apis.AvocavoNutrition import _l2, _l1, _now_ts, _MISSING, AvocavoNutritionClient
+        from third_apis.AvocavoNutrition import _l2, _l1_foods, _now_ts, _MISSING, AvocavoNutritionClient
         query = "__l2_test_chicken_avocavo__"
         fake_food = {
             "ingredient": "Test Chicken L2 Avocavo",
@@ -145,12 +145,12 @@ def _test_cache_l2_hit(client) -> list:
         }
         _l2["foods"][query] = {"food": fake_food, "_ts": _now_ts()}
         AvocavoNutritionClient.clear_l1_cache()
-        assert _l1.get(query) is _MISSING
+        assert _l1_foods.get(query) is _MISSING
         start = time.time()
         r = client.search_best(query)
         elapsed = time.time() - start
         assert r is not None and r.get("ingredient") == "Test Chicken L2 Avocavo"
-        l1_val = _l1.get(query)
+        l1_val = _l1_foods.get(query)
         assert l1_val is not _MISSING and l1_val.get("ingredient") == "Test Chicken L2 Avocavo"
         return [(True, "synthetic inject+promote", f"{elapsed:.4f}s  L1 promoted ✓")]
     except Exception as e:
@@ -162,7 +162,7 @@ def _test_cache_l2_hit(client) -> list:
 
 
 def _test_search_by_barcode(client) -> list:
-    """Test search_by_barcode() — invalid barcode returns None; valid returns dict (or None if not in DB)."""
+    """Test search_by_barcode() returns compact parsed Avocavo barcode response shape."""
     cases = [
         ("8934563138165", True),   # numeric barcode → attempt API call
         ("abc",           False),  # non-numeric → must return None immediately
@@ -177,12 +177,18 @@ def _test_search_by_barcode(client) -> list:
                 else:
                     results.append((False, f"'{code}'", f"expected None, got {type(raw).__name__}"))
                 continue
-            # numeric barcode: API either finds or returns 404 — both are acceptable
+            # numeric barcode: should return a compact parsed dict
             if raw is None:
-                results.append((True, f"'{code}'", "404 not in DB → None handled correctly ✓"))
+                results.append((False, f"'{code}'", "returned None"))
             else:
                 assert isinstance(raw, dict)
-                results.append((True, f"'{code}'", f"success={raw.get('success', '?')}, resp={raw}"))
+                assert raw.get("barcode") == code
+                assert isinstance(raw.get("found"), bool)
+                if raw.get("found"):
+                    assert raw.get("product_name")
+                    assert isinstance(raw.get("nutritions"), dict)
+                results.append((True, f"'{code}'",
+                                f"found={raw.get('found')} name={raw.get('product_name', 'N/A')}"))
         except Exception as e:
             results.append((False, f"'{code}'", str(e)))
     return results
@@ -192,27 +198,37 @@ def _test_barcode_cache(client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import AvocavoNutrition as av_module
-    from third_apis.AvocavoNutrition import _l1, _l2, _now_ts, _MISSING, AvocavoNutritionClient
+    from third_apis.AvocavoNutrition import _l1_barcodes, _l2, _now_ts, _MISSING, AvocavoNutritionClient
 
     barcode = "8801234567890"
-    l1_key  = f"barcode:{barcode}"
+    l1_key  = barcode
 
     try:
         # L2 hit should promote to L1
-        fake_l2 = {"success": True, "ingredient": "Barcode L2 Avocavo"}
+        fake_l2 = {
+            "barcode": barcode,
+            "found": True,
+            "product_name": "Barcode L2 Avocavo",
+            "nutritions": {"calories": 452.0, "protein": 10.0, "fat": 18.2, "carbs": 61.0},
+        }
         _l2["barcodes"][barcode] = {"food": fake_l2, "_ts": _now_ts()}
         AvocavoNutritionClient.clear_l1_cache()
-        assert _l1.get(l1_key) is _MISSING
+        assert _l1_barcodes.get(l1_key) is _MISSING
 
         got_l2 = client.search_by_barcode(barcode)
         assert got_l2 == fake_l2
-        promoted = _l1.get(l1_key)
+        promoted = _l1_barcodes.get(l1_key)
         assert promoted is not _MISSING and promoted == fake_l2
         results.append((True, "L2->L1 promotion", "barcode cache promoted successfully"))
 
         # L1 hit should not call network
-        fake_l1 = {"success": True, "ingredient": "Barcode L1 Avocavo"}
-        _l1.set(l1_key, fake_l1)
+        fake_l1 = {
+            "barcode": barcode,
+            "found": True,
+            "product_name": "Barcode L1 Avocavo",
+            "nutritions": {"calories": 452.0, "protein": 10.0, "fat": 18.2, "carbs": 61.0},
+        }
+        _l1_barcodes.set(l1_key, fake_l1)
         original_post = av_module.requests.post
 
         def _blocked_post(*args, **kwargs):

@@ -59,8 +59,9 @@ class _LRUCache:
 
 _MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
 
-# Module-level L1 cache (shared across all OpenFoodFactsClient instances in one process)
-_l1: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
+# Module-level L1 caches (shared across all OpenFoodFactsClient instances in one process)
+_l1_foods: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
+_l1_barcodes: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
 
 
 def _now_ts() -> float:
@@ -164,8 +165,9 @@ class OpenFoodFactsClient:
         self.user_agent = "NutriTrack/2.0"
         logger.info("OpenFoodFactsClient initialized (no API key required)")
         l2_entries = len(_l2["foods"]) + len(_l2["barcodes"])
+        l1_entries = len(_l1_foods) + len(_l1_barcodes)
         logger.debug("L1 cache size: %d / %d   |   L2 disk entries: %d",
-                     len(_l1), _L1_MAXSIZE, l2_entries)
+                 l1_entries, _L1_MAXSIZE * 2, l2_entries)
 
     # ─────────────────────────────────────────────────────────────────────
     # Public API
@@ -273,7 +275,7 @@ class OpenFoodFactsClient:
              → result saved to both L1 + L2 on success
         """
         # ── Level 1: RAM LRU ──────────────────────────────────────────────
-        l1_hit = _l1.get(normalized_query)
+        l1_hit = _l1_foods.get(normalized_query)
         if l1_hit is not _MISSING:
             logger.info("search_best: L1 HIT (RAM) for '%s' → '%s'",
                         normalized_query,
@@ -294,7 +296,7 @@ class OpenFoodFactsClient:
                 logger.info("search_best: Cache HIT for '%s' → '%s'",
                             normalized_query,
                             food.get("product_name", "None") if food else "None")
-                _l1.set(normalized_query, food)
+                _l1_foods.set(normalized_query, food)
                 return food
             else:
                 logger.info("search_best: L2 EXPIRED for '%s' (age > %d days)",
@@ -305,7 +307,7 @@ class OpenFoodFactsClient:
         products = self.search(normalized_query, pageSize)
 
         if not products:
-            _l1.set(normalized_query, None)
+            _l1_foods.set(normalized_query, None)
             _l2["foods"][normalized_query] = {"food": None, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return None
@@ -316,7 +318,7 @@ class OpenFoodFactsClient:
                      best_food.get("product_name", "N/A"),
                      self._calculate_score(best_food))
 
-        _l1.set(normalized_query, best_food)
+        _l1_foods.set(normalized_query, best_food)
         _l2["foods"][normalized_query] = {"food": best_food, "_ts": _now_ts()}
         _save_disk_cache(_l2)
 
@@ -329,13 +331,15 @@ class OpenFoodFactsClient:
     @staticmethod
     def clear_l1_cache():
         """Clear Level-1 (RAM) cache only."""
-        _l1.clear()
+        _l1_foods.clear()
+        _l1_barcodes.clear()
         logger.info("L1 RAM cache cleared")
 
     @staticmethod
     def clear_all_caches():
         """Clear both L1 (RAM) and L2 (disk) caches."""
-        _l1.clear()
+        _l1_foods.clear()
+        _l1_barcodes.clear()
         _l2["foods"].clear()
         _l2["barcodes"].clear()
         _save_disk_cache(_l2)
@@ -349,7 +353,9 @@ class OpenFoodFactsClient:
         expired  = sum(1 for e in foods.values()    if _is_expired(e)) \
                  + sum(1 for e in barcodes.values() if _is_expired(e))
         return {
-            "l1_entries":         len(_l1),
+            "l1_food_entries":    len(_l1_foods),
+            "l1_barcode_entries": len(_l1_barcodes),
+            "l1_entries":         len(_l1_foods) + len(_l1_barcodes),
             "l1_maxsize":         _L1_MAXSIZE,
             "l2_food_entries":    len(foods),
             "l2_barcode_entries": len(barcodes),
@@ -442,10 +448,10 @@ class OpenFoodFactsClient:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
             return None
 
-        l1_key = f"barcode:{barcode}"
+        l1_key = barcode
 
         # Level 1: RAM cache
-        l1_hit = _l1.get(l1_key)
+        l1_hit = _l1_barcodes.get(l1_key)
         if l1_hit is not _MISSING:
             logger.info("search_by_barcode: L1 HIT (RAM) for code='%s'", barcode)
             logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
@@ -458,7 +464,7 @@ class OpenFoodFactsClient:
                 cached = entry.get("food")
                 logger.info("search_by_barcode: L2 HIT (disk) for code='%s'", barcode)
                 logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
-                _l1.set(l1_key, cached)
+                _l1_barcodes.set(l1_key, cached)
                 return cached
             logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
                         barcode, _CACHE_TTL_DAYS)
@@ -479,7 +485,7 @@ class OpenFoodFactsClient:
                          resp.status_code, raw_data.get("status", "N/A"))
 
             data = self._parse_barcode_response(raw_data, barcode)
-            _l1.set(l1_key, data)
+            _l1_barcodes.set(l1_key, data)
             _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
             _save_disk_cache(_l2)
             return data

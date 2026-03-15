@@ -425,61 +425,50 @@
   "barcodes": {
     "8934563138165": {
       "food": {
-        "nutrition": {
-          "coverage": "comprehensive",
-          "data": {
-            "per_100g": {
-              "calcium": 0.0,
-              "calories": 452.0,
-              "carbohydrates": 61.0,
-              "fat": 18.2,
-              "fiber": 1.95,
-              "iron": 0.0,
-              "protein": 10.0,
-              "saturated_fat": 8.96,
-              "sodium": 2.05,
-              "sugars": 8.31
-            },
-            "serving_size": "100g serving",
-            "serving_size_grams": 100
-          },
-          "note": "Raw nutrition values as stored in database - serving sizes vary by product",
+        "barcode": "8934563138165",
+        "found": true,
+        "product_name": "Hao Hao Mi Tom Chua Cay (hot Sour Shrimp Flavor Noodle)",
+        "brands": "Vina acecook",
+        "quantity": "75 g",
+        "category": "dried products",
+        "ingredients_text": "Nudeln (68 g): WEIZENmehl (Amerika, Australien, Kanada) 58%, Pflanzenöl (Palmöl, Antioxidationsmittel E320, E321), Tapiokastärke, Salz, Zucker, FISCHsauce, Geschmacksverstärker: E621, Säureregulator: E451, E500, E501; Suppenpulver (6,9 g): Zucker, Salz, Gewürze, Geschmacksverstärker: E621, E627, E631; Säureregulator: E330; GARNELENpulver 0,3%, getrocknete Frühlingszwiebel; Würzöl (2,1 g): Pflanzenöl (Palmöl, Antioxidationsmittel E320, E321), Gewürze, FISCHsauce, Salz, Aroma, Farbstoff: E160a.",
+        "ingredients": [
+          "nudeln weizenmehl",
+          "pflanzenöl",
+          "tapiokastärke",
+          "salz",
+          "zucker",
+          "fischsauce",
+          "geschmacksverstärker e621",
+          "säureregulator e451",
+          "e500",
+          "e501",
+          "suppenpulver zucker",
+          "gewürze",
+          "e627",
+          "e631",
+          "säureregulator e330",
+          "garnelenpulver",
+          "getrocknete frühlingszwiebel",
+          "würzöl pflanzenöl",
+          "aroma",
+          "farbstoff e160a"
+        ],
+        "nutritions": {
+          "calories": 452.0,
+          "protein": 10.0,
+          "fat": 18.2,
+          "carbs": 61.0,
+          "fiber": 1.95,
+          "sodium": 2.05,
+          "sugar": 8.31
+        },
+        "labels": {
           "source": "open_food_facts",
-          "source_description": "Community-verified nutrition data from Open Food Facts (good coverage)"
-        },
-        "product": {
-          "brand": "Vina acecook",
-          "categories": [
-            "Dried Products",
-            "Noodles",
-            "Cereals And Their Products",
-            "Plant Based Foods",
-            "Pastas"
-          ],
-          "countries": null,
-          "data_sources": [
-            "open_food_facts"
-          ],
-          "fdc_id": null,
-          "image_url": null,
-          "ingredients": "Nudeln (68 g): WEIZENmehl (Amerika, Australien, Kanada) 58%, Pflanzenöl (Palmöl, Antioxidationsmittel E320, E321), Tapiokastärke, Salz, Zucker, FISCHsauce, Geschmacksverstärker: E621, Säureregulator: E451, E500, E501; Suppenpulver (6,9 g): Zucker, Salz, Gewürze, Geschmacksverstärker: E621, E627, E631; Säureregulator: E330; GARNELENpulver 0,3%, getrocknete Frühlingszwiebel; Würzöl (2,1 g): Pflanzenöl (Palmöl, Antioxidationsmittel E320, E321), Gewürze, FISCHsauce, Salz, Aroma, Farbstoff: E160a.",
-          "labels": null,
-          "name": "Hao Hao Mi Tom Chua Cay (hot Sour Shrimp Flavor Noodle)",
-          "origins": null,
-          "packaging": null,
-          "quantity": "75 g",
-          "stores": null
-        },
-        "response_time_ms": 43.67,
-        "success": true,
-        "timing_debug": {
-          "total_response_ms": 43.67494583129883,
-          "upc_search_ms": 25.611162185668945,
-          "user_lookup_ms": 17.368555068969727
-        },
-        "upc": "8934563138165"
+          "coverage": "comprehensive"
+        }
       },
-      "_ts": 1773511693.5469537
+      "_ts": 1773587907.7317178
     }
   }
 }
