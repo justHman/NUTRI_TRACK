@@ -83,6 +83,55 @@ def test_analyze_label(image_filepath):
     yield res_json, table_data
 
 
+def _render_barcode_table(res_json: dict) -> list:
+    """Extract barcode scan results into a display table."""
+    table_data = []
+    if not res_json.get("success"):
+        return table_data
+
+    data = res_json.get("data", {})
+    found = data.get("found", False)
+    barcode = data.get("barcode") or "N/A"
+
+    if not found:
+        table_data.append([barcode, "Không tìm thấy", "", "", "", "", ""])
+        return table_data
+
+    product_name = data.get("product_name", "N/A")
+    source = data.get("source", "N/A")
+    cache_level = data.get("cache_level", "N/A")
+    nut = data.get("nutritions") or {}
+    table_data.append([
+        barcode,
+        product_name,
+        f"{source} ({cache_level})",
+        f"{nut.get('calories', 'N/A')}",
+        f"{nut.get('protein', 'N/A')}",
+        f"{nut.get('carbs', 'N/A')}",
+        f"{nut.get('fat', 'N/A')}",
+    ])
+    return table_data
+
+
+def test_scan_barcode(image_filepath):
+    if not image_filepath:
+        yield {"error": "Chưa chọn ảnh"}, []
+        return
+
+    url = f"{API_BASE_URL}/scan-barcode"
+    with open(image_filepath, "rb") as f:
+        files = {"file": (os.path.basename(image_filepath), f, "image/png")}
+        response = requests.post(url, files=files)
+
+    res_json = response.json()
+    table_data = _render_barcode_table(res_json)
+
+    if res_json.get("success") and not res_json.get("data", {}).get("barcode"):
+        table_data = [["⚠️ Không phát hiện barcode trong ảnh", "", "", "", "", "", ""]]
+
+    yield res_json, table_data
+
+
 def save_results(json_data):
     if not json_data or "error" in json_data:
         return None
@@ -102,6 +151,7 @@ def save_results(json_data):
 
 
 NUTRITION_TABLE_HEADERS = ["Tên món/Nguyên liệu", "Khối lượng (g)", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)"]
+BARCODE_TABLE_HEADERS = ["Barcode", "Tên sản phẩm", "Nguồn", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)"]
 
 # Tạo giao diện với gr.Blocks + Tabs để phân biệt Food Analysis và Label Analysis
 with gr.Blocks(title="NutriTrack API Tester") as demo:
@@ -170,6 +220,37 @@ with gr.Blocks(title="NutriTrack API Tester") as demo:
                 fn=save_results,
                 inputs=[label_json_output],
                 outputs=[label_file_download]
+            )
+
+        # ─── Tab 3: Barcode Scan ────────────────────────────────────────
+        with gr.TabItem("📷 Quét mã vạch"):
+            with gr.Row():
+                with gr.Column():
+                    barcode_img_input = gr.Image(type="filepath", label="Upload Barcode Image")
+                    barcode_size_output = gr.Textbox(label="Dung lượng ảnh gốc", interactive=False)
+                    barcode_scan_btn = gr.Button("📷 Scan Barcode", variant="primary")
+
+                    gr.Markdown("---")
+                    barcode_save_btn = gr.Button("💾 Save Results to JSON")
+                    barcode_file_download = gr.File(label="Tải về file kết quả")
+
+                with gr.Column():
+                    barcode_json_output = gr.JSON(label="API Response - Raw JSON")
+                    barcode_df_output = gr.Dataframe(
+                        headers=BARCODE_TABLE_HEADERS,
+                        label="Kết quả quét mã vạch"
+                    )
+
+            barcode_img_input.change(fn=get_image_size, inputs=barcode_img_input, outputs=barcode_size_output)
+            barcode_scan_btn.click(
+                fn=test_scan_barcode,
+                inputs=[barcode_img_input],
+                outputs=[barcode_json_output, barcode_df_output]
+            )
+            barcode_save_btn.click(
+                fn=save_results,
+                inputs=[barcode_json_output],
+                outputs=[barcode_file_download]
             )
 
 demo.launch()  # Mặc định chạy ở localhost:7860

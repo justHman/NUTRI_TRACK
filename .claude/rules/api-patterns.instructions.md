@@ -22,15 +22,22 @@ applyTo: "templates/*.py"
 ## Endpoint Patterns
 - Accept file uploads via `UploadFile = File(...)`.
 - Accept config parameters via `Query(default=…, description="…")`.
-- Always read upload bytes with `await file.read()` then pass as `image_bytes=` to the pipeline — never write to disk unless a temp file is strictly needed.
-- Wrap upload handling in try/finally to clean up temp files:
-  ```python
-  tmp = tempfile.NamedTemporaryFile(delete=False, suffix="…")
-  try:
-      …
-  finally:
-      os.unlink(tmp.name)
-  ```
+- **Image input contract — bytes only at the pipeline boundary:**
+  - API endpoints read the upload with `await file.read()` and pass `image_bytes: bytes` to the pipeline.
+  - Pipelines and scripts **never** accept a file path from the outside — only `bytes` or `bytearray`.
+  - Reading the image file from disk is the **UI's responsibility** (`open(path, "rb").read()` in `ui.py`).
+  - If a pipeline internally needs a file path (e.g., for a library that doesn't support bytes), write a private temp file and delete it in a `finally` block:
+    ```python
+    import tempfile, os
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp.write(image_bytes)
+        tmp_path = tmp.name
+    try:
+        result = some_lib(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+    ```
+- Always read upload bytes with `await file.read()` then pass as `image_bytes=` to the pipeline — never pass `UploadFile` objects deeper than the endpoint handler.
 
 ## Response and Error Handling
 - Return plain `dict` from endpoints (FastAPI serializes automatically).

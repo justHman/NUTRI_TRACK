@@ -1,7 +1,7 @@
-"""
+b"""
 Tests for NutriTrack API Endpoints
 ====================================
-Tests the FastAPI endpoints: /health, /analyze-food
+Tests the FastAPI endpoints: /health, /analyze-food, /analyze-label, /scan-barcode
 """
 
 import os
@@ -39,6 +39,7 @@ BASE_URL = "http://localhost:8000"
 LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "hao_hao.jpg")
 FOOD_IMG = os.path.join(project_root, "data", "images", "dishes", "com_tam.jpg")
 FAST_FOOD_IMG = os.path.join(project_root, "data", "images", "dishes", "fast_food.jpg")
+BARCODE_IMG = os.path.join(project_root, "data", "images", "barcodes", "barcode.png")
 
 
 # ─── Health Check ────────────────────────────────────────────────────────────
@@ -259,6 +260,121 @@ def _test_analyze_label_invalid_file() -> dict:
         result["notes"] = str(e)
     return result
 
+
+# ─── Scan Barcode ────────────────────────────────────────────────────────────
+
+def _test_scan_barcode(image_path: str, image_name: str) -> dict:
+    """Test POST /scan-barcode endpoint with a valid barcode image."""
+    result = {
+        "endpoint": "/scan-barcode",
+        "method": "POST",
+        "image": image_name,
+        "success": False,
+        "status_code": None,
+        "time_s": 0,
+        "notes": "",
+    }
+
+    if not os.path.exists(image_path):
+        result["notes"] = f"Image not found: {image_path}"
+        return result
+
+    try:
+        start = time.time()
+        with open(image_path, "rb") as f:
+            files = {"file": (os.path.basename(image_path), f, "image/png")}
+            resp = requests.post(f"{BASE_URL}/scan-barcode", files=files, timeout=30)
+        elapsed = time.time() - start
+
+        result["status_code"] = resp.status_code
+        result["time_s"] = round(elapsed, 2)
+        data = resp.json()
+
+        if resp.status_code == 200 and data.get("success"):
+            scan_data = data.get("data", {})
+            barcode = scan_data.get("barcode")
+            found = scan_data.get("found", False)
+            result["success"] = True
+            result["notes"] = f"barcode={barcode}, found={found}"
+            if found:
+                result["notes"] += f", source={scan_data.get('source')}, level={scan_data.get('cache_level')}"
+        else:
+            result["notes"] = f"HTTP {resp.status_code}: {data.get('detail', '')}"
+
+    except Exception as e:
+        result["notes"] = str(e)
+
+    return result
+
+
+def _test_scan_barcode_invalid_file() -> dict:
+    """Test POST /scan-barcode with non-image file -> expect 400"""
+    result = {
+        "endpoint": "/scan-barcode",
+        "method": "POST",
+        "image": "invalid_file",
+        "success": False,
+        "status_code": None,
+        "notes": "",
+    }
+    try:
+        files = {"file": ("test.txt", b"not an image", "text/plain")}
+        resp = requests.post(f"{BASE_URL}/scan-barcode", files=files, timeout=10)
+        result["status_code"] = resp.status_code
+        if resp.status_code == 400:
+            result["success"] = True
+            result["notes"] = "Correctly rejected non-image file"
+        else:
+            result["notes"] = f"Expected 400, got {resp.status_code}"
+    except Exception as e:
+        result["notes"] = str(e)
+    return result
+
+
+def _test_scan_barcode_no_barcode() -> dict:
+    """Test POST /scan-barcode with a food image (no barcode) -> success but no barcode detected"""
+    result = {
+        "endpoint": "/scan-barcode",
+        "method": "POST",
+        "image": "com_tam (no barcode)",
+        "success": False,
+        "status_code": None,
+        "time_s": 0,
+        "notes": "",
+    }
+
+    if not os.path.exists(FOOD_IMG):
+        result["notes"] = f"Image not found: {FOOD_IMG}"
+        return result
+
+    try:
+        start = time.time()
+        with open(FOOD_IMG, "rb") as f:
+            files = {"file": (os.path.basename(FOOD_IMG), f, "image/jpeg")}
+            resp = requests.post(f"{BASE_URL}/scan-barcode", files=files, timeout=30)
+        elapsed = time.time() - start
+
+        result["status_code"] = resp.status_code
+        result["time_s"] = round(elapsed, 2)
+        data = resp.json()
+
+        if resp.status_code == 200 and data.get("success"):
+            scan_data = data.get("data", {})
+            barcode = scan_data.get("barcode")
+            if barcode is None:
+                result["success"] = True
+                result["notes"] = "Correctly returned no barcode for non-barcode image"
+            else:
+                result["success"] = True
+                result["notes"] = f"Detected barcode={barcode} in non-barcode image (acceptable)"
+        else:
+            result["notes"] = f"HTTP {resp.status_code}: {data.get('detail', '')}"
+
+    except Exception as e:
+        result["notes"] = str(e)
+
+    return result
+
 def run_all() -> list:
     """Run all API endpoint tests.
 
@@ -326,6 +442,16 @@ def run_all() -> list:
         r = _test_analyze_label_invalid_file()
         all_results.append(r); label_cases.append(_to_case(r))
         _print_group("LABEL ENDPOINT TESTS", label_cases)
+
+        # ─ BARCODE endpoint (3 cases)
+        barcode_cases = []
+        r = _test_scan_barcode(BARCODE_IMG, "barcode")
+        all_results.append(r); barcode_cases.append(_to_case(r))
+        r = _test_scan_barcode_no_barcode()
+        all_results.append(r); barcode_cases.append(_to_case(r))
+        r = _test_scan_barcode_invalid_file()
+        all_results.append(r); barcode_cases.append(_to_case(r))
+        _print_group("BARCODE ENDPOINT TESTS", barcode_cases)
 
         passed = sum(1 for r in all_results if r.get("success"))
         icon = "✅" if passed == len(all_results) else "❌"

@@ -5,13 +5,18 @@ applyTo: "**/*.py"
 # Python Conventions — NutriTrack
 
 ## Logging
-- Always import and use the project logger — never `logging.getLogger()` directly:
+- **Every `.py` file must declare a module-level logger** — no exceptions:
   ```python
   from config.logging_config import get_logger
   logger = get_logger(__name__)
   ```
+  This includes scripts, pipelines, utility modules, clients, and test helpers.
+  Never use `logging.getLogger()` directly.
 - Use `logger.title("…")` for major section headers (pipeline stages, initialization).
-- Use `logger.info()` for key milestones, `logger.debug()` for detailed internals.
+- Use `logger.info()` for key milestones and happy-path results.
+- Use `logger.debug()` for detailed internals (cache hits, intermediate values).
+- Use `logger.warning()` for handled edge cases (empty input, fallback used, cache miss).
+- Use `logger.error("…", exc_info=True)` before re-raising or returning an error dict.
 
 ## Type Hints
 - All function signatures **must** have type hints on parameters and return values.
