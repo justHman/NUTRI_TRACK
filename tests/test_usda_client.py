@@ -140,7 +140,12 @@ def _test_cache_l2_hit(usda_client) -> list:
                 {"nutrientNumber": "205", "unitName": "G",    "value": 0.0},
             ],
         }
-        _l2["foods"][query] = {"food": fake_food, "_ts": _now_ts()}
+        _l2["foods"][query] = {
+            "food": fake_food,
+            "found": True,
+            "message": "ingredient found",
+            "_ts": _now_ts(),
+        }
         USDAClient.clear_l1_cache()
         assert _l1_foods.get(query) is _MISSING
         start = time.time()
@@ -214,37 +219,51 @@ def _test_normalize_query(usda_client) -> list:
 
 
 def _test_search_by_barcode(usda_client) -> list:
-    """Test search_by_barcode() returns compact parsed USDA response shape."""
+    """Test search_by_barcode() returns streamlined response format."""
     cases = [
-        ("8934563138165", True),
-        ("abc", False),
+        ("8934563138165", "found=False"),  # numeric barcode not in USDA
+        ("abc",           "invalid"),      # non-numeric -> validation error
+        ("",              "invalid"),      # empty -> validation error
+        ("  123456789  ", "found=False"),  # numeric barcode not in USDA
+        ("000000000000", "found=False")    # numeric barcode not in USDA
     ]
     results = []
 
-    for code, should_be_valid in cases:
+    for code, expected_type in cases:
         try:
-            raw = usda_client.search_by_barcode(code)
+            result = usda_client.search_by_barcode(code)
 
-            if not should_be_valid:
-                if raw is None:
-                    results.append((True, f"'{code}'", "invalid barcode -> None"))
-                else:
-                    results.append((False, f"'{code}'", f"expected None, got {type(raw).__name__}"))
+            # All responses should be dict with consistent format
+            assert isinstance(result, dict), f"expected dict, got {type(result).__name__}"
+            assert "food" in result
+            assert "found" in result and isinstance(result["found"], bool)
+            assert "message" in result
+
+            if expected_type == "invalid":
+                # Invalid barcode should return validation error
+                assert result["found"] is False
+                assert result["food"] is None
+                assert result["message"] == "invalid barcode"
+                results.append((True, f"'{code}'", "invalid barcode -> found=False"))
                 continue
 
-            if raw is None:
-                results.append((False, f"'{code}'", "returned None"))
-                continue
+            # Numeric barcode: should return valid response structure
+            if result["found"]:
+                assert result["food"] is not None
+                assert result["message"] == "product found"
+                assert isinstance(result["food"], dict)
+                # Should have product info specific to USDA
+                expected_fields = ["barcode", "description", "nutritions", "fdcId"]
+                found_fields = [field for field in expected_fields if field in result["food"]]
+                assert len(found_fields) > 0, f"Expected at least one of {expected_fields}"
+                results.append((True, f"'{code}'", f"found=True, food has {found_fields}"))
+            else:
+                assert result["food"] is None or isinstance(result["food"], dict)
+                if isinstance(result["food"], dict):
+                    assert result["food"].get("barcode") == code
+                assert "not found" in result["message"].lower() or "0 results" in result["message"].lower()
+                results.append((True, f"'{code}'", "found=False (no USDA data)"))
 
-            assert isinstance(raw, dict), f"expected dict, got {type(raw).__name__}"
-            assert raw.get("barcode") == code
-            assert isinstance(raw.get("found"), bool)
-            if raw.get("found"):
-                assert raw.get("product_name")
-                assert isinstance(raw.get("nutritions"), dict)
-                assert "calories" in raw["nutritions"]
-            results.append((True, f"'{code}'",
-                            f"found={raw.get('found')} name={raw.get('product_name', 'N/A')}"))
         except Exception as e:
             results.append((False, f"'{code}'", str(e)))
 
@@ -257,35 +276,46 @@ def _test_barcode_cache(usda_client) -> list:
     from third_apis import USDA as usda_module
     from third_apis.USDA import _l1_barcodes, _l2, _now_ts, _MISSING, USDAClient
 
-    barcode = "8934563138165"
-    l1_key  = barcode
+    barcode = "8934563138166"
 
     try:
         # L2 hit should promote to L1
-        fake_l2 = {
+        fake_l2_food = {
             "barcode": barcode,
-            "found": True,
-            "product_name": "Barcode L2 USDA",
+            "description": "Barcode L2 USDA Test Food",
+            "fdcId": 789012,
             "nutritions": {"calories": 165.0, "protein": 31.0, "fat": 3.6, "carbs": 0.0},
         }
-        _l2["barcodes"][barcode] = {"food": fake_l2, "_ts": _now_ts()}
+        _l2["barcodes"][barcode] = {
+            "food": fake_l2_food,
+            "found": True,
+            "message": "product found",
+            "_ts": _now_ts(),
+        }
         USDAClient.clear_l1_cache()
-        assert _l1_barcodes.get(l1_key) is _MISSING
+        assert _l1_barcodes.get(barcode) is _MISSING
 
+        # Test L2 -> L1 promotion
         got_l2 = usda_client.search_by_barcode(barcode)
-        assert got_l2 == fake_l2
-        promoted = _l1_barcodes.get(l1_key)
-        assert promoted is not _MISSING and promoted == fake_l2
+        assert isinstance(got_l2, dict)
+        assert got_l2["found"] is True
+        assert got_l2["food"] == fake_l2_food
+        assert got_l2["message"] == "product found"
+
+        # Verify L1 promotion
+        promoted = _l1_barcodes.get(barcode)
+        assert promoted is not _MISSING
+        assert promoted == fake_l2_food
         results.append((True, "L2->L1 promotion", "barcode cache promoted successfully"))
 
         # L1 hit should not call network
-        fake_l1 = {
+        fake_l1_food = {
             "barcode": barcode,
-            "found": True,
-            "product_name": "Barcode L1 USDA",
+            "description": "Barcode L1 USDA Test Food",
+            "fdcId": 789013,
             "nutritions": {"calories": 165.0, "protein": 31.0, "fat": 3.6, "carbs": 0.0},
         }
-        _l1_barcodes.set(l1_key, fake_l1)
+        _l1_barcodes.set(barcode, fake_l1_food)
         original_get = usda_module.requests.get
 
         def _blocked_get(*args, **kwargs):
@@ -294,10 +324,14 @@ def _test_barcode_cache(usda_client) -> list:
         usda_module.requests.get = _blocked_get
         try:
             got_l1 = usda_client.search_by_barcode(barcode)
-            assert got_l1 == fake_l1
+            assert isinstance(got_l1, dict)
+            assert got_l1["found"] is True
+            assert got_l1["food"] == fake_l1_food
+            assert got_l1["message"] == "product found"
             results.append((True, "L1 hit no network", "returned from RAM cache"))
         finally:
             usda_module.requests.get = original_get
+
     except Exception as e:
         results.append((False, "barcode cache", str(e)))
     finally:

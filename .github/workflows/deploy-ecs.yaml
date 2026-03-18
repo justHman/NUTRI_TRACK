@@ -1,145 +1,180 @@
-# ============================================================
-# GitHub Actions CI/CD — NutriTrack API → AWS ECS
-# ============================================================
-#
-# Pipeline này tự động:
-#   1. Build Docker Image (x86 & ARM64 song song)
-#   2. Push lên Docker Hub
-#   3. Cập nhật ECS Task Definition với image mới
-#   4. Deploy lên ECS Fargate (Standard x86 & ARM Spot)
-#
-# Đặt file này tại: .github/workflows/deploy-ecs.yml
-# (root của repo, KHÔNG trong thư mục app/)
-#
-# Xem hướng dẫn đầy đủ: app/docs/cicd_ecs_complete.md
-# ============================================================
-
-name: 🚀 Deploy NutriTrack → AWS ECS
+name: 🚀 Deploy NutriTrack API → AWS ECS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
-      - "app/**"          # Chỉ trigger khi code trong app/ thay đổi
+      - "**"
 
   workflow_dispatch:
     inputs:
       target:
-        description: "Chiến lược deploy"
+        description: "Deployment target"
         required: true
         default: "arm-spot"
         type: choice
         options:
-          # - both       # Build & deploy cả 2 service
-          # - standard   # Chỉ Fargate Standard (x86)
-          - arm-spot   # Chỉ Fargate ARM64 Spot
+          - arm
+          - arm-spot
+          - both
 
-# ─────────────────────────────────────────────────────────────
-# Biến môi trường — Chỉnh sửa nếu tên resource của bạn khác
-# ─────────────────────────────────────────────────────────────
 env:
   AWS_REGION: us-east-1
 
   ECS_CLUSTER: nutritrack-api-cluster
-  CONTAINER_NAME: nutritrack-api-container
-
-  # Fargate ARM64 Spot
-  ECS_SERVICE_ARM: arm-nutritrack-api-service
+  CONTAINER_NAME: arm-nutritrack-api-container 
+  
   ECS_TASK_ARM: arm-nutritrack-api-task
 
+  ECS_SERVICE_ARM: arm-nutritrack-api-service
+  ECS_SERVICE_ARM_SPOT: arm-spot-nutritrack-api-service
+
+  IMAGE_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api
+
+# ============================================================
+# BUILD IMAGE
+# ============================================================
+
 jobs:
-  # ─────────────────────────────────────────────────────────
-  # JOB 2: Build Docker Image ARM64 (linux/arm64)
-  # Dùng QEMU để cross-compile trên runner x86
-  # ─────────────────────────────────────────────────────────
-  build-arm:
-    name: "🔨 Build ARM64 Image"
+
+  build:
+    name: 🔨 Build & Push Docker Image
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'push' ||
-      inputs.target == 'both' ||
-      inputs.target == 'arm-spot'
 
     outputs:
       image: ${{ steps.meta.outputs.image }}
 
     steps:
-      - name: Checkout source code
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (hỗ trợ cross-compile ARM64)
+      - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build và push image ARM64
+      # 🚀 build cache giúp build nhanh hơn ~3x
+      - name: Build & Push ARM64 Image
         uses: docker/build-push-action@v6
         with:
-          context: ./app
+          context: .
+          file: ./Dockerfile
           platforms: linux/arm64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api:arm
-            ${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api:arm-${{ github.sha }}
 
-      - name: Set image output
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+          tags: |
+            ${{ env.IMAGE_REPO }}:arm
+            ${{ env.IMAGE_REPO }}:arm-${{ github.sha }}
+
+      - name: Export image tag
         id: meta
         run: |
-          echo "image=${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api:arm-${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "image=${{ env.IMAGE_REPO }}:arm-${{ github.sha }}" >> $GITHUB_OUTPUT
 
-  # ─────────────────────────────────────────────────────────
-  # JOB 4: Deploy lên ECS Fargate ARM64 Spot
-  # Chạy sau khi build-arm hoàn tất
-  # ─────────────────────────────────────────────────────────
+
+# ============================================================
+# DEPLOY ARM SPOT (PRIMARY)
+# ============================================================
+
   deploy-arm-spot:
-    name: "🚀 Deploy → Fargate ARM64 Spot"
+    name: 🚀 Deploy → ECS ARM Spot
     runs-on: ubuntu-latest
-    needs: build-arm
+    needs: build
+
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'arm-spot') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'both')
+
+    outputs:
+      task_revision: ${{ steps.deploy.outputs.task-definition }}
 
     steps:
-      - name: Configure AWS credentials
+
+      - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Tải Task Definition ARM hiện tại từ ECS
+      - name: Download task definition
         run: |
           aws ecs describe-task-definition \
             --task-definition ${{ env.ECS_TASK_ARM }} \
             --query taskDefinition \
-            > /tmp/task-def-arm.json
-          echo "✅ Đã tải task definition: ${{ env.ECS_TASK_ARM }}"
+            > task-definition.json
 
-      - name: Inject image ARM mới vào Task Definition
-        id: task-def
+      - name: Inject new image
+        id: render
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: /tmp/task-def-arm.json
+          task-definition: task-definition.json
           container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ needs.build-arm.outputs.image }}
+          image: ${{ needs.build.outputs.image }}
 
-      - name: Đăng ký Task Definition ARM revision mới và deploy Service
+      - name: Deploy service
+        id: deploy
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE_ARM }}
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_ARM_SPOT }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
 
-      - name: Thông báo kết quả
-        if: success()
+
+# ============================================================
+# DEPLOY ARM (SECONDARY / BACKUP)
+# ============================================================
+
+  deploy-arm:
+    name: 🚀 Deploy → ECS ARM
+    runs-on: ubuntu-latest
+    needs: [build, deploy-arm-spot]
+
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'arm') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'both')
+
+    steps:
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download task definition
         run: |
-          echo "✅ Deploy ARM Spot thành công!"
-          echo "Image: ${{ needs.build-arm.outputs.image }}"
-          echo "Service: ${{ env.ECS_SERVICE_ARM }}"
-          echo "Cluster: ${{ env.ECS_CLUSTER }}"
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_ARM }} \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Inject new image
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build.outputs.image }}
+
+      - name: Deploy service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_ARM }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

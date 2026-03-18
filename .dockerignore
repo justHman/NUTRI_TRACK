@@ -56,3 +56,6 @@ apprunner.yaml
 
 # AI
 .claude/
+
+# File .py
+app/utils/craw_data2cache.py

@@ -120,10 +120,7 @@ def _load_cache_file(path: str) -> dict:
 
 
 def _lookup_in_disk_caches(barcode: str) -> Optional[Dict]:
-    """Search barcode in all L2 disk caches in priority order.
-
-    Returns dict with extra keys `source` and `cache_level` on hit, None on miss.
-    """
+    first_negative = None
     for source in _LOOKUP_ORDER:
         cache_path = _CACHE_FILES.get(source)
         if not cache_path:
@@ -133,36 +130,38 @@ def _lookup_in_disk_caches(barcode: str) -> Optional[Dict]:
         barcodes = cache_data.get("barcodes", {})
 
         if barcode in barcodes:
-            entry = barcodes[barcode]
+            entry = barcodes[barcode].copy()  # Copy to avoid mutating cache data
             if not _is_expired(entry):
                 food = entry.get("food")
-                if food is not None:
-                    result = dict(food)
-                    result["source"] = source
-                    result["cache_level"] = "L2"
+                entry_found = entry.get("found") is True
+                entry["source"] = source
+                entry = {k: v for k, v in entry.items() if k != "_ts"}
+                if entry_found:
+                    _l1_barcodes.set(barcode, food)
                     logger.info("L2 cache hit for barcode '%s' in %s", barcode, source)
-                    return result
+                    return entry
+
+                # Keep the first negative hit as a fallback while continuing to
+                # scan later providers for any positive hit.
+                if first_negative is None:
+                    first_negative = entry
             else:
                 logger.debug("L2 entry expired for barcode '%s' in %s", barcode, source)
+
+    if first_negative is not None:
+        _l1_barcodes.set(barcode, None)
+        logger.info(
+            "L2 negative cache fallback for barcode '%s' from source=%s",
+            barcode,
+            first_negative.get("source"),
+        )
+        return first_negative
 
     logger.debug("No L2 cache hit for barcode '%s' across all sources", barcode)
     return None
 
 
-def _lookup_via_api(barcode: str, clients: Dict) -> Optional[Dict]:
-    """Search barcode by calling API clients in priority order (L3).
-
-    Iterates: Avocavo → OpenFoodFacts → USDA. Returns the first found result.
-    Each client's search_by_barcode() handles its own L1/L2/L3 internally,
-    so calling it will also cache the result in the client's own caches.
-
-    Args:
-        barcode: Sanitized barcode string (digits only).
-        clients: Dict of client instances keyed by source name.
-
-    Returns:
-        Dict with 'source' and 'cache_level' keys on hit, None on miss.
-    """
+def lookup_via_api(barcode: str, clients: Dict) -> Optional[Dict]:
     for source in _L3_LOOKUP_ORDER:
         client = clients.get(source)
         if client is None:
@@ -173,8 +172,8 @@ def _lookup_via_api(barcode: str, clients: Dict) -> Optional[Dict]:
             logger.info("L3: calling %s.search_by_barcode('%s')", source, barcode)
             api_result = client.search_by_barcode(barcode)
 
-            if api_result and api_result.get("found") is True:
-                result = dict(api_result)
+            if api_result and api_result.get("found", False) is True:
+                result = api_result.copy()
                 result["source"] = source
                 result["cache_level"] = "L3"
                 logger.info("L3 API hit for barcode '%s' from %s", barcode, source)
@@ -187,7 +186,13 @@ def _lookup_via_api(barcode: str, clients: Dict) -> Optional[Dict]:
                            source, barcode, e)
 
     logger.info("L3: no API hit for barcode '%s' across all clients", barcode)
-    return None
+    return {
+        "food": None,
+        "found": False,
+        "message": "product not found via API search",
+        "source": "api miss",
+        "cache_level": "MISS",
+    }
 
 
 # ─── Barcode Scanning ────────────────────────────────────────────────────────
@@ -239,44 +244,63 @@ def scan_barcode_from_image(image_source) -> Optional[str]:
 # ─── Barcode Lookup ──────────────────────────────────────────────────────────
 
 def lookup_barcode(code: str) -> Dict:
-    """Look up barcode in L1 cache → L2 disk caches.
 
-    Args:
-        code: Raw barcode string (will be sanitized to digits only).
-
-    Returns:
-        Dict with barcode info. Always contains 'barcode' and 'found' keys.
-        On cache hit, also contains 'source' and 'cache_level'.
-    """
     barcode = re.sub(r"\D", "", str(code or "")).strip()
 
-    if not barcode:
+    if not barcode or len(barcode) < 8:
         logger.warning("lookup_barcode: invalid or empty barcode input='%s'", code)
-        return {"barcode": str(code or ""), "found": False, "message": "invalid barcode"}
+        return {
+            "food": None,
+            "found": False,
+            "message": "invalid barcode",
+            "source": "invalid_input",
+            "cache_level": None,
+        }
 
     logger.info("Looking up barcode: %s", barcode)
 
     # Level 1: RAM cache
     l1_hit = _l1_barcodes.get(barcode)
     if l1_hit is not _MISSING:
-        logger.info("L1 cache hit for barcode '%s'", barcode)
-        result = dict(l1_hit) if isinstance(l1_hit, dict) else l1_hit
-        if isinstance(result, dict):
-            result["cache_level"] = "L1"
-        return result
+        food_data = l1_hit if l1_hit is not None else None
+        final_result = {
+            "food": food_data,
+        }
+        # Flatten food fields to top-level for easier access
+        if isinstance(food_data, dict):
+            final_result.update({k: v for k, v in food_data.items() if k not in final_result})
+        if l1_hit is not None:
+            logger.info("L1 cache hit for barcode '%s'", barcode)
+            final_result["found"] = True
+            final_result["message"] = "product found"
+        else:
+            logger.info("L1 cache hit for barcode '%s' with negative result", barcode)
+            final_result["found"] = False
+            final_result["message"] = "product not found"
+
+        final_result["source"] = "L1 RAM cache"
+        final_result["cache_level"] = "L1"
+        return final_result
 
     # Level 2: Disk caches (OpenFoodFacts → Avocavo → USDA)
     l2_hit = _lookup_in_disk_caches(barcode)
     if l2_hit is not None:
         # Promote to L1
-        _l1_barcodes.set(barcode, l2_hit)
+        _l1_barcodes.set(barcode, l2_hit.get("food", None))
         logger.info("Promoted barcode '%s' from L2 to L1 (source=%s)",
                      barcode, l2_hit.get("source"))
-        return l2_hit
+        final_result = l2_hit.copy()
+        final_result["cache_level"] = "L2"
+        return final_result
 
-    # No hit at any level
     logger.info("Barcode '%s' not found in any cache or API", barcode)
-    return {"barcode": barcode, "found": False, "message": "barcode not found in cache"}
+    return {
+        "food": None,
+        "found": False,
+        "message": "product not found in caches",
+        "source": "cache miss",
+        "cache_level": "MISS",
+    }
 
 
 # ─── Full Pipeline ───────────────────────────────────────────────────────────
@@ -300,8 +324,6 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
 
     result = {
         "image_path": image_source if isinstance(image_source, str) else None,
-        "barcode": None,
-        "found": False,
     }
 
     # Step 1: Scan barcode from image
@@ -309,6 +331,8 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
     elapsed_scan = time.time() - start
 
     if not code:
+        result["food"] = None
+        result["found"] = False
         result["message"] = "No barcode detected in image"
         result["scan_time_s"] = round(elapsed_scan, 3)
         result["total_time_s"] = round(time.time() - start, 3)
@@ -321,58 +345,17 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
     # Step 2: Lookup barcode in L1 → L2 caches
     lookup_result = lookup_barcode(code)
 
-    # Step 3: If not found in cache, search via API clients
-    #         Search order: Avocavo → OpenFoodFacts → USDA
-    if not lookup_result.get("found") and clients:
+    # Step 3: If not found in cache, search via API clients (L3)
+    if not lookup_result.get("found") and clients and lookup_result.get("cache_level") == "MISS":
         barcode = re.sub(r"\D", "", str(code or "")).strip()
         logger.info("Cache miss for barcode '%s', starting API search fallback", barcode)
 
-        # 3a: Try Avocavo
-        avocavo = clients.get("avocavo")
-        if avocavo:
-            try:
-                logger.info("Pipeline L3: searching Avocavo for barcode '%s'", barcode)
-                api_result = avocavo.search_by_barcode(barcode)
-                if api_result and api_result.get("found") is True:
-                    lookup_result = dict(api_result)
-                    lookup_result["source"] = "avocavo"
-                    lookup_result["cache_level"] = "L3"
-                    _l1_barcodes.set(barcode, lookup_result)
-                    logger.info("Pipeline L3: found in Avocavo for barcode '%s'", barcode)
-            except Exception as e:
-                logger.warning("Pipeline L3: Avocavo search failed for '%s': %s", barcode, e)
-
-        # 3b: Try OpenFoodFacts
-        if not lookup_result.get("found"):
-            openfoodfacts = clients.get("openfoodfacts")
-            if openfoodfacts:
-                try:
-                    logger.info("Pipeline L3: searching OpenFoodFacts for barcode '%s'", barcode)
-                    api_result = openfoodfacts.search_by_barcode(barcode)
-                    if api_result and api_result.get("found") is True:
-                        lookup_result = dict(api_result)
-                        lookup_result["source"] = "openfoodfacts"
-                        lookup_result["cache_level"] = "L3"
-                        _l1_barcodes.set(barcode, lookup_result)
-                        logger.info("Pipeline L3: found in OpenFoodFacts for barcode '%s'", barcode)
-                except Exception as e:
-                    logger.warning("Pipeline L3: OpenFoodFacts search failed for '%s': %s", barcode, e)
-
-        # 3c: Try USDA
-        if not lookup_result.get("found"):
-            usda = clients.get("usda")
-            if usda:
-                try:
-                    logger.info("Pipeline L3: searching USDA for barcode '%s'", barcode)
-                    api_result = usda.search_by_barcode(barcode)
-                    if api_result and api_result.get("found") is True:
-                        lookup_result = dict(api_result)
-                        lookup_result["source"] = "usda"
-                        lookup_result["cache_level"] = "L3"
-                        _l1_barcodes.set(barcode, lookup_result)
-                        logger.info("Pipeline L3: found in USDA for barcode '%s'", barcode)
-                except Exception as e:
-                    logger.warning("Pipeline L3: USDA search failed for '%s': %s", barcode, e)
+        api_hit = lookup_via_api(barcode, clients)
+        lookup_result = api_hit
+        if api_hit.get("found", False):
+            _l1_barcodes.set(barcode, lookup_result.get("food", None))
+            logger.info("Promoted barcode '%s' from L3 to L1 (source=%s)",
+                        barcode, lookup_result.get("source"))
 
     elapsed_total = time.time() - start
 

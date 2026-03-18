@@ -4,7 +4,7 @@ import time
 import requests
 import re
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import unicodedata
 
@@ -59,6 +59,10 @@ class _LRUCache:
 
 
 _MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
+
+
+# Only legitimate "not found" statuses should be cached (not HTTP errors)
+_NEGATIVE_CACHEABLE_SEARCH_STATUSES = {404, 204}
 
 # Module-level L1 caches (shared across all USDAClient instances in one process)
 _l1_foods: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
@@ -172,6 +176,8 @@ class USDAClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.nal.usda.gov/fdc/v1"
+        self._last_search_http_status: Optional[int] = None
+        self._last_search_empty_result: bool = False
         logger.info("USDAClient initialized (api_key=%s)", "DEMO_KEY" if api_key == "DEMO_KEY" else "***")
         l2_entries = len(_l2["foods"]) + len(_l2["barcodes"])
         l1_entries = len(_l1_foods) + len(_l1_barcodes)
@@ -277,6 +283,25 @@ class USDAClient:
     # Cache-aware search  (two-tier lookup happens here)
     # ─────────────────────────────────────────────────────────────────────
 
+    def _should_cache_negative_search_result(self) -> bool:
+        """Return True when a failed search should be negative-cached."""
+        if self._last_search_empty_result:
+            return True
+        return self._last_search_http_status in _NEGATIVE_CACHEABLE_SEARCH_STATUSES
+
+    def _cache_negative_barcode_result(self, barcode: str, message: str = "product not found") -> Dict:
+        """Helper to cache negative barcode results and return formatted response."""
+        _l1_barcodes.set(barcode, None)
+        _l2["barcodes"][barcode] = {
+            "food": None,
+            "found": False,
+            "message": message,
+            "_ts": _now_ts(),
+        }
+        _save_disk_cache(_l2)
+        entry = _l2["barcodes"][barcode]
+        return {k: v for k, v in entry.items() if k != "_ts"}
+
     def search_best(self, normalized_query: str, pageSize: int = 5) -> Optional[dict]:
         """
         Return the highest-scored food entry for a query.
@@ -300,10 +325,6 @@ class USDAClient:
             logger.info("search_best: L1 HIT (RAM) for '%s' → '%s'",
                         normalized_query,
                         l1_hit.get("description", "None") if l1_hit else "None")
-            # Log as "Cache HIT" so existing log parsers in tests still count it
-            logger.info("search_best: Cache HIT for '%s' → '%s'",
-                        normalized_query,
-                        l1_hit.get("description", "None") if l1_hit else "None")
             return l1_hit
 
         # ── Level 2: Disk JSON ────────────────────────────────────────────
@@ -312,9 +333,6 @@ class USDAClient:
             if not _is_expired(entry):
                 food = entry.get("food")
                 logger.info("search_best: L2 HIT (disk) for '%s' → '%s'",
-                            normalized_query,
-                            food.get("description", "None") if food else "None")
-                logger.info("search_best: Cache HIT for '%s' → '%s'",
                             normalized_query,
                             food.get("description", "None") if food else "None")
                 # Promote to L1
@@ -328,11 +346,29 @@ class USDAClient:
         logger.debug("search_best: Cache MISS for '%s' → calling USDA API", normalized_query)
         foods = self.search(normalized_query, pageSize)
 
+        if foods is None:
+            if self._should_cache_negative_search_result():
+                _l1_foods.set(normalized_query, None)
+                _l2["foods"][normalized_query] = {
+                    "food": None,
+                    "found": False,
+                    "message": "ingredient not found",
+                    "_ts": _now_ts(),
+                }
+                _save_disk_cache(_l2)
+                logger.info(
+                    "search_best: cached negative result for '%s' (http_status=%s, empty_result=%s)",
+                    normalized_query,
+                    self._last_search_http_status,
+                    self._last_search_empty_result,
+                )
+            else:
+                logger.info("search_best: skip caching for '%s' (last HTTP status=%s)",
+                            normalized_query, self._last_search_http_status)
+            return None
+
         if not foods:
-            # Cache the None result to avoid repeat calls for queries with 0 results
-            _l1_foods.set(normalized_query, None)
-            _l2["foods"][normalized_query] = {"food": None, "_ts": _now_ts()}
-            _save_disk_cache(_l2)
+            logger.info("search_best: no foods returned for '%s'; skip negative caching", normalized_query)
             return None
 
         best_food = max(foods, key=lambda x: x.get("score", 0))
@@ -341,7 +377,12 @@ class USDAClient:
 
         # Save to L1 + L2
         _l1_foods.set(normalized_query, best_food)
-        _l2["foods"][normalized_query] = {"food": best_food, "_ts": _now_ts()}
+        _l2["foods"][normalized_query] = {
+            "food": best_food,
+            "found": True,
+            "message": "ingredient found",
+            "_ts": _now_ts(),
+        }
         _save_disk_cache(_l2)
 
         return best_food
@@ -406,10 +447,14 @@ class USDAClient:
             "pageSize": pageSize,
             "api_key": self.api_key,
         }
+        self._last_search_http_status = None
+        self._last_search_empty_result = False
 
         try:
             logger.info("USDA API search: query='%s'", normalized_query)
-            resp = requests.get(search_url, params=params, timeout=10)
+            resp = requests.get(search_url, params=params, timeout=20)
+            # Record status immediately so 4xx/5xx can be negative-cached reliably.
+            self._last_search_http_status = resp.status_code
             resp.raise_for_status()
             data = resp.json()
             logger.debug("USDA API: status=%d, totalHits=%s",
@@ -418,6 +463,7 @@ class USDAClient:
             foods = data.get("foods", [])
             if not foods:
                 logger.warning("USDA returned 0 results for '%s'", normalized_query)
+                self._last_search_empty_result = True
                 return None
 
             logger.info("USDA found %d result(s) for '%s'", len(foods), normalized_query)
@@ -426,6 +472,7 @@ class USDAClient:
         except requests.exceptions.Timeout:
             logger.error("USDA API timeout for query='%s'", normalized_query)
         except requests.exceptions.HTTPError as e:
+            self._last_search_http_status = e.response.status_code if getattr(e, "response", None) is not None else None
             logger.error("USDA API HTTP error: %s (query='%s')", e, normalized_query)
         except Exception as e:
             logger.error("USDA API unexpected error: %s (query='%s')", e, normalized_query, exc_info=True)
@@ -445,29 +492,50 @@ class USDAClient:
         barcode = re.sub(r"\D", "", str(code or "")).strip()
         if not barcode:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
-            return None
-
-        l1_key = barcode
+            return {
+                "food": None,
+                "found": False,
+                "message": "invalid barcode",
+            }
 
         # Level 1: RAM cache
-        l1_hit = _l1_barcodes.get(l1_key)
+        l1_hit = _l1_barcodes.get(barcode)
         if l1_hit is not _MISSING:
             logger.info("search_by_barcode: L1 HIT (RAM) for code='%s'", barcode)
-            logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
-            return l1_hit
+            if l1_hit is not None:
+                return {
+                    "food": l1_hit,
+                    "found": True,
+                    "message": "product found",
+                }
+            else:
+                return {
+                    "food": None,
+                    "found": False,
+                    "message": "product not found",
+                }
 
         # Level 2: Disk cache
         if barcode in _l2["barcodes"]:
             entry = _l2["barcodes"][barcode]
             if not _is_expired(entry):
-                cached = entry.get("food")
+                food = entry.get("food")
+                entry_found = entry.get("found")
                 logger.info("search_by_barcode: L2 HIT (disk) for code='%s'", barcode)
-                logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
-                _l1_barcodes.set(l1_key, cached)
-                return cached
-            logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
-                        barcode, _CACHE_TTL_DAYS)
+                if entry_found:
+                    _l1_barcodes.set(barcode, food)
+                    logger.info("search_by_barcode: L2 HIT (disk) for code='%s' → found", barcode)
+                else:
+                    _l1_barcodes.set(barcode, None)
+                    logger.info("search_by_barcode: L2 HIT (disk) for code='%s' → not found", barcode)
 
+                logger.info("search_by_barcode: L2 > L1 for code='%s'", barcode)
+                return {k: v for k, v in entry.items() if k != "_ts"}
+            else:
+                logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
+                           barcode, _CACHE_TTL_DAYS)
+
+        # Level 3: API call
         search_url = f"{self.base_url}/foods/search"
         params = {
             "query": barcode,
@@ -476,19 +544,47 @@ class USDAClient:
 
         try:
             logger.info("USDA API barcode search: code='%s'", barcode)
-            resp = requests.get(search_url, params=params, timeout=10)
-            logger.debug(resp)
-            logger.debug("USDA barcode API raw response: status=%d, content=%s",
-                         resp.status_code, resp.text)  # Log first 200 chars
+            resp = requests.get(search_url, params=params, timeout=20)
+            logger.debug("USDA barcode API: status=%d body=%s",
+                         resp.status_code, resp.text[:120])
+
+            # Handle HTTP errors first (400, 402, 422, etc. should raise exceptions)
+            # Only 404/204 are legitimate "not found" responses
+            if resp.status_code in _NEGATIVE_CACHEABLE_SEARCH_STATUSES:
+                logger.info("USDA barcode API: code '%s' not found (status=%d)", barcode, resp.status_code)
+                return self._cache_negative_barcode_result(barcode)
+
+            # Raise for other HTTP errors (400, 402, 422, 500, etc.)
             resp.raise_for_status()
+
+            # Parse successful response
             raw_data = resp.json()
             logger.debug("USDA barcode API: status=%d, totalHits=%s",
                          resp.status_code, raw_data.get("totalHits", "N/A"))
-            data = self._parse_barcode_response(raw_data, barcode)
-            _l1_barcodes.set(l1_key, data)
-            _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
+
+            parsed, entry_found = self._parse_barcode_response(raw_data, barcode)
+
+            if not entry_found:
+                # Valid response but no product data found
+                logger.info("USDA barcode API: code '%s' - valid response but no product data", barcode)
+                return self._cache_negative_barcode_result(barcode)
+
+            # Success - cache positive result
+            _l1_barcodes.set(barcode, parsed)
+            _l2["barcodes"][barcode] = {
+                "food": parsed,
+                "found": entry_found,
+                "message": "product found",
+                "_ts": _now_ts(),
+            }
             _save_disk_cache(_l2)
-            return data
+
+            return {
+                "food": parsed,
+                "found": True,
+                "message": "product found",
+            }
+
         except requests.exceptions.Timeout:
             logger.error("USDA barcode API timeout for code='%s'", barcode)
         except requests.exceptions.HTTPError as e:
@@ -496,13 +592,17 @@ class USDAClient:
         except Exception as e:
             logger.error("USDA barcode API unexpected error: %s (code='%s')", e, barcode, exc_info=True)
 
-        return None
+        return {
+            "food": None,
+            "found": False,
+            "message": "error during search",
+        }
 
     # ─────────────────────────────────────────────────────────────────────
     # Private: Parse
     # ─────────────────────────────────────────────────────────────────────
 
-    def _parse_barcode_response(self, raw: dict, barcode: str) -> Dict:
+    def _parse_barcode_response(self, raw: dict, barcode: str) -> Tuple[dict, bool]:
         """Reduce verbose USDA barcode search payloads to a compact, app-friendly schema."""
         if not isinstance(raw, dict):
             logger.warning("_parse_barcode_response: invalid payload type for '%s': %s",
@@ -511,16 +611,16 @@ class USDAClient:
                 "barcode": barcode,
                 "found": False,
                 "message": "invalid payload",
-            }
+            }, False
 
         foods = raw.get("foods") or []
         if not foods:
-            logger.info("_parse_barcode_response:product found for '%s'", barcode)
+            logger.info("_parse_barcode_response: no foods found for '%s'", barcode)
             return {
                 "barcode": barcode,
                 "found": False,
                 "message": "product not found",
-            }
+            }, False
 
         best_food = max(foods, key=lambda x: x.get("score", 0))
         nutritions = self._parse_100g_nutritions(best_food)
@@ -548,7 +648,7 @@ class USDAClient:
         compact = {key: value for key, value in parsed.items() if value is not None}
         logger.debug("_parse_barcode_response: compact fields for '%s' -> %s",
                      barcode, list(compact.keys()))
-        return compact
+        return compact, any(key in compact for key in ("product_name", "nutritions", "ingredients", "ingredients_text"))
 
     def _normalize_metadata_value(self, value):
         """Normalize optional metadata values, dropping placeholders like 'unknown'."""

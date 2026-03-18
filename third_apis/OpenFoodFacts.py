@@ -4,7 +4,7 @@ import time
 import requests
 import re
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import unicodedata
 
@@ -58,6 +58,10 @@ class _LRUCache:
 
 
 _MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
+
+
+# Only legitimate "not found" statuses should be cached (not HTTP errors)
+_NEGATIVE_CACHEABLE_SEARCH_STATUSES = {404, 204}
 
 # Module-level L1 caches (shared across all OpenFoodFactsClient instances in one process)
 _l1_foods: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
@@ -163,6 +167,8 @@ class OpenFoodFactsClient:
         self.api_key = api_key  # Not required, kept for interface consistency
         self.base_url = "https://world.openfoodfacts.org"
         self.user_agent = "NutriTrack/2.0"
+        self._last_search_http_status: Optional[int] = None
+        self._last_search_empty_result: bool = False
         logger.info("OpenFoodFactsClient initialized (no API key required)")
         l2_entries = len(_l2["foods"]) + len(_l2["barcodes"])
         l1_entries = len(_l1_foods) + len(_l1_barcodes)
@@ -264,6 +270,25 @@ class OpenFoodFactsClient:
     # Cache-aware search  (two-tier lookup happens here)
     # ─────────────────────────────────────────────────────────────────────
 
+    def _should_cache_negative_search_result(self) -> bool:
+        """Return True when a failed search should be negative-cached."""
+        if self._last_search_empty_result:
+            return True
+        return self._last_search_http_status in _NEGATIVE_CACHEABLE_SEARCH_STATUSES
+
+    def _cache_negative_barcode_result(self, barcode: str, message: str = "product not found") -> Dict:
+        """Helper to cache negative barcode results and return formatted response."""
+        _l1_barcodes.set(barcode, None)
+        _l2["barcodes"][barcode] = {
+            "food": None,
+            "found": False,
+            "message": message,
+            "_ts": _now_ts(),
+        }
+        _save_disk_cache(_l2)
+        entry = _l2["barcodes"][barcode]
+        return {k: v for k, v in entry.items() if k != "_ts"}
+
     def search_best(self, normalized_query: str, pageSize: int = 5) -> Optional[dict]:
         """
         Return the best-matching product for a query.
@@ -280,9 +305,6 @@ class OpenFoodFactsClient:
             logger.info("search_best: L1 HIT (RAM) for '%s' → '%s'",
                         normalized_query,
                         l1_hit.get("product_name", "None") if l1_hit else "None")
-            logger.info("search_best: Cache HIT for '%s' → '%s'",
-                        normalized_query,
-                        l1_hit.get("product_name", "None") if l1_hit else "None")
             return l1_hit
 
         # ── Level 2: Disk JSON ────────────────────────────────────────────
@@ -293,9 +315,6 @@ class OpenFoodFactsClient:
                 logger.info("search_best: L2 HIT (disk) for '%s' → '%s'",
                             normalized_query,
                             food.get("product_name", "None") if food else "None")
-                logger.info("search_best: Cache HIT for '%s' → '%s'",
-                            normalized_query,
-                            food.get("product_name", "None") if food else "None")
                 _l1_foods.set(normalized_query, food)
                 return food
             else:
@@ -304,22 +323,46 @@ class OpenFoodFactsClient:
 
         # ── Level 3: Open Food Facts API ──────────────────────────────────
         logger.debug("search_best: Cache MISS for '%s' → calling Open Food Facts API", normalized_query)
-        products = self.search(normalized_query, pageSize)
+        foods = self.search(normalized_query, pageSize)
 
-        if not products:
-            _l1_foods.set(normalized_query, None)
-            _l2["foods"][normalized_query] = {"food": None, "_ts": _now_ts()}
-            _save_disk_cache(_l2)
+        if foods is None:
+            if self._should_cache_negative_search_result():
+                _l1_foods.set(normalized_query, None)
+                _l2["foods"][normalized_query] = {
+                    "food": None,
+                    "found": False,
+                    "message": "ingredient not found",
+                    "_ts": _now_ts(),
+                }
+                _save_disk_cache(_l2)
+                logger.info(
+                    "search_best: cached negative result for '%s' (http_status=%s, empty_result=%s)",
+                    normalized_query,
+                    self._last_search_http_status,
+                    self._last_search_empty_result,
+                )
+            else:
+                logger.info("search_best: skip caching for '%s' (last HTTP status=%s)",
+                            normalized_query, self._last_search_http_status)
+            return None
+
+        if not foods:
+            logger.info("search_best: no products returned for '%s'; skip negative caching", normalized_query)
             return None
 
         # Pick the best product based on scoring logic: score = unique_scans_n + popularity_key + completeness
-        best_food = self._find_best_product(products)
+        best_food = self._find_best_product(foods)
         logger.debug("search_best: best='%s' with score=%.2f",
                      best_food.get("product_name", "N/A"),
                      self._calculate_score(best_food))
 
         _l1_foods.set(normalized_query, best_food)
-        _l2["foods"][normalized_query] = {"food": best_food, "_ts": _now_ts()}
+        _l2["foods"][normalized_query] = {
+            "food": best_food,
+            "found": True,
+            "message": "ingredient found",
+            "_ts": _now_ts(),
+        }
         _save_disk_cache(_l2)
 
         return best_food
@@ -407,10 +450,14 @@ class OpenFoodFactsClient:
         headers = {
             "User-Agent": self.user_agent,
         }
+        self._last_search_http_status = None
+        self._last_search_empty_result = False
 
         try:
             logger.info("Open Food Facts API search: query='%s'", normalized_query)
             resp = requests.get(search_url, params=params, timeout=60)
+            # Record status immediately so 4xx/5xx can be negative-cached reliably.
+            self._last_search_http_status = resp.status_code
             resp.raise_for_status()
             data = resp.json()
             logger.debug("Open Food Facts API: status=%d, count=%s",
@@ -419,6 +466,7 @@ class OpenFoodFactsClient:
             products = data.get("products", [])
             if not products:
                 logger.warning("Open Food Facts returned 0 results for '%s'", normalized_query)
+                self._last_search_empty_result = True
                 return None
 
             logger.info("Open Food Facts found %d result(s) for '%s'", len(products), normalized_query)
@@ -427,6 +475,7 @@ class OpenFoodFactsClient:
         except requests.exceptions.Timeout:
             logger.error("Open Food Facts API timeout for query='%s'", normalized_query)
         except requests.exceptions.HTTPError as e:
+            self._last_search_http_status = e.response.status_code if getattr(e, "response", None) is not None else None
             logger.error("Open Food Facts API HTTP error: %s (query='%s')", e, normalized_query)
         except Exception as e:
             logger.error("Open Food Facts API unexpected error: %s (query='%s')", e, normalized_query, exc_info=True)
@@ -446,29 +495,46 @@ class OpenFoodFactsClient:
         barcode = re.sub(r"\D", "", str(code or "")).strip()
         if not barcode:
             logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
-            return None
-
-        l1_key = barcode
+            return {
+                "food": None,
+                "found": False,
+                "message": "invalid barcode",
+            }
 
         # Level 1: RAM cache
-        l1_hit = _l1_barcodes.get(l1_key)
+        l1_hit = _l1_barcodes.get(barcode)
         if l1_hit is not _MISSING:
             logger.info("search_by_barcode: L1 HIT (RAM) for code='%s'", barcode)
-            logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
-            return l1_hit
+            if l1_hit is not None:
+                return {
+                    "food": l1_hit,
+                    "found": True,
+                    "message": "product found",
+                }
+            else:
+                return {
+                    "food": None,
+                    "found": False,
+                    "message": "product not found",
+                }
 
         # Level 2: Disk cache
         if barcode in _l2["barcodes"]:
             entry = _l2["barcodes"][barcode]
             if not _is_expired(entry):
-                cached = entry.get("food")
+                food = entry.get("food")
+                entry_found = entry.get("found")
                 logger.info("search_by_barcode: L2 HIT (disk) for code='%s'", barcode)
-                logger.info("search_by_barcode: Cache HIT for code='%s'", barcode)
-                _l1_barcodes.set(l1_key, cached)
-                return cached
-            logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
-                        barcode, _CACHE_TTL_DAYS)
+                if entry_found:
+                    _l1_barcodes.set(barcode, food)
+                else:
+                    _l1_barcodes.set(barcode, None)
+                return {k: v for k, v in entry.items() if k != "_ts"}
+            else:
+                logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
+                           barcode, _CACHE_TTL_DAYS)
 
+        # Level 3: API call
         search_url = f"{self.base_url}/api/v2/product/{barcode}"
         headers = {
             "User-Agent": self.user_agent,
@@ -477,18 +543,44 @@ class OpenFoodFactsClient:
         try:
             logger.info("Open Food Facts API barcode search: code='%s'", barcode)
             resp = requests.get(search_url, headers=headers, timeout=60)
-            logger.debug("Open Food Facts barcode API raw response: status=%d, content=%s",
-                         resp.status_code, resp.text)
+            logger.debug("Open Food Facts barcode API: status=%d body=%s",
+                         resp.status_code, resp.text[:120])
+
+            # Handle HTTP errors first (400, 402, 422, etc. should raise exceptions)
+            # Only 404/204 are legitimate "not found" responses
+            if resp.status_code in _NEGATIVE_CACHEABLE_SEARCH_STATUSES:
+                logger.info("Open Food Facts barcode API: code '%s' not found (status=%d)", barcode, resp.status_code)
+                return self._cache_negative_barcode_result(barcode)
+
+            # Raise for other HTTP errors (400, 402, 422, 500, etc.)
             resp.raise_for_status()
+
+            # Parse successful response
             raw_data = resp.json()
             logger.debug("Open Food Facts barcode API: status=%d, product_status=%s",
                          resp.status_code, raw_data.get("status", "N/A"))
 
-            data = self._parse_barcode_response(raw_data, barcode)
-            _l1_barcodes.set(l1_key, data)
-            _l2["barcodes"][barcode] = {"food": data, "_ts": _now_ts()}
+            parsed, entry_found = self._parse_barcode_response(raw_data, barcode)
+
+            if not entry_found:
+                # Valid response but no product data found
+                logger.info("Open Food Facts barcode API: code '%s' - valid response but no product data", barcode)
+                return self._cache_negative_barcode_result(barcode)
+            # Success - cache positive result
+            _l1_barcodes.set(barcode, parsed)
+            _l2["barcodes"][barcode] = {
+                "food": parsed,
+                "found": entry_found,
+                "message": "product found",
+                "_ts": _now_ts(),
+            }
             _save_disk_cache(_l2)
-            return data
+
+            return {
+                "food": parsed,
+                "found": True,
+                "message": "product found",
+            }
         except requests.exceptions.Timeout:
             logger.error("Open Food Facts barcode API timeout for code='%s'", barcode)
         except requests.exceptions.HTTPError as e:
@@ -496,13 +588,17 @@ class OpenFoodFactsClient:
         except Exception as e:
             logger.error("Open Food Facts barcode API unexpected error: %s (code='%s')", e, barcode, exc_info=True)
 
-        return None
+        return {
+            "food": None,
+            "found": False,
+            "message": "error during search",
+        }
 
     # ─────────────────────────────────────────────────────────────────────
     # Private: Parse
     # ─────────────────────────────────────────────────────────────────────
 
-    def _parse_barcode_response(self, raw: dict, barcode: str) -> Dict:
+    def _parse_barcode_response(self, raw: dict, barcode: str) -> Tuple[dict, bool]:
         """Reduce a verbose Open Food Facts barcode payload to the fields the app actually needs."""
         if not isinstance(raw, dict):
             logger.warning("_parse_barcode_response: invalid payload type for '%s': %s",
@@ -511,7 +607,7 @@ class OpenFoodFactsClient:
                 "barcode": barcode,
                 "found": False,
                 "message": "invalid payload",
-            }
+            }, False
 
         product = raw.get("product") or {}
         found = raw.get("status") == 1 and isinstance(product, dict) and bool(product)
@@ -521,7 +617,7 @@ class OpenFoodFactsClient:
                 "barcode": barcode,
                 "found": False,
                 "message": raw.get("status_verbose") or "product not found",
-            }
+            }, False
 
         nutritions = self._parse_100g_nutritions(product)
         ingredients = self._parse_ingredient_string(product)
@@ -542,7 +638,6 @@ class OpenFoodFactsClient:
 
         parsed = {
             "barcode": product.get("code") or raw.get("code") or barcode,
-            "found": True,
             "product_name": product.get("product_name") or product.get("product_name_en") or "N/A",
             "brands": product.get("brands") or None,
             "quantity": product.get("quantity") or None,
@@ -558,7 +653,7 @@ class OpenFoodFactsClient:
         compact = {key: value for key, value in parsed.items() if value is not None}
         logger.debug("_parse_barcode_response: compact fields for '%s' -> %s",
                      barcode, list(compact.keys()))
-        return compact
+        return compact, (found or any(key in compact for key in ("product_name", "nutritions", "ingredients", "ingredients_text")))
 
     def _extract_primary_category(self, product: dict) -> Optional[str]:
         """Return the most specific category tag in a human-readable format."""
@@ -597,7 +692,10 @@ class OpenFoodFactsClient:
         if ":" in normalized:
             normalized = normalized.split(":", 1)[1]
         normalized = normalized.replace("_", " ").replace("-", " ").strip().lower()
-        return normalized or None
+        
+        if normalized in ("unknown", "none", "null", ""):
+            return None
+        return normalized
 
     def _normalize_metadata_value(self, value):
         """Normalize optional metadata values, dropping placeholders like 'unknown'."""
@@ -888,6 +986,9 @@ class OpenFoodFactsClient:
 
         original = query
         query = str(query).strip().lower()
+
+        # Remove common trademark symbols before normalization so they don't expand to letters like 'TM'
+        query = re.sub(r"[\u2122\u00ae\u00a9]", "", query)
 
         query = unicodedata.normalize('NFKD', query)
         query = ''.join([c for c in query if not unicodedata.combining(c)])

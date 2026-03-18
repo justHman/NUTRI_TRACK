@@ -1,14 +1,14 @@
 {
   "dishes": [
     {
-      "name": "Vietnamese Pork Chop Rice",
+      "name": "Broken Rice with Grilled Pork",
       "vi_name": "Cơm Tấm Sườn Nướng",
-      "confidence": 0.98,
+      "confidence": 0.95,
       "cooking_method": "grilled",
       "ingredients": [
         {
-          "name": "grilled pork chop",
-          "vi_name": "sườn nướng",
+          "name": "Grilled pork chop",
+          "vi_name": "Sườn nướng",
           "estimated_weight_g": 150.0,
           "estimated_nutritions": {
             "calories": 285.0,
@@ -20,8 +20,8 @@
           "note": "main protein component, visibly glazed and charred"
         },
         {
-          "name": "white rice",
-          "vi_name": "cơm trắng",
+          "name": "White rice",
+          "vi_name": "Cơm tấm",
           "estimated_weight_g": 120.0,
           "estimated_nutritions": {
             "calories": 427.2,
@@ -30,11 +30,11 @@
             "fat": 0.0
           },
           "confidence": 0.95,
-          "note": "steamed rice mound, typical serving size"
+          "note": "base of the dish, broken rice grains visible"
         },
         {
-          "name": "fried egg",
-          "vi_name": "trứng ốp la",
+          "name": "Fried egg",
+          "vi_name": "Trứng ốp la",
           "estimated_weight_g": 60.0,
           "estimated_nutritions": {
             "calories": 117.6,
@@ -42,12 +42,12 @@
             "carbs": 0.5,
             "fat": 8.88
           },
-          "confidence": 0.9,
-          "note": "sunny-side up, visible yolk and white"
+          "confidence": 0.95,
+          "note": "sunny-side up, yolk intact"
         },
         {
-          "name": "pickled vegetables",
-          "vi_name": "dưa chua",
+          "name": "Pickled vegetables",
+          "vi_name": "Dưa chua",
           "estimated_weight_g": 30.0,
           "estimated_nutritions": {
             "calories": 7.5,
@@ -55,12 +55,25 @@
             "carbs": 1.82,
             "fat": 0.0
           },
-          "confidence": 0.85,
+          "confidence": 0.9,
           "note": "shredded carrot and daikon, typical garnish"
         },
         {
-          "name": "cucumber slices",
-          "vi_name": "dưa leo cắt lát",
+          "name": "Pork roll",
+          "vi_name": "Chả lụa",
+          "estimated_weight_g": 50.0,
+          "estimated_nutritions": {
+            "calories": 71.5,
+            "protein": 4.46,
+            "carbs": 0.9,
+            "fat": 5.35
+          },
+          "confidence": 0.9,
+          "note": "sliced, yellowish, typical Vietnamese pork sausage"
+        },
+        {
+          "name": "Cucumber",
+          "vi_name": "Dưa leo",
           "estimated_weight_g": 20.0,
           "estimated_nutritions": {
             "calories": 6.8,
@@ -68,42 +81,42 @@
             "carbs": 1.36,
             "fat": 0.03
           },
-          "confidence": 0.8,
-          "note": "fresh slices, used as garnish"
+          "confidence": 0.85,
+          "note": "sliced, used as garnish"
         },
         {
-          "name": "tomato slices",
-          "vi_name": "cà chua cắt lát",
-          "estimated_weight_g": 25.0,
+          "name": "Tomato",
+          "vi_name": "Cà chua",
+          "estimated_weight_g": 20.0,
           "estimated_nutritions": {
-            "calories": 22.5,
-            "protein": 1.09,
-            "carbs": 3.17,
-            "fat": 0.59
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
           },
-          "confidence": 0.8,
-          "note": "arranged in rose shape, decorative and fresh"
+          "confidence": 0.85,
+          "note": "sliced, carved into rose shape for garnish"
         },
         {
-          "name": "scrambled egg cake",
-          "vi_name": "trứng hấp",
-          "estimated_weight_g": 40.0,
+          "name": "Green herbs",
+          "vi_name": "Rau thơm",
+          "estimated_weight_g": 10.0,
           "estimated_nutritions": {
-            "calories": 70.0,
-            "protein": 5.0,
-            "carbs": 3.0,
-            "fat": 4.0
+            "calories": 2.0,
+            "protein": 0.2,
+            "carbs": 0.5,
+            "fat": 0.0
           },
-          "confidence": 0.75,
-          "note": "inferred from yellow cake-like item, typical in cơm tấm"
+          "confidence": 0.7,
+          "note": "inferred – visible chopped green garnish on rice"
         }
       ],
-      "total_estimated_weight_g": 445.0,
+      "total_estimated_weight_g": 500.0,
       "total_estimated_nutritions": {
-        "calories": 936.6,
-        "protein": 58.22,
-        "carbs": 117.68,
-        "fat": 26.06
+        "calories": 917.6,
+        "protein": 56.79,
+        "carbs": 112.81,
+        "fat": 27.79
       },
       "scale_reference_used": "plate size"
     }

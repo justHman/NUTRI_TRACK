@@ -336,10 +336,6 @@ class Qwen3VL:
             messages[-1]["content"].append({"text": max_tool_rounds_prompt})
             converse_kwargs["messages"] = messages
             
-        # Optional: Disable tools for the last turn so it's forced to generate text/JSON
-        if "toolConfig" in converse_kwargs:
-            del converse_kwargs["toolConfig"]
-            
         response = self.client.converse(**converse_kwargs)
         if "usage" in response:
             self.input_tokens += response["usage"].get("inputTokens", 0)
