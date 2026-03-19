@@ -2,24 +2,35 @@
     "tools": [
         {
             "toolSpec": {
-                "name": "get_nutritions_and_ingredients_by_weight",
-                "description": "Combined lookup: returns actual nutrition facts (calories, protein, fat, carbs) calculated based on the provided weight_g, AND ingredient list for a food item. Returns {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...] or null}. Use this to get actual estimated nutrition for ingredients or dishes.",
+                "name": "get_batch",
+                "description": "Fetch nutritional information and ingredients for multiple food items at once in a single batch.",
                 "inputSchema": {
                     "json": {
                         "type": "object",
                         "properties": {
-                            "food_name": {
-                                "type": "string",
-                                "description": "Name of the food item in English (e.g., 'fried rice', 'grilled pork', 'pho bo')"
-                            },
-                            "weight_g": {
-                                "type": "number",
-                                "description": "The estimated weight of the food item in grams (e.g., 150.0)"
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "description": "Name of the food item"
+                                        },
+                                        "weight": {
+                                            "type": "number",
+                                            "description": "Weight in grams"
+                                        }
+                                    },
+                                    "required": [
+                                        "name",
+                                        "weight"
+                                    ]
+                                }
                             }
                         },
                         "required": [
-                            "food_name",
-                            "weight_g"
+                            "items"
                         ]
                     }
                 }

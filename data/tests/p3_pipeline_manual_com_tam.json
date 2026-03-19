@@ -30,7 +30,7 @@
             "fat": 0.41
           },
           "confidence": 0.9,
-          "note": "standard serving size based on plate proportion"
+          "note": "standard serving size for Vietnamese rice plate"
         },
         {
           "name": "Fried egg",
@@ -56,7 +56,7 @@
             "fat": 0.0
           },
           "confidence": 0.9,
-          "note": "visible shredded orange and white strips"
+          "note": "typical Vietnamese pickled garnish"
         },
         {
           "name": "Cucumber slices",
@@ -69,7 +69,7 @@
             "fat": 0.03
           },
           "confidence": 0.9,
-          "note": "green slices arranged decoratively"
+          "note": "fresh, raw slices"
         },
         {
           "name": "Tomato slices",
@@ -82,7 +82,7 @@
             "fat": 0.59
           },
           "confidence": 0.9,
-          "note": "red slices, one carved into rose shape"
+          "note": "fresh, raw slices"
         },
         {
           "name": "Fried shallots",
@@ -95,7 +95,7 @@
             "fat": 0.01
           },
           "confidence": 0.85,
-          "note": "golden crispy bits on rice and plate"
+          "note": "scattered on rice, typical topping"
         },
         {
           "name": "Green onions",
@@ -108,7 +108,7 @@
             "fat": 0.0
           },
           "confidence": 0.8,
-          "note": "chopped green garnish on rice"
+          "note": "chopped garnish on rice"
         },
         {
           "name": "Vietnamese pork roll (chả lụa)",
@@ -121,7 +121,7 @@
             "fat": 14.2
           },
           "confidence": 0.9,
-          "note": "yellowish slice with visible meat texture"
+          "note": "yellowish slice with visible texture"
         },
         {
           "name": "Red chili pepper",
@@ -134,11 +134,11 @@
             "fat": 0.01
           },
           "confidence": 0.85,
-          "note": "whole red chili on plate"
+          "note": "whole, fresh, for garnish"
         },
         {
           "name": "Lettuce leaves",
-          "vi_name": "Lá xà lách",
+          "vi_name": "Rau xà lách",
           "estimated_weight_g": 20.0,
           "estimated_nutritions": {
             "calories": 3.6,
@@ -147,27 +147,11 @@
             "fat": 0.0
           },
           "confidence": 0.8,
-          "note": "green leaves on side, likely for wrapping"
-        }
-      ],
-      "total_estimated_weight_g": 555.0,
-      "total_estimated_nutritions": {
-        "calories": 1036.15,
-        "protein": 54.28,
-        "carbs": 76.55,
-        "fat": 46.46
-      },
-      "scale_reference_used": "plate size"
-    },
-    {
-      "name": "Fish sauce dipping sauce",
-      "vi_name": "Nước mắm chấm",
-      "confidence": 0.85,
-      "cooking_method": "mixed",
-      "ingredients": [
+          "note": "fresh, raw, for wrapping or garnish"
+        },
         {
-          "name": "Fish sauce",
-          "vi_name": "Nước mắm",
+          "name": "Fish sauce dipping sauce",
+          "vi_name": "Nước mắm chấm",
           "estimated_weight_g": 15.0,
           "estimated_nutritions": {
             "calories": 5.25,
@@ -175,70 +159,18 @@
             "carbs": 0.55,
             "fat": 0.0
           },
-          "confidence": 0.8,
-          "note": "visible in small white bowl, typical Vietnamese dipping sauce"
-        },
-        {
-          "name": "Sugar",
-          "vi_name": "Đường",
-          "estimated_weight_g": 5.0,
-          "estimated_nutritions": {
-            "calories": 18.75,
-            "protein": 0.0,
-            "carbs": 5.0,
-            "fat": 0.0
-          },
           "confidence": 0.75,
-          "note": "inferred – standard ingredient in fish sauce dip"
-        },
-        {
-          "name": "Lime juice",
-          "vi_name": "Nước cốt chanh",
-          "estimated_weight_g": 5.0,
-          "estimated_nutritions": {
-            "calories": 0.0,
-            "protein": 0.0,
-            "carbs": 0.33,
-            "fat": 0.0
-          },
-          "confidence": 0.7,
-          "note": "inferred – common in Vietnamese dipping sauces"
-        },
-        {
-          "name": "Chili",
-          "vi_name": "Ớt",
-          "estimated_weight_g": 2.0,
-          "estimated_nutritions": {
-            "calories": 2.04,
-            "protein": 0.14,
-            "carbs": 0.14,
-            "fat": 0.1
-          },
-          "confidence": 0.8,
-          "note": "visible red flecks in sauce"
-        },
-        {
-          "name": "Garlic",
-          "vi_name": "Tỏi",
-          "estimated_weight_g": 2.0,
-          "estimated_nutritions": {
-            "calories": 3.34,
-            "protein": 0.0,
-            "carbs": 0.67,
-            "fat": 0.0
-          },
-          "confidence": 0.75,
-          "note": "inferred – typical in fish sauce dip"
+          "note": "in small bowl, typical accompaniment"
         }
       ],
-      "total_estimated_weight_g": 29.0,
+      "total_estimated_weight_g": 595.0,
       "total_estimated_nutritions": {
-        "calories": 29.38,
-        "protein": 0.9,
-        "carbs": 6.69,
-        "fat": 0.1
+        "calories": 1042.19,
+        "protein": 55.04,
+        "carbs": 77.1,
+        "fat": 46.46
       },
-      "scale_reference_used": "small bowl visible"
+      "scale_reference_used": "plate size"
     }
   ],
   "image_quality": "good"

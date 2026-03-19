@@ -1,73 +1,75 @@
-{
-  "role": "assistant",
-  "content": [
-    {
-      "text": "\n\n"
-    },
-    {
-      "toolUse": {
-        "toolUseId": "tooluse_o3dGzQmUodLITXaHoFU7BN",
-        "name": "get_nutritions_and_ingredients_by_weight",
-        "input": {
-          "food_name": "grilled steak",
-          "weight_g": 250.0
+[
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "text": "\n\n"
+      },
+      {
+        "toolUse": {
+          "toolUseId": "tooluse_o3dGzQmUodLITXaHoFU7BN",
+          "name": "get_nutritions_and_ingredients_by_weight",
+          "input": {
+            "food_name": "grilled steak",
+            "weight_g": 250.0
+          }
+        }
+      },
+      {
+        "toolUse": {
+          "toolUseId": "tooluse_qd1FhhLeIBnEngaFeEU4lj",
+          "name": "get_nutritions_and_ingredients_by_weight",
+          "input": {
+            "food_name": "mashed potatoes",
+            "weight_g": 150.0
+          }
+        }
+      },
+      {
+        "toolUse": {
+          "toolUseId": "tooluse_GVt7qhAEuBmLusmDwgSUce",
+          "name": "get_nutritions_and_ingredients_by_weight",
+          "input": {
+            "food_name": "roasted root vegetables",
+            "weight_g": 100.0
+          }
         }
       }
-    },
-    {
-      "toolUse": {
-        "toolUseId": "tooluse_qd1FhhLeIBnEngaFeEU4lj",
-        "name": "get_nutritions_and_ingredients_by_weight",
-        "input": {
-          "food_name": "mashed potatoes",
-          "weight_g": 150.0
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "toolResult": {
+          "toolUseId": "tooluse_o3dGzQmUodLITXaHoFU7BN",
+          "content": [
+            {
+              "json": "{\"description\":\"Beef, sirloin, top sirloin, lean, trimmed of fat, cooked, pan-broiled\",\"nutritions\":{\"calories\":224.0,\"protein\":30.0,\"carbs\":0.0,\"fat\":10.0},\"ingredients\":[{\"name\":\"Beef, sirloin, top sirloin, lean, trimmed of fat\",\"vi_name\":\"Thịt bò thăn ngoại, nạc, loại bỏ mỡ\",\"estimated_weight_g\":250.0,\"estimated_nutritions\":{\"calories\":224.0,\"protein\":30.0,\"carbs\":0.0,\"fat\":10.0},\"confidence\":0.95,\"note\":\"Inferred from dish name\"},\{\"name\":\"Pan-broiled\",\"vi_name\":\"Áp chảo\",\"estimated_weight_g\":0.0,\"estimated_nutritions\":{\"calories\":0.0,\"protein\":0.0,\"carbs\":0.0,\"fat\":0.0},\"confidence\":0.8,\"note\":\"Cooking method\"}]}\n\n"
+            }
+          ]
+        }
+      },
+      {
+        "toolResult": {
+          "toolUseId": "tooluse_qd1FhhLeIBnEngaFeEU4lj",
+          "content": [
+            {
+              "json": "{\"description\":\"Potatoes, mashed, prepared from dehydrated flakes, without milk, water, or salt added\",\"nutritions\":{\"calories\":367.0,\"protein\":7.0,\"carbs\":82.0,\"fat\":1.0},\"ingredients\":[{\"name\":\"Potatoes, dehydrated flakes\",\"vi_name\":\"Khoai tây, dạng mảnh sấy khô\",\"estimated_weight_g\":150.0,\"estimated_nutritions\":{\"calories\":367.0,\"protein\":7.0,\"carbs\":82.0,\"fat\":1.0},\"confidence\":0.9,\"note\":\"Inferred from dish name\"}]}\n\n"
+            }
+          ]
+        }
+      },
+      {
+        "toolResult": {
+          "toolUseId": "tooluse_GVt7qhAEuBmLusmDwgSUce",
+          "content": [
+            {
+              "json": "{\"description\":\"Vegetables, mixed, frozen, cooked, boiled, drained, without salt\",\"nutritions\":{\"calories\":44.0,\"protein\":2.0,\"carbs\":9.0,\"fat\":0.0},\"ingredients\":[{\"name\":\"Vegetables, mixed, frozen\",\"vi_name\":\"Rau củ hỗn hợp, đông lạnh\",\"estimated_weight_g\":100.0,\"estimated_nutritions\":{\"calories\":44.0,\"protein\":2.0,\"carbs\":9.0,\"fat\":0.0},\"confidence\":0.92,\"note\":\"Inferred from dish name\"},\{\"name\":\"Boiled\",\"vi_name\":\"Luộc\",\"estimated_weight_g\":0.0,\"estimated_nutritions\":{\"calories\":0.0,\"protein\":0.0,\"carbs\":0.0,\"fat\":0.0},\"confidence\":0.85,\"note\":\"Cooking method\"}]}\n\n"
+            }
+          ]
         }
       }
-    },
-    {
-      "toolUse": {
-        "toolUseId": "tooluse_GVt7qhAEuBmLusmDwgSUce",
-        "name": "get_nutritions_and_ingredients_by_weight",
-        "input": {
-          "food_name": "roasted root vegetables",
-          "weight_g": 100.0
-        }
-      }
-    }
-  ]
-},
-{
-  "role": "user",
-  "content": [
-    {
-      "toolResult": {
-        "toolUseId": "tooluse_o3dGzQmUodLITXaHoFU7BN",
-        "content": [
-          {
-            "text": "{\"description\":\"Beef, sirloin, top sirloin, lean, trimmed of fat, cooked, pan-broiled\",\"nutritions\":{\"calories\":224.0,\"protein\":30.0,\"carbs\":0.0,\"fat\":10.0},\"ingredients\":[{\"name\":\"Beef, sirloin, top sirloin, lean, trimmed of fat\",\"vi_name\":\"Thịt bò thăn ngoại, nạc, loại bỏ mỡ\",\"estimated_weight_g\":250.0,\"estimated_nutritions\":{\"calories\":224.0,\"protein\":30.0,\"carbs\":0.0,\"fat\":10.0},\"confidence\":0.95,\"note\":\"Inferred from dish name\"},\{\"name\":\"Pan-broiled\",\"vi_name\":\"Áp chảo\",\"estimated_weight_g\":0.0,\"estimated_nutritions\":{\"calories\":0.0,\"protein\":0.0,\"carbs\":0.0,\"fat\":0.0},\"confidence\":0.8,\"note\":\"Cooking method\"}]}\n\n"
-          }
-        ]
-      }
-    },
-    {
-      "toolResult": {
-        "toolUseId": "tooluse_qd1FhhLeIBnEngaFeEU4lj",
-        "content": [
-          {
-            "text": "{\"description\":\"Potatoes, mashed, prepared from dehydrated flakes, without milk, water, or salt added\",\"nutritions\":{\"calories\":367.0,\"protein\":7.0,\"carbs\":82.0,\"fat\":1.0},\"ingredients\":[{\"name\":\"Potatoes, dehydrated flakes\",\"vi_name\":\"Khoai tây, dạng mảnh sấy khô\",\"estimated_weight_g\":150.0,\"estimated_nutritions\":{\"calories\":367.0,\"protein\":7.0,\"carbs\":82.0,\"fat\":1.0},\"confidence\":0.9,\"note\":\"Inferred from dish name\"}]}\n\n"
-          }
-        ]
-      }
-    },
-    {
-      "toolResult": {
-        "toolUseId": "tooluse_GVt7qhAEuBmLusmDwgSUce",
-        "content": [
-          {
-            "text": "{\"description\":\"Vegetables, mixed, frozen, cooked, boiled, drained, without salt\",\"nutritions\":{\"calories\":44.0,\"protein\":2.0,\"carbs\":9.0,\"fat\":0.0},\"ingredients\":[{\"name\":\"Vegetables, mixed, frozen\",\"vi_name\":\"Rau củ hỗn hợp, đông lạnh\",\"estimated_weight_g\":100.0,\"estimated_nutritions\":{\"calories\":44.0,\"protein\":2.0,\"carbs\":9.0,\"fat\":0.0},\"confidence\":0.92,\"note\":\"Inferred from dish name\"},\{\"name\":\"Boiled\",\"vi_name\":\"Luộc\",\"estimated_weight_g\":0.0,\"estimated_nutritions\":{\"calories\":0.0,\"protein\":0.0,\"carbs\":0.0,\"fat\":0.0},\"confidence\":0.85,\"note\":\"Cooking method\"}]}\n\n"
-          }
-        ]
-      }
-    }
-  ]
-}
+    ]
+  }
+]

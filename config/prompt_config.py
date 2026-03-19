@@ -68,36 +68,69 @@ Return ONLY valid JSON in this exact format:
   "image_quality": "good | poor_lighting | blurry | partial_view"
 }"""
 
+# FOOD_VISION_TOOLS_PROMPT = """
+
+# TOOL USAGE INSTRUCTIONS (MANDATORY):
+# You have access to USDA nutrition lookup tools. Follow this exact workflow:
+
+# STEP 1 — For EACH dish you identify in the image:
+#   Call get_nutritions_and_ingredients_by_weight(food_name, weight_g) with the English dish name and its estimated total weight in grams.
+#   This returns: {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...]}
+#   Use the returned data STRICTLY AS A REFERENCE. Do NOT blindly copy it if it doesn't make sense.
+
+# STEP 2 — For EACH ingredient you visually detect in each dish:
+#   Call get_nutritions_and_ingredients_by_weight(food_name, weight_g) with the English ingredient name (e.g., "white rice", "grilled pork") and its estimated weight in grams.
+#   This returns: {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...]}
+#   Use these STRICTLY AS A REFERENCE to populate per-ingredient nutrition.
+
+# STEP 3 — After receiving ALL tool results, you MUST compile the final JSON response carefully and MAKE IT MAKE SENSE.
+#   - The tool outputs provide estimated nutrition based on the weight you passed. Note: ONLY USE THESE AS A REFERENCE!
+#   - You MUST NOT over-rely on the tool's result. Often the tool finds a packaged food or generic item that does not match the real food in the image.
+#   - If the tool returns a ridiculous value (like 0 calories for 200g of Pineapple, or 2500 calories for a bowl of rice), IGNORE IT completely and use your own knowledge to estimate realistically.
+#   - You should adjust the `nutritional` value based on your cooking method (fried, grilled add oil/fat) and visual observation.
+#   - Calculate `total_estimated_nutritions` for the whole dish by summing up the `estimated_nutritions` of its ingredients.
+#   - Output the final FoodList JSON schema exactly.
+
+# IMPORTANT:
+# - Always call get_nutritions_and_ingredients_by_weight FIRST for each dish before calling it for ingredients.
+# - You are strictly limited to a MAXIMUM of {max_tool_rounds} tool call rounds. If you exceed this limit, your process will be forcibly terminated and fail! Batch your tool calls efficiently into as few rounds as possible!
+# - If ingredients returned is null, that is OK — still proceed with tool calls for visible ingredients.
+# - Use English food names when calling tools.
+# - After all tool calls complete, return ONLY the final JSON. No extra text."""
+
 FOOD_VISION_TOOLS_PROMPT = """
 
 TOOL USAGE INSTRUCTIONS (MANDATORY):
-You have access to USDA nutrition lookup tools. Follow this exact workflow:
+You have access to USDA nutrition lookup tools. Follow this workflow:
 
 STEP 1 — For EACH dish you identify in the image:
-  Call get_nutritions_and_ingredients_by_weight(food_name, weight_g) with the English dish name and its estimated total weight in grams.
-  This returns: {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...]}
-  Use the returned data STRICTLY AS A REFERENCE. Do NOT blindly copy it if it doesn't make sense.
+  - Identify the dish and ALL its visible ingredients.
+  - Estimate weight (grams) for the whole dish AND for each ingredient.
+  - Prepare a SINGLE batch input list containing:
+      + The whole dish (name + total weight)
+      + ALL ingredients (name + estimated weight)
 
-STEP 2 — For EACH ingredient you visually detect in each dish:
-  Call get_nutritions_and_ingredients_by_weight(food_name, weight_g) with the English ingredient name (e.g., "white rice", "grilled pork") and its estimated weight in grams.
-  This returns: {description, nutritions: {calories, protein, fat, carbs}, weight_g, ingredients: [...]}
-  Use these STRICTLY AS A REFERENCE to populate per-ingredient nutrition.
+  - Call get_batch ONCE with ALL items:
+      [
+        {"name": "...", "weight": ...},
+        {"name": "...", "weight": ...}
+      ]
 
-STEP 3 — After receiving ALL tool results, you MUST compile the final JSON response carefully and MAKE IT MAKE SENSE.
-  - The tool outputs provide estimated nutrition based on the weight you passed. Note: ONLY USE THESE AS A REFERENCE!
-  - You MUST NOT over-rely on the tool's result. Often the tool finds a packaged food or generic item that does not match the real food in the image.
-  - If the tool returns a ridiculous value (like 0 calories for 200g of Pineapple, or 2500 calories for a bowl of rice), IGNORE IT completely and use your own knowledge to estimate realistically.
-  - You should adjust the `nutritional` value based on your cooking method (fried, grilled add oil/fat) and visual observation.
-  - Calculate `total_estimated_nutritions` for the whole dish by summing up the `estimated_nutritions` of its ingredients.
-  - Output the final FoodList JSON schema exactly.
+  IMPORTANT:
+  - Use ONLY ONE tool call per image (very important).
+  - Use English names (e.g., "grilled pork", "white rice", "fried egg").
+
+STEP 2 — After receiving ALL tool results:
+  - Use tool outputs STRICTLY AS A REFERENCE (NOT absolute truth).
+  - If any value is unrealistic → IGNORE and estimate manually.
+  - Adjust nutrition based on cooking method (fried, grilled, added oil, etc.).
+  - Ensure the final result is realistic and consistent.
 
 IMPORTANT:
-- Always call get_nutritions_and_ingredients_by_weight FIRST for each dish before calling it for ingredients.
-- You are strictly limited to a MAXIMUM of {max_tool_rounds} tool call rounds. If you exceed this limit, your process will be forcibly terminated and fail! Batch your tool calls efficiently into as few rounds as possible!
-- If ingredients returned is null, that is OK — still proceed with tool calls for visible ingredients.
-- Use English food names when calling tools.
-- After all tool calls complete, return ONLY the final JSON. No extra text."""
-
+- You are strictly limited to a MAXIMUM of {max_tool_rounds} tool call rounds.
+- You MUST call get_batch exactly ONCE per image.
+- Return ONLY the final FoodList JSON. No extra text.
+"""
 
 # ─── Label Analysis Prompts ──────────────────────────────────────────────────
 

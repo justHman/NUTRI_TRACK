@@ -7,6 +7,7 @@ from typing import List, Optional, Type
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from utils.processor import prepare_image_for_bedrock
+from utils.transformer import batch_to_csv
 from config.logging_config import get_logger
 from config.prompt_config import (FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT,
                                   LABEL_VISION_SYSTEM_PROMPT, LABEL_VISION_USER_PROMPT)
@@ -217,9 +218,8 @@ class Qwen3VL:
 
             stop_reason = response.get("stopReason", "end_turn")
             output_message = response["output"]["message"]
-            logger.info("[ToolCalling] Output message: %s", str(output_message)[:1000])
-
             logger.info("[ToolCalling] Round %d — stopReason: %s", round_num, stop_reason)
+            logger.info("[ToolCalling] Output message: %s", str(output_message)[:1000])
 
             # If model is done (no more tool calls), return the text
             if stop_reason != "tool_use":
@@ -227,8 +227,7 @@ class Qwen3VL:
                 for block in output_message.get("content", []):
                     if "text" in block:
                         final_text += block["text"]
-                logger.info("[ToolCalling] Final response received (%d chars)", len(final_text))
-                logger.debug("[ToolCalling] Final response preview: %s", final_text[:500])
+                logger.info("[ToolCalling] Final response received (%d chars): %s", len(final_text), str(final_text)[:500])
                 return final_text
 
             # Model requested tool use — process each tool call
@@ -236,15 +235,25 @@ class Qwen3VL:
             clean_content = []
             for block in output_message.get("content", []):
                 if "toolUse" in block:
-                    if not block["toolUse"].get("name"):
+                    t_name = block["toolUse"].get("name", "")
+                    if not t_name:
                         logger.warning("[ToolCalling] Dropping toolUse with empty name")
                         continue
+
                     tool_input = block["toolUse"].get("input", {})
-                    if "food_name" not in tool_input or "weight_g" not in tool_input:
-                        logger.warning("[ToolCalling] Dropping toolUse with missing food_name or weight_g: %s", tool_input)
-                        continue
-                    if not tool_input.get("food_name", "unknown") or not tool_input.get("weight_g", 0):
-                        logger.warning("[ToolCalling] Dropping toolUse with empty food_name or weight_g: %s", tool_input)
+
+                    if t_name == "get_batch":
+                        items = tool_input.get("items", [])
+                        if not items or not isinstance(items, list):
+                            logger.warning("[ToolCalling] Dropping toolUse get_batch with missing items: %s", tool_input)
+                            continue
+                        for item in items:
+                            name = item.get("name", None)
+                            weight = item.get("weight", 0.0)
+                            if not name or not weight:
+                                logger.warning("[ToolCalling] Dropping toolUse get_batch with empty food_name or weight_g: %s", item)
+                                continue
+                    else:    
                         continue
                 clean_content.append(block)
             output_message["content"] = clean_content
@@ -257,8 +266,8 @@ class Qwen3VL:
                     continue
 
                 tool_use = block["toolUse"]
-                tool_name = tool_use["name"]
-                tool_use_id = tool_use["toolUseId"]
+                tool_use_id = tool_use.get("toolUseId", "")
+                tool_name = tool_use.get("name", "")
                 tool_input = tool_use.get("input", {})
 
                 logger.info("[ToolCalling] Tool request: %s(input=%s)",
@@ -266,54 +275,29 @@ class Qwen3VL:
 
                 # ── Tool dispatcher ──
                 try:
-                    food_name = tool_input.get("food_name", "unknown")
-                    
-                    # ── Robust name matching ──
-                    if tool_name.startswith("get_nutritions_and") and tool_name != "get_nutritions_and_ingredients_by_weight":
-                        logger.warning("[ToolCalling] Normalizing '%s' → 'get_nutritions_and_ingredients_by_weight'", tool_name)
-                        tool_name = "get_nutritions_and_ingredients_by_weight"
-
-                    if tool_name == "get_nutritions":
-                        result = usda_client.get_nutritions(food_name)
+                    if tool_name.startswith("get_batch"):
+                        items = tool_input.get("items", [])
+                        result = usda_client.get_batch(items)
                         if result is None:
-                            raise ValueError(f"No nutrition data found for '{food_name}'")
-                        logger.info("[ToolCalling] ✅ get_nutritions('%s') → %s", food_name, result)
-                    
-                    elif tool_name == "get_ingredients":
-                        result = usda_client.get_ingredients(food_name)
-                        if result is None:
-                            raise ValueError(f"No ingredient data available for '{food_name}'")
-                        logger.info("[ToolCalling] ✅ get_ingredients('%s') → %d items",
-                                    food_name, len(result.get("ingredients") or []))
-                    
-                    elif tool_name == "get_nutritions_and_ingredients":
-                        result = usda_client.get_nutritions_and_ingredients(food_name)
-                        if result is None:
-                            raise ValueError(f"No USDA data found for '{food_name}'")
-                        logger.info("[ToolCalling] ✅ get_nutritions_and_ingredients('%s') → %s",
-                                    food_name, result.get("description", "N/A"))
-                    
-                    elif tool_name == "get_nutritions_and_ingredients_by_weight":
-                        weight_g = tool_input.get("weight_g", 0.0)
-                        result = usda_client.get_nutritions_and_ingredients_by_weight(food_name, weight_g)
-                        if result is None:
-                            raise ValueError(f"No USDA data found for '{food_name}'")
-                        logger.info("[ToolCalling] ✅ get_nutritions_and_ingredients_by_weight('%s', %.2fg) → %s",
-                                    food_name, weight_g, result.get("description", "N/A"))
-
+                            raise ValueError(f"No batch data found for '{items}'")
+                        logger.info("[ToolCalling] ✅ get_batch() → processed %d items", len(items))
                     else:
                         raise ValueError(f"Unknown tool: {tool_name}")
                     
+                    # Convert to CSV format
+                    processed_result = batch_to_csv(result)
+                    logger.info("[ToolCalling] ✅ get_batch() → processed %s", processed_result)
+
                     tool_results.append({
                         "toolResult": {
                             "toolUseId": tool_use_id,
-                            "content": [{"json": result}],
+                            "content": [{"json": {"csv_data": processed_result}}], # Phải là dict, không được là string
                             "status": "success"
                         }
                     })
 
                 except Exception as e:
-                    logger.error("[ToolCalling] ❌ %s('%s') failed: %s", tool_name, food_name, e)
+                    logger.error("[ToolCalling] ❌ %s failed: %s", tool_name, e)
                     tool_results.append({
                         "toolResult": {
                             "toolUseId": tool_use_id,
@@ -329,8 +313,7 @@ class Qwen3VL:
         # ── Final attempt to get response after exhausting rounds ──
         logger.warning("[ToolCalling] Round limit reached (%d), attempting one final turn...", max_tool_rounds)
         
-        max_tool_rounds_prompt = "SYSTEM INSTRUCTION: You have reached the maximum number of tool use rounds. Please provide the final JSON answer now based on the information you have gathered."
-        
+        max_tool_rounds_prompt = "[SYSTEM] You have reached the maximum number of tool use rounds. Please provide the final JSON answer now based on the information you have gathered."
         # Append to the LAST message instead of creating a new one (to preserve alternating roles)
         if messages and messages[-1]["role"] == "user":
             messages[-1]["content"].append({"text": max_tool_rounds_prompt})
