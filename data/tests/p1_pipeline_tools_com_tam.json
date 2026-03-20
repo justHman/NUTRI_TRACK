@@ -1,138 +1,208 @@
 {
   "dishes": [
     {
-      "name": "Grilled Pork Chop with Rice and Egg",
+      "name": "Vietnamese Pork Chop Rice Plate",
       "vi_name": "Cơm Tấm Sườn Nướng",
       "confidence": 0.95,
       "cooking_method": "Grilled,Fried,Steamed",
       "ingredients": [
         {
-          "name": "Grilled pork chop",
-          "vi_name": "Sườn nướng",
-          "weight": null,
-          "nutritions": null,
+          "name": "white rice",
+          "vi_name": "cơm trắng",
+          "weight": 150.0,
+          "nutritions": {
+            "calories": 534.0,
+            "protein": 10.0,
+            "carbs": 120.0,
+            "fat": 0.0
+          },
           "confidence": 0.95,
-          "note": "Main protein,grilled with glaze"
+          "note": "steamed"
         },
         {
-          "name": "White rice",
-          "vi_name": "Cơm trắng",
-          "weight": null,
-          "nutritions": null,
+          "name": "grilled pork chop",
+          "vi_name": "sườn nướng",
+          "weight": 180.0,
+          "nutritions": {
+            "calories": 342.0,
+            "protein": 33.0,
+            "carbs": 14.0,
+            "fat": 16.0
+          },
           "confidence": 0.95,
-          "note": "Steamed,enriched rice"
+          "note": "grilled with glaze"
         },
         {
-          "name": "Fried egg",
-          "vi_name": "Trứng ốp la",
-          "weight": null,
-          "nutritions": null,
+          "name": "fried egg",
+          "vi_name": "trứng ốp la",
+          "weight": 60.0,
+          "nutritions": {
+            "calories": 118.0,
+            "protein": 8.0,
+            "carbs": 1.0,
+            "fat": 9.0
+          },
           "confidence": 0.95,
-          "note": "Sunny-side up,fried in oil"
+          "note": "fried sunny-side up"
         },
         {
           "name": "Vietnamese meatloaf",
-          "vi_name": "Chả lụa",
-          "weight": null,
-          "nutritions": null,
+          "vi_name": "chả lụa",
+          "weight": 50.0,
+          "nutritions": {
+            "calories": 109.0,
+            "protein": 6.0,
+            "carbs": 14.0,
+            "fat": 3.0
+          },
           "confidence": 0.85,
-          "note": "Sliced,steamed meatloaf"
+          "note": "steamed,sliced"
         },
         {
-          "name": "Crispy fried shallots",
-          "vi_name": "Hành phi",
-          "weight": null,
-          "nutritions": null,
+          "name": "crispy fried shallots",
+          "vi_name": "hành phi",
+          "weight": 10.0,
+          "nutritions": {
+            "calories": 7.0,
+            "protein": 0.0,
+            "carbs": 2.0,
+            "fat": 0.0
+          },
           "confidence": 0.8,
-          "note": "Garnish,fried"
+          "note": "fried"
         },
         {
-          "name": "Green onion",
-          "vi_name": "Hành lá",
-          "weight": null,
-          "nutritions": null,
+          "name": "green onions",
+          "vi_name": "hành lá",
+          "weight": 5.0,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
           "confidence": 0.8,
-          "note": "Chopped,raw garnish"
+          "note": "chopped garnish"
         },
         {
-          "name": "Fish sauce",
-          "vi_name": "Nước mắm",
-          "weight": null,
-          "nutritions": null,
+          "name": "chili pepper",
+          "vi_name": "ớt",
+          "weight": 3.0,
+          "nutritions": {
+            "calories": 3.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
           "confidence": 0.7,
-          "note": "Dipping sauce,added to rice"
+          "note": "fresh garnish"
         },
         {
-          "name": "Sugar",
-          "vi_name": "Đường",
-          "weight": null,
-          "nutritions": null,
+          "name": "lettuce leaves",
+          "vi_name": "xà lách",
+          "weight": 20.0,
+          "nutritions": {
+            "calories": 4.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
           "confidence": 0.7,
-          "note": "Added to sauce or rice"
-        },
-        {
-          "name": "Vinegar",
-          "vi_name": "Giấm",
-          "weight": null,
-          "nutritions": null,
-          "confidence": 0.7,
-          "note": "Added to pickles or sauce"
+          "note": "raw,for wrapping"
         }
       ],
-      "weight": null,
-      "nutritions": null,
-      "scale_reference": null
+      "weight": 550.0,
+      "nutritions": {
+        "calories": 850.0,
+        "protein": 55.0,
+        "carbs": 140.0,
+        "fat": 30.0
+      },
+      "scale_reference": "Standard plate"
     },
     {
-      "name": "Pickled Vegetables and Garnishes",
-      "vi_name": "Dưa Chua và Trang Trí",
+      "name": "Pickled Vegetable Side",
+      "vi_name": "Dưa Chua",
       "confidence": 0.85,
-      "cooking_method": "Pickled,Raw",
+      "cooking_method": "Pickled",
       "ingredients": [
         {
-          "name": "Pickled carrot and daikon",
-          "vi_name": "Dưa cải chua",
-          "weight": null,
-          "nutritions": null,
-          "confidence": 0.9,
-          "note": "Pickled,tangy garnish"
-        },
-        {
-          "name": "Cucumber slices",
-          "vi_name": "Dưa leo",
-          "weight": null,
-          "nutritions": null,
-          "confidence": 0.9,
-          "note": "Raw,sliced"
-        },
-        {
-          "name": "Tomato slices",
-          "vi_name": "Cà chua",
-          "weight": null,
-          "nutritions": null,
-          "confidence": 0.9,
-          "note": "Raw,sliced"
-        },
-        {
-          "name": "Lettuce leaves",
-          "vi_name": "Rau xà lách",
-          "weight": null,
-          "nutritions": null,
+          "name": "pickled carrot and daikon",
+          "vi_name": "dưa cải chua",
+          "weight": 30.0,
+          "nutritions": {
+            "calories": 11.0,
+            "protein": 0.0,
+            "carbs": 2.0,
+            "fat": 0.0
+          },
           "confidence": 0.85,
-          "note": "Raw,fresh greens"
+          "note": "pickled with rice vinegar"
         },
         {
-          "name": "Chili pepper",
-          "vi_name": "Ớt",
-          "weight": null,
-          "nutritions": null,
+          "name": "cucumber slices",
+          "vi_name": "dưa leo",
+          "weight": 25.0,
+          "nutritions": {
+            "calories": 9.0,
+            "protein": 0.0,
+            "carbs": 2.0,
+            "fat": 0.0
+          },
           "confidence": 0.8,
-          "note": "Raw,garnish or condiment"
+          "note": "raw,sliced"
+        },
+        {
+          "name": "tomato slices",
+          "vi_name": "cà chua",
+          "weight": 30.0,
+          "nutritions": {
+            "calories": 27.0,
+            "protein": 1.0,
+            "carbs": 4.0,
+            "fat": 1.0
+          },
+          "confidence": 0.8,
+          "note": "raw,sliced"
         }
       ],
-      "weight": null,
-      "nutritions": null,
-      "scale_reference": null
+      "weight": 55.0,
+      "nutritions": {
+        "calories": 20.0,
+        "protein": 0.0,
+        "carbs": 4.0,
+        "fat": 0.0
+      },
+      "scale_reference": "Standard plate"
+    },
+    {
+      "name": "Fish Sauce Dip",
+      "vi_name": "Nước Mắm",
+      "confidence": 0.75,
+      "cooking_method": "Raw",
+      "ingredients": [
+        {
+          "name": "fish sauce",
+          "vi_name": "nước mắm",
+          "weight": 5.0,
+          "nutritions": {
+            "calories": 2.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.75,
+          "note": "dipping sauce"
+        }
+      ],
+      "weight": 5.0,
+      "nutritions": {
+        "calories": 2.0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0
+      },
+      "scale_reference": "Small bowl"
     }
   ],
   "image_quality": "0.95"
