@@ -1,4 +1,313 @@
 {
-  "dishes": [],
-  "image_quality": "good"
+  "dishes": [
+    {
+      "name": "potato cubes",
+      "vi_name": "Khoai tây chiên",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "potato cubes",
+          "vi_name": "Khoai tây chiên",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "deep fried"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "chicken sandwich",
+      "vi_name": "Bánh mì gà",
+      "confidence": 0.98,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "chicken breast patty",
+          "vi_name": "Thịt gà nướng",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.98,
+          "note": "grilled with sauce"
+        },
+        {
+          "name": "honey wheat bun",
+          "vi_name": "Bánh mì lúa mì",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.98,
+          "note": "with cheese and sauce"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "fried chicken wings",
+      "vi_name": "Cánh gà rán",
+      "confidence": 0.97,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "chicken wing",
+          "vi_name": "Cánh gà",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.97,
+          "note": "coated and fried"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "pizza",
+      "vi_name": "Pizza",
+      "confidence": 0.99,
+      "cooking_method": "baked",
+      "ingredients": [
+        {
+          "name": "wheat flour",
+          "vi_name": "Bột mì",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.99,
+          "note": "base crust"
+        },
+        {
+          "name": "mozzarella cheese",
+          "vi_name": "Phô mai mozzarella",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.99,
+          "note": "melted topping"
+        },
+        {
+          "name": "peeled tomatoes",
+          "vi_name": "Cà chua",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.99,
+          "note": "sauce base"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "beef burrito",
+      "vi_name": "Burrito bò",
+      "confidence": 0.96,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "beef steak",
+          "vi_name": "Thịt bò",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.96,
+          "note": "grilled"
+        },
+        {
+          "name": "cheese",
+          "vi_name": "Phô mai",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.96,
+          "note": "melted"
+        },
+        {
+          "name": "tortilla",
+          "vi_name": "Bánh tráng",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.96,
+          "note": "wrapped"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "nachos",
+      "vi_name": "Nachos",
+      "confidence": 0.95,
+      "cooking_method": "baked",
+      "ingredients": [
+        {
+          "name": "tortilla chips",
+          "vi_name": "Khoai tây chiên giòn",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "base"
+        },
+        {
+          "name": "cheese",
+          "vi_name": "Phô mai",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "melted"
+        },
+        {
+          "name": "chicken",
+          "vi_name": "thịt gà",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "shredded"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "french fries",
+      "vi_name": "Khoai tây chiên",
+      "confidence": 0.97,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "potatoes",
+          "vi_name": "Khoai tây",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.97,
+          "note": "fried in oil"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "fried chicken pieces",
+      "vi_name": "Gà rán",
+      "confidence": 0.96,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "chicken pieces",
+          "vi_name": "Gà",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.96,
+          "note": "breaded and fried"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "grilled cheese sandwich",
+      "vi_name": "Bánh mì phô mai nướng",
+      "confidence": 0.94,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "wheat bread",
+          "vi_name": "Bánh mì lúa mì",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.94,
+          "note": "grilled"
+        },
+        {
+          "name": "mozzarella cheese",
+          "vi_name": "Phô mai mozzarella",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.94,
+          "note": "melted"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "bacon and egg",
+      "vi_name": "Trứng ốp la với thịt xông khói",
+      "confidence": 0.95,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "bacon",
+          "vi_name": "Thịt xông khói",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "fried"
+        },
+        {
+          "name": "egg",
+          "vi_name": "Trứng",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "fried"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "fried shrimp",
+      "vi_name": "Tôm rán",
+      "confidence": 0.96,
+      "cooking_method": "fried",
+      "ingredients": [
+        {
+          "name": "shrimp",
+          "vi_name": "Tôm",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.96,
+          "note": "battered and fried"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    },
+    {
+      "name": "egg sandwich",
+      "vi_name": "Bánh mì trứng",
+      "confidence": 0.95,
+      "cooking_method": "grilled",
+      "ingredients": [
+        {
+          "name": "egg",
+          "vi_name": "Trứng",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "fried"
+        },
+        {
+          "name": "bread",
+          "vi_name": "Bánh mì",
+          "weight": null,
+          "nutritions": null,
+          "confidence": 0.95,
+          "note": "toasted"
+        }
+      ],
+      "weight": null,
+      "nutritions": null,
+      "scale_reference": null
+    }
+  ],
+  "image_quality": "1.0"
 }

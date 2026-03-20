@@ -1,5 +1,5 @@
-# Sử dụng Python 3.10 slim để giảm dung lượng image
-FROM python:3.10-slim
+# Sử dụng Python 3.11 slim để giảm dung lượng image (pyrxing>=1.1.0 yêu cầu Python>=3.11)
+FROM python:3.11-slim
 
 # Thiết lập thư mục làm việc trong container
 WORKDIR /app

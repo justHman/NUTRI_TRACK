@@ -11,7 +11,7 @@ import unicodedata
 
 from config.logging_config import get_logger
 from utils.caculator import calculate_ingredient_nutrition
-from utils.transformer import normalize_query, get_mock_nutrition
+from utils.transformer import normalize_query, get_mock_nutrition, safe_float
 from models.LRUCache import _LRUCache, _MISSING
 from config.client_config import _CACHE_TTL_DAYS, _L1_MAXSIZE, _NEGATIVE_CACHEABLE_SEARCH_STATUSES
 from utils.cache_utils import get_now_ts, is_expired, load_disk_cache, save_disk_cache
@@ -698,10 +698,10 @@ class AvocavoNutritionClient:
             ratio = 100.0 / estimated_g if estimated_g > 0 else 1.0
 
         result = {
-            "calories": float(f"{(nut.get('calories', 0.0)) * ratio:.2f}"),
-            "protein":  float(f"{(nut.get('protein', 0.0)) * ratio:.2f}"),
-            "fat":      float(f"{(nut.get('total_fat', 0.0)) * ratio:.2f}"),
-            "carbs":    float(f"{(nut.get('carbohydrates', 0.0)) * ratio:.2f}"),
+            "calories": float(f"{safe_float(nut.get('calories', 0.0)) * ratio:.2f}"),
+            "protein":  float(f"{safe_float(nut.get('protein', 0.0)) * ratio:.2f}"),
+            "fat":      float(f"{safe_float(nut.get('total_fat', 0.0)) * ratio:.2f}"),
+            "carbs":    float(f"{safe_float(nut.get('carbohydrates', 0.0)) * ratio:.2f}"),
         }
 
         logger.debug("_parse_100g_nutritions result: %s", result)

@@ -1,34 +1,29 @@
 {
-  "dishes": [
+  "product": {
+    "product_id": 1,
+    "name": "Mì Ăn Liền",
+    "brand": "Doraemon",
+    "serving_value": 75.0,
+    "serving_unit": "g",
+    "package_value": 75.0,
+    "package_unit": "g"
+  },
+  "nutrition": [
     {
-      "name": "Doraemon Instant Noodles",
-      "vi_name": "Mì Ăn Liền Doraemon",
-      "confidence": 0.95,
-      "cooking_method": "packaged",
-      "ingredients": [
-        {
-          "name": "Total Nutrition (as labeled)",
-          "vi_name": "Thành phần dinh dưỡng",
-          "estimated_weight_g": 75.0,
-          "estimated_nutritions": {
-            "calories": 350.0,
-            "protein": 6.9,
-            "carbs": 51.4,
-            "fat": 13.0
-          },
-          "confidence": 0.9,
-          "note": "per serving (75g); contains: sodium (from natri carbonat 500mg), additives (BHA 320, BHT 321, monosodium glutamate 621, citric acid 330, aspartame 160c, curcumin 100i)"
-        }
-      ],
-      "total_estimated_weight_g": 75.0,
-      "total_estimated_nutritions": {
-        "calories": 350.0,
-        "protein": 6.9,
-        "carbs": 51.4,
-        "fat": 13.0
-      },
-      "scale_reference_used": "per serving 75g"
+      "nutrient": "Calories",
+      "value": 350.0,
+      "unit": "kcal"
+    },
+    {
+      "nutrient": "[Bột mì (bột sắn vị chát: kẽm",
+      "value": 0.0,
+      "unit": "dầu thực vật (dầu cọ"
     }
   ],
-  "image_quality": "good"
+  "ingredients": [
+    "wheat",
+    "soy",
+    "fish"
+  ],
+  "allergens": []
 }

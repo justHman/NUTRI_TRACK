@@ -15,6 +15,7 @@ import os
 import sys
 import time
 import json
+from typing import Optional
 from dotenv import load_dotenv
 
 # project_root = app/ directory (this is the package root for Docker)
@@ -25,15 +26,16 @@ if project_root not in sys.path:
 load_dotenv(os.path.join(project_root, "config", ".env"))
 
 from config.logging_config import get_logger
-from models.QWEN3VL import Qwen3VL, FoodList, NutritionInfo
+from models.QWEN3VL import Qwen3VL
+from utils.schemas import FoodList, NutritionInfo
 from third_apis.USDA import USDAClient
 from utils.caculator import calculate_ingredient_nutrition, calculate_total_nutrition, adjust_nutrition_for_cooking_method
 
 logger = get_logger(__name__)
 
 
-def analyze_nutrition(image_path: str = None, qwen: Qwen3VL = None, usda_client: USDAClient = None,
-                      method: str = "tools", image_bytes: bytes = None, filename: str = None) -> dict:
+def analyze_nutrition(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = None, usda_client: Optional[USDAClient] = None,
+                      method: str = "tools", image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> dict:
     """
     Full pipeline: Image → Qwen3VL → USDA → Nutrition Results
     """
@@ -64,24 +66,21 @@ def analyze_nutrition(image_path: str = None, qwen: Qwen3VL = None, usda_client:
         return _analyze_manual(image_path, image_bytes, filename, qwen, usda_client, pipeline_start)
 
 
-def _analyze_with_tools(image_path: str, image_bytes: bytes, filename: str,
+def _analyze_with_tools(image_path: Optional[str], image_bytes: Optional[bytes], filename: Optional[str],
                          qwen: Qwen3VL, usda_client: USDAClient, pipeline_start: float) -> dict:
     """Tool-calling pipeline"""
     logger.title("Pipeline Mode: Tool Calling")
 
     step_start = time.time()
     food_list: FoodList = qwen.analyze_food_with_tools(image_path=image_path, image_bytes=image_bytes, filename=filename, usda_client=usda_client, max_tool_rounds=1)
-    logger.info("Tool-calling analysis complete: %d dish(es) in %.1fs",
+    logger.info("Pipeline tool-calling analysis complete: %d dish(es) in %.1fs",
                 len(food_list.dishes), time.time() - step_start)
-
-    total_time = time.time() - pipeline_start
-    logger.info("Pipeline complete in %.1fs (method=tools)", total_time)
     
     return food_list.model_dump()
 
 
 
-def _analyze_manual(image_path: str, image_bytes: bytes, filename: str,
+def _analyze_manual(image_path: Optional[str], image_bytes: Optional[bytes], filename: Optional[str],
                      qwen: Qwen3VL, usda_client: USDAClient, pipeline_start: float) -> dict:
     """Manual 2-step pipeline"""
     logger.title("Pipeline Mode: Manual (2-step)")
@@ -92,6 +91,7 @@ def _analyze_manual(image_path: str, image_bytes: bytes, filename: str,
     food_list: FoodList = qwen.analyze_food(image_path=image_path, image_bytes=image_bytes, filename=filename)
     logger.info("Step 1/2 complete: detected %d dish(es) in %.1fs",
                 len(food_list.dishes), time.time() - step_start)
+    logger.info("Food list: %s", food_list.model_dump_json(indent=2))
 
     # Step 2: USDA lookup per ingredient
     logger.title("Step 2/2: USDA Nutrition Lookup")
@@ -104,7 +104,7 @@ def _analyze_manual(image_path: str, image_bytes: bytes, filename: str,
         ingredient_nutritions = []
 
         for ing_idx, ing in enumerate(food.ingredients, 1):
-            weight = ing.estimated_weight_g if ing.estimated_weight_g else 0.0
+            weight = ing.weight if ing.weight else 0.0
             logger.debug("  Ingredient %d/%d: %s (weight=%.1fg)",
                          ing_idx, len(food.ingredients), ing.name, weight)
 
@@ -113,13 +113,13 @@ def _analyze_manual(image_path: str, image_bytes: bytes, filename: str,
             # If USDA returned data, override the model's estimated_nutritions
             if usda_100g and any(usda_100g.get(k, 0) > 0 for k in ["calories", "protein", "carbs", "fat"]):
                 calculated_nutrition = calculate_ingredient_nutrition(usda_100g, weight)
-                ing.estimated_nutritions = NutritionInfo(**calculated_nutrition)
+                ing.nutritions = NutritionInfo(**calculated_nutrition)
                 logger.debug("  USDA calculation used: %s", calculated_nutrition)
             else:
                 logger.debug("  USDA data unavailable/zeros. Keeping model's estimated_nutritions.")
                 
-            if ing.estimated_nutritions:
-                ingredient_nutritions.append(ing.estimated_nutritions.model_dump())
+            if ing.nutritions:
+                ingredient_nutritions.append(ing.nutritions.model_dump())
 
             time.sleep(0.2)  # USDA rate limit
 
@@ -127,7 +127,7 @@ def _analyze_manual(image_path: str, image_bytes: bytes, filename: str,
         dish_total_raw = calculate_total_nutrition(ingredient_nutritions)
         dish_total_adjusted = adjust_nutrition_for_cooking_method(dish_total_raw, food.cooking_method)
         
-        food.total_estimated_nutritions = NutritionInfo(**dish_total_adjusted)
+        food.nutritions = NutritionInfo(**dish_total_adjusted)
 
         logger.info("Dish '%s' total: cal=%.1f pro=%.1f carb=%.1f fat=%.1f",
                      food.name, dish_total_adjusted["calories"], dish_total_adjusted["protein"],
@@ -165,14 +165,14 @@ def print_report(results: dict):
             print("-" * 95)
 
             for ing in ingredients:
-                n = ing.get("estimated_nutritions") or {}
+                n = ing.get("nutritions") or {}
                 n_str = f"{n.get('calories',0):>5.0f}/{n.get('protein',0):>4.1f}/{n.get('carbs',0):>4.1f}/{n.get('fat',0):>4.1f}"
-                weight = ing.get('estimated_weight_g', 0)
+                weight = ing.get('weight', 0)
                 ing_name = ing.get('name', '')[:26]
                 print(f"   {ing_name:<25} | {weight:>7.1f}g | {n_str:<28}")
 
-            t = food.get("total_estimated_nutritions", {})
-            total_weight = food.get("total_estimated_weight_g", 0)
+            t = food.get("nutritions", {})
+            total_weight = food.get("weight", 0)
             print("-" * 95)
             print(f"📊 TỔNG CỘNG: Cân nặng={total_weight}g | Cal={t.get('calories',0):.1f} | Pro={t.get('protein',0):.1f}g | Carb={t.get('carbs',0):.1f}g | Fat={t.get('fat',0):.1f}g")
         else:

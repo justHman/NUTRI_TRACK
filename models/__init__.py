@@ -13,9 +13,13 @@ Pydantic schemas:
     - FoodList: (dishes: List[FoodItem], image_quality)
 """
 
-from models.QWEN3VL import (
-    Qwen3VL,
+from utils.schemas import (
+    NutritionItem,
+    Product,
+    FoodLabel,
+    NutritionInfo,
     Ingredient,
     FoodItem,
     FoodList,
 )
+from .QWEN3VL import Qwen3VL

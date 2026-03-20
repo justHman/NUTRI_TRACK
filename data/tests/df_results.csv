@@ -1,5 +1,3 @@
 method,image,status,time_s,dishes,ingredients,bedrock_calls,usda_calls,usda_cache_hits,token_input,price_input,token_output,price_output,notes
-tools,com_tam,pass,23.16,1,8,0,8,0,5077,0.0027,1433,0.0038,"1 dish(es), 8 ingredient(s)"
-tools,fast_food,pass,118.76,12,35,0,36,8,12952,0.0069,6994,0.0186,"12 dish(es), 35 ingredient(s)"
-manual,com_tam,pass,37.29,2,16,0,14,44,1250,0.0007,1997,0.0053,"2 dish(es), 16 ingredient(s)"
-manual,fast_food,pass,108.54,12,45,0,13,58,1517,0.0008,6243,0.0166,"12 dish(es), 45 ingredient(s)"
+manual,com_tam,partial,25.06,3,17,0,16,0,833,0.0004,722,0.0019,3 dish(es) detected but no total nutritions calculated
+manual,fast_food,partial,50.43,12,37,0,25,16,1100,0.0006,1682,0.0045,12 dish(es) detected but no total nutritions calculated

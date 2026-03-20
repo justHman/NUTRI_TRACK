@@ -257,7 +257,7 @@ def _test_cache_l1_hit(client) -> list:
 
 def _test_cache_l2_hit(client) -> list:
     try:
-        from third_apis.OpenFoodFacts import _l2, _l1_foods, _now_ts, _MISSING, OpenFoodFactsClient
+        from third_apis.OpenFoodFacts import _l2, _l1_foods, get_now_ts, _MISSING, OpenFoodFactsClient
         query = "__l2_test_chicken_off__"
         fake_food = {
             "product_name": "Test Chicken L2 OFF",
@@ -273,7 +273,7 @@ def _test_cache_l2_hit(client) -> list:
             "food": fake_food,
             "found": True,
             "message": "ingredient found",
-            "_ts": _now_ts(),
+            "_ts": get_now_ts(),
         }
         OpenFoodFactsClient.clear_l1_cache()
         assert _l1_foods.get(query) is _MISSING
@@ -295,11 +295,11 @@ def _test_cache_l2_hit(client) -> list:
 def _test_expired_cache_entries(client) -> list:
     """Test that expired cache entries are ignored and refreshed."""
     try:
-        from third_apis.OpenFoodFacts import _l2, _l1_foods, _now_ts, _MISSING, OpenFoodFactsClient
+        from third_apis.OpenFoodFacts import _l2, _l1_foods, get_now_ts, _MISSING, OpenFoodFactsClient
         query = "__expired_test_off__"
 
         # Create expired entry (31 days old)
-        expired_ts = _now_ts() - (31 * 24 * 3600)
+        expired_ts = get_now_ts() - (31 * 24 * 3600)
         fake_food = {
             "product_name": "Expired Product",
             "nutriments": {
@@ -408,6 +408,7 @@ def _test_cache_stats(client) -> list:
 
 def _test_normalize_query(client) -> list:
     """Tests all normalization cases."""
+    from utils.transformer import normalize_query
     cases = [
         ("Chicken Breast", "chicken breast"),
         ("  white rice  ", "white rice"),
@@ -429,7 +430,7 @@ def _test_normalize_query(client) -> list:
     for raw, expected in cases:
         label = repr(raw) if raw else "'(empty)'"
         try:
-            got = client._normalize_query(raw)
+            got = normalize_query(raw)
             if got == expected:
                 results.append((True, label, f"→ '{got}'"))
             else:
@@ -522,7 +523,7 @@ def _test_barcode_cache(client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import OpenFoodFacts as off_module
-    from third_apis.OpenFoodFacts import _l1_barcodes, _l2, _now_ts, _MISSING, OpenFoodFactsClient
+    from third_apis.OpenFoodFacts import _l1_barcodes, _l2, get_now_ts, _MISSING, OpenFoodFactsClient
 
     barcode = "8934563138165"
     l1_key  = barcode
@@ -538,7 +539,7 @@ def _test_barcode_cache(client) -> list:
             "food": fake_l2,
             "found": True,
             "message": "product found",
-            "_ts": _now_ts(),
+            "_ts": get_now_ts(),
         }
         OpenFoodFactsClient.clear_l1_cache()
         assert _l1_barcodes.get(l1_key) is _MISSING

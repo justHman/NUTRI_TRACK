@@ -3,7 +3,7 @@ NutriTrack Label Analyzer Script
 =================================
 Analyze nutrition labels on product packaging using Qwen3VL OCR.
 
-Pipeline: Image → Qwen3VL (analyze_label) → FoodList JSON
+Pipeline: Image → Qwen3VL (analyze_label) → FoodLabel JSON
 
 Usage:
     python -m app.scripts.label_analyzer <image_path>
@@ -23,18 +23,17 @@ if project_root not in sys.path:
 load_dotenv(os.path.join(project_root, "config", ".env"))
 
 from config.logging_config import get_logger
-from models.QWEN3VL import Qwen3VL, FoodList
+from typing import Optional
+from models.QWEN3VL import Qwen3VL
+from utils.schemas import FoodLabel
 
 logger = get_logger(__name__)
 
 
-def analyze_label(image_path: str = None, qwen: Qwen3VL = None,
-                  image_bytes: bytes = None, filename: str = None) -> dict:
+def analyze_label(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = None,
+                  image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> dict:
     """
-    Analyze a nutrition label image and return structured FoodList data.
-
-    Returns:
-        dict with FoodList schema. Empty dishes list if no label detected.
+    Analyze a nutrition label image and return structured FoodLabel data.
     """
     logger.title("Label Analysis Pipeline")
     logger.info("Image: %s", image_path or filename)
@@ -48,66 +47,61 @@ def analyze_label(image_path: str = None, qwen: Qwen3VL = None,
         logger.debug("Using pre-initialized Qwen3VL client")
 
     step_start = time.time()
-    food_list: FoodList = qwen.analyze_label(
+    label_result: FoodLabel = qwen.analyze_label(
         image_path=image_path,
         image_bytes=image_bytes,
         filename=filename
     )
-    logger.info("Label analysis complete: %d product(s) in %.1fs",
-                len(food_list.dishes), time.time() - step_start)
+    logger.info("Label analysis complete for product: %s in %.1fs",
+                label_result.product.name, time.time() - step_start)
 
     total_time = time.time() - pipeline_start
+    logger.info("Pipeline complete in %.1fs", total_time)
 
-    if not food_list.dishes:
-        logger.warning("No nutrition label detected in image")
-    else:
-        logger.info("Pipeline complete in %.1fs", total_time)
-
-    return food_list.model_dump()
+    return label_result.model_dump()
 
 
 def print_label_report(results: dict):
     """Pretty-print the label analysis report to console"""
-    dishes = results.get("dishes", [])
-    image_quality = results.get("image_quality", "N/A")
+    product = results.get("product")
+    nutrition = results.get("nutrition", [])
+    ingredients = results.get("ingredients", [])
+    allergens = results.get("allergens", [])
 
     print(f"\n{'='*95}")
     print(f"🏷️  BÁO CÁO PHÂN TÍCH NHÃN DINH DƯỠNG")
     print(f"{'='*95}\n")
 
-    if not dishes:
-        print("⚠️  Không phát hiện nhãn dinh dưỡng trong ảnh.")
-        print(f"   Chất lượng ảnh: {image_quality}")
+    if not product:
+        print("⚠️  Không phát hiện thông tin sản phẩm.")
         return
 
-    for product in dishes:
-        name = product.get("name", "Unknown")
-        vi_name = product.get("vi_name", "")
-        confidence = product.get("confidence", 0)
+    name = product.get("name", "Unknown")
+    brand = product.get("brand", "")
+    pid = product.get("product_id", "")
+    
+    print(f"📦 SẢN PHẨM: {name} ({brand}) | ID: {pid}")
+    
+    print(f"   Khẩu phần: {product.get('serving_value')} {product.get('serving_unit')}")
+    print(f"   Đóng gói:  {product.get('package_value')} {product.get('package_unit')}")
 
-        print(f"📦 SẢN PHẨM: {name} ({vi_name}) | Confidence: {confidence:.0%}")
+    if nutrition:
+        print("\n   GIÁ TRỊ DINH DƯỠNG (mỗi khẩu phần):")
+        for item in nutrition:
+            nut_name = item.get("nutrient", "")
+            val = item.get("value", 0)
+            unit = item.get("unit", "")
+            print(f"     • {nut_name:15}: {val:>6} {unit}")
 
-        total_nut = product.get("total_estimated_nutritions") or {}
-        total_weight = product.get("total_estimated_weight_g", 0)
-        print(f"   Khối lượng: {total_weight}g")
-        print(f"   Calories: {total_nut.get('calories', 0):.1f} kcal")
-        print(f"   Protein:  {total_nut.get('protein', 0):.1f} g")
-        print(f"   Carbs:    {total_nut.get('carbs', 0):.1f} g")
-        print(f"   Fat:      {total_nut.get('fat', 0):.1f} g")
+    if ingredients:
+        print(f"\n   DANH SÁCH THÀNH PHẦN:")
+        print(f"     {', '.join(ingredients)}")
 
-        ingredients = product.get("ingredients", [])
-        if ingredients:
-            print(f"\n   Thành phần ({len(ingredients)} nguyên liệu):")
-            for ing in ingredients:
-                ing_name = ing.get("name", "")
-                vi = ing.get("vi_name", "")
-                note = ing.get("note", "")
-                display = f"{ing_name} ({vi})" if vi else ing_name
-                if note:
-                    display += f" — {note}"
-                print(f"     • {display}")
+    if allergens:
+        print(f"\n   CẢNH BÁO DỊ ỨNG:")
+        print(f"     ⚠️  Có chứa: {', '.join(allergens)}")
 
-        print("\n" + "=" * 95 + "\n")
+    print("\n" + "=" * 95 + "\n")
 
     logger.info("Label report generation complete")
 

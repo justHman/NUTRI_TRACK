@@ -198,7 +198,7 @@ def _test_cache_l1_hit(client) -> list:
 
 def _test_cache_l2_hit(client) -> list:
     try:
-        from third_apis.AvocavoNutrition import _l2, _l1_foods, _now_ts, _MISSING, AvocavoNutritionClient
+        from third_apis.AvocavoNutrition import _l2, _l1_foods, get_now_ts, _MISSING, AvocavoNutritionClient
         query = "__l2_test_chicken_avocavo__"
         fake_food = {
             "ingredient": "Test Chicken L2 Avocavo",
@@ -213,7 +213,7 @@ def _test_cache_l2_hit(client) -> list:
             "food": fake_food,
             "found": True,
             "message": "ingredient found",
-            "_ts": _now_ts(),
+            "_ts": get_now_ts(),
         }
         AvocavoNutritionClient.clear_l1_cache()
         assert _l1_foods.get(query) is _MISSING
@@ -235,11 +235,11 @@ def _test_cache_l2_hit(client) -> list:
 def _test_expired_cache_entries(client) -> list:
     """Test that expired cache entries are ignored and refreshed."""
     try:
-        from third_apis.AvocavoNutrition import _l2, _l1_foods, _now_ts, _MISSING, AvocavoNutritionClient
+        from third_apis.AvocavoNutrition import _l2, _l1_foods, get_now_ts, _MISSING, AvocavoNutritionClient
         query = "__expired_test_avocavo__"
 
         # Create expired entry (31 days old)
-        expired_ts = _now_ts() - (31 * 24 * 3600)
+        expired_ts = get_now_ts() - (31 * 24 * 3600)
         fake_food = {
             "ingredient": "Expired Food",
             "success": True,
@@ -312,7 +312,7 @@ def _test_barcode_cache(client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import AvocavoNutrition as av_module
-    from third_apis.AvocavoNutrition import _l1_barcodes, _l2, _now_ts, _MISSING, AvocavoNutritionClient
+    from third_apis.AvocavoNutrition import _l1_barcodes, _l2, get_now_ts, _MISSING, AvocavoNutritionClient
 
     barcode = "8801234567890"
     l1_key  = barcode
@@ -328,7 +328,7 @@ def _test_barcode_cache(client) -> list:
             "food": fake_l2,
             "found": True,
             "message": "product found",
-            "_ts": _now_ts(),
+            "_ts": get_now_ts(),
         }
         AvocavoNutritionClient.clear_l1_cache()
         assert _l1_barcodes.get(l1_key) is _MISSING
@@ -442,6 +442,7 @@ def _test_cache_stats(client) -> list:
 
 def _test_normalize_query(client) -> list:
     """Tests all normalization cases."""
+    from utils.transformer import normalize_query
     cases = [
         ("Chicken Breast", "chicken breast"),
         ("  white rice  ", "white rice"),
@@ -461,7 +462,7 @@ def _test_normalize_query(client) -> list:
     for raw, expected in cases:
         label = repr(raw) if raw else "'(empty)'"
         try:
-            got = client._normalize_query(raw)
+            got = normalize_query(raw)
             if got == expected:
                 results.append((True, label, f"→ '{got}'"))
             else:

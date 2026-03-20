@@ -1,0 +1,209 @@
+{
+  "dishes": [
+    {
+      "name": "Grilled Pork Chop Rice Plate",
+      "vi_name": "Bánh Cơm Thịt Nướng",
+      "confidence": 0.95,
+      "cooking_method": "Grilled/Fried",
+      "ingredients": [
+        {
+          "name": "White Rice",
+          "vi_name": "Cơm Trắng",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.95,
+          "note": "Steamed"
+        },
+        {
+          "name": "Grilled Pork Chop",
+          "vi_name": "Thịt Heo Nướng",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.95,
+          "note": "Glazed with sauce"
+        },
+        {
+          "name": "Fried Egg",
+          "vi_name": "Trứng Chiên",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.95,
+          "note": "Sunny-side up"
+        },
+        {
+          "name": "Steamed Egg Cake (Chả Trứng)",
+          "vi_name": "Chả Trứng Hấp",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "Cut triangular slice"
+        },
+        {
+          "name": "Fried Shallots",
+          "vi_name": "Hành Phi",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.8,
+          "note": "Scattered on rice"
+        },
+        {
+          "name": "Chopped Green Onion",
+          "vi_name": "Hành Lá Băm",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "Garnish on rice"
+        },
+        {
+          "name": "Sliced Tomato",
+          "vi_name": "Cà Chua Thái",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "Raw slices"
+        },
+        {
+          "name": "Sliced Cucumber",
+          "vi_name": "Dưa Leo Thái",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "Raw slices"
+        }
+      ],
+      "weight": null,
+      "nutritions": {
+        "calories": 0.0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0
+      },
+      "scale_reference": null
+    },
+    {
+      "name": "Side of Pickled Vegetables",
+      "vi_name": "Đồ Chua",
+      "confidence": 0.85,
+      "cooking_method": "Raw/Pickled",
+      "ingredients": [
+        {
+          "name": "Shredded Carrot",
+          "vi_name": "Cà Rốt Thái Sợi",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "Pickled"
+        },
+        {
+          "name": "Shredded Daikon",
+          "vi_name": "Rau Củ Cải Thái Sợi",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.85,
+          "note": "Pickled"
+        },
+        {
+          "name": "Red Chili Pepper",
+          "vi_name": "Ớt Đỏ",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.8,
+          "note": "Raw garnish"
+        }
+      ],
+      "weight": null,
+      "nutritions": {
+        "calories": 0.0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0
+      },
+      "scale_reference": null
+    },
+    {
+      "name": "Small Chili Sauce Bowl",
+      "vi_name": "Nước Chấm Ớt",
+      "confidence": 0.8,
+      "cooking_method": "Raw",
+      "ingredients": [
+        {
+          "name": "Chili Fish Sauce",
+          "vi_name": "Nước Mắm Ớt",
+          "weight": null,
+          "nutritions": {
+            "calories": 0.0,
+            "protein": 0.0,
+            "carbs": 0.0,
+            "fat": 0.0
+          },
+          "confidence": 0.8,
+          "note": "Red chili in liquid base"
+        }
+      ],
+      "weight": null,
+      "nutritions": {
+        "calories": 0.0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0
+      },
+      "scale_reference": null
+    }
+  ],
+  "image_quality": "High"
+}

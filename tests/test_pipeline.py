@@ -95,6 +95,7 @@ def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: 
         result["raw_output"] = data
 
         # Token usage & pricing
+        result["bedrock_calls"] = qwen.bedrock_calls
         result["token_input"] = qwen.input_tokens
         result["token_output"] = qwen.output_tokens
         result["price_input"] = round(qwen.input_tokens / 1000 * PRICE_PER_1K_INPUT, 4)
@@ -112,8 +113,8 @@ def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: 
 
         # Validate results
         if len(dishes) > 0:
-            # Check that at least one dish has total_estimated_nutritions
-            has_nutritions = any(d.get("total_estimated_nutritions") for d in dishes)
+            # Check that at least one dish has nutritions
+            has_nutritions = any(d.get("nutritions") for d in dishes)
             if has_nutritions:
                 result["status"] = "pass"
                 result["success"] = True
@@ -189,3 +190,12 @@ def run_all(qwen, usda_client) -> list:
         return all_results
     finally:
         _restore_console(_saved)
+
+if __name__ == "__main__":
+    from models.QWEN3VL import Qwen3VL
+    from third_apis.USDA import USDAClient
+    
+    qwen = Qwen3VL()
+    usda_client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
+    
+    run_all(qwen, usda_client)

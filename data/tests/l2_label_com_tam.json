@@ -1,4 +1,14 @@
 {
-  "dishes": [],
-  "image_quality": "good"
+  "product": {
+    "product_id": 1,
+    "name": "Vietnamese Pork Chop Rice Plate",
+    "brand": "",
+    "serving_value": 1.0,
+    "serving_unit": "plate",
+    "package_value": 0.0,
+    "package_unit": ""
+  },
+  "nutrition": [],
+  "ingredients": [],
+  "allergens": []
 }

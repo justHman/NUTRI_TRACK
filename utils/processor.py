@@ -2,7 +2,7 @@
 import os
 from io import BytesIO
 from PIL import Image
-from typing import Tuple
+from typing import Tuple, Optional
 import re
 import unicodedata
 
@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 
 
 # Bedrock Converse API payload limits can be strict.
-# Base64 encoding adds ~33% overhead. Set limit to 3MB to be absolutely safe.
-BEDROCK_MAX_RAW_BYTES = 3_000_000
+# Base64 encoding adds ~33% overhead. Set limit to 2MB to be absolutely safe.
+BEDROCK_MAX_RAW_BYTES = 2_000_000
 
 def normalize_query(query: str) -> str:
     """
@@ -126,7 +126,7 @@ def compress_image(image_bytes: bytes, max_pixels: int = 1024, quality: int = 85
     return compressed
 
 
-def prepare_image_for_bedrock(image_path: str = None, image_bytes: bytes = None, filename: str = None, max_pixels: int = 1024) -> Tuple[bytes, str]:
+def prepare_image_for_bedrock(image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: Optional[str] = None, max_pixels: int = 1024) -> Tuple[bytes, str]:
     """Load image and ensure it fits within Bedrock's size and dimension limits."""
     if image_bytes is None:
         if not image_path:

@@ -129,7 +129,7 @@ def _test_cache_l1_hit(usda_client) -> list:
 
 def _test_cache_l2_hit(usda_client) -> list:
     try:
-        from third_apis.USDA import _l2, _l1_foods, _now_ts, _MISSING, USDAClient
+        from third_apis.USDA import _l2, _l1_foods, get_now_ts, _MISSING, USDAClient
         query = "__l2_test_chicken__"
         fake_food = {
             "fdcId": 999999, "description": "Test Chicken L2", "score": 100.0,
@@ -144,7 +144,7 @@ def _test_cache_l2_hit(usda_client) -> list:
             "food": fake_food,
             "found": True,
             "message": "ingredient found",
-            "_ts": _now_ts(),
+            "_ts": get_now_ts(),
         }
         USDAClient.clear_l1_cache()
         assert _l1_foods.get(query) is _MISSING
@@ -195,6 +195,7 @@ def _test_cache_stats(usda_client) -> list:
 
 def _test_normalize_query(usda_client) -> list:
     """Tests all normalization cases. Returns one (ok, label, detail) per case."""
+    from utils.transformer import normalize_query
     cases = [
         ("Chicken Breast", "chicken breast"),
         ("  white rice  ", "white rice"),
@@ -208,7 +209,7 @@ def _test_normalize_query(usda_client) -> list:
     for raw, expected in cases:
         label = repr(raw) if raw else "'(empty)'"
         try:
-            got = usda_client._normalize_query(raw)
+            got = normalize_query(raw)
             if got == expected:
                 results.append((True, label, f"→ '{got}'"))
             else:
@@ -274,7 +275,7 @@ def _test_barcode_cache(usda_client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import USDA as usda_module
-    from third_apis.USDA import _l1_barcodes, _l2, _now_ts, _MISSING, USDAClient
+    from third_apis.USDA import _l1_barcodes, _l2, get_now_ts, _MISSING, USDAClient
 
     barcode = "8934563138166"
 
@@ -290,7 +291,7 @@ def _test_barcode_cache(usda_client) -> list:
             "food": fake_l2_food,
             "found": True,
             "message": "product found",
-            "_ts": _now_ts(),
+            "_ts": get_now_ts(),
         }
         USDAClient.clear_l1_cache()
         assert _l1_barcodes.get(barcode) is _MISSING

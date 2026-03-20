@@ -39,6 +39,11 @@ LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "hao_hao.jpg"
 NON_LABEL_IMG = os.path.join(project_root, "..", "data", "images", "food", "com_tam.jpg")
 
 
+# Bedrock pricing (approximate — adjust as needed)
+PRICE_PER_1K_INPUT = 0.00053
+PRICE_PER_1K_OUTPUT = 0.00266
+
+
 def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool) -> dict:
     """Run a single label analysis test"""
     result = {
@@ -49,6 +54,11 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
         "time_s": 0,
         "dishes": 0,
         "ingredients": 0,
+        "bedrock_calls": 0,
+        "token_input": 0,
+        "price_input": 0,
+        "token_output": 0,
+        "price_output": 0,
         "raw_output": None,
         "notes": "",
     }
@@ -60,6 +70,8 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
     try:
         from scripts.label_analyzer import analyze_label
 
+        qwen.reset_usage()
+
         start = time.time()
         data = analyze_label(image_path=image_path, qwen=qwen)
         elapsed = time.time() - start
@@ -67,29 +79,39 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
         result["time_s"] = round(elapsed, 2)
         result["raw_output"] = data
 
-        dishes = data.get("dishes", [])
-        result["dishes"] = len(dishes)
-        result["ingredients"] = sum(len(d.get("ingredients", [])) for d in dishes)
+        # Token usage & pricing
+        result["bedrock_calls"] = qwen.bedrock_calls
+        result["token_input"] = qwen.input_tokens
+        result["token_output"] = qwen.output_tokens
+        result["price_input"] = round(qwen.input_tokens / 1000 * PRICE_PER_1K_INPUT, 4)
+        result["price_output"] = round(qwen.output_tokens / 1000 * PRICE_PER_1K_OUTPUT, 4)
+
+        product = data.get("product")
+        ingredients = data.get("ingredients", [])
+        allergens = data.get("allergens", [])
+
+        result["dishes"] = 1 if product else 0
+        result["ingredients"] = len(ingredients)
 
         if expect_label:
-            if len(dishes) > 0:
+            if product:
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = f"Detected {len(dishes)} product(s)"
+                result["notes"] = f"Detected product: {product.get('name')}"
             else:
                 result["status"] = "fail"
-                result["notes"] = "Expected label detection but got empty dishes"
+                result["notes"] = "Expected label detection but got no product"
         else:
-            # For non-label images, empty dishes is the expected result
-            if len(dishes) == 0:
+            # For non-label images, no product is the expected result
+            if not product:
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = "Correctly returned empty dishes for non-label image"
+                result["notes"] = "Correctly returned no product for non-label image"
             else:
                 # Model detected something — still mark as pass (it might find partial label info)
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = f"Model returned {len(dishes)} dish(es) for non-label image (acceptable)"
+                result["notes"] = f"Unexpectedly detected product: {product.get('name')}"
 
     except Exception as e:
         result["status"] = "error"
@@ -146,3 +168,8 @@ def run_all(qwen) -> list:
         return all_results
     finally:
         _restore_console(_saved)
+
+if __name__ == "__main__":
+    from models.QWEN3VL import Qwen3VL
+    qwen = Qwen3VL()
+    run_all(qwen)
