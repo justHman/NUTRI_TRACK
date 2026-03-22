@@ -7,7 +7,9 @@ Tests the FastAPI endpoints: /health, /analyze-food, /analyze-label, /scan-barco
 import os
 import sys
 import time
+import subprocess
 import requests
+import pytest
 import logging as _stdlib_logging
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -460,3 +462,60 @@ def run_all() -> list:
         return all_results
     finally:
         _restore_console(_saved)
+
+
+def _is_server_ready() -> bool:
+    try:
+        resp = requests.get(f"{BASE_URL}/health", timeout=2)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="module")
+def ensure_api_server():
+    """Start templates.api:app with uvicorn if it is not already running."""
+    if _is_server_ready():
+        yield
+        return
+
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "templates.api:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8000",
+        ],
+        cwd=project_root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    deadline = time.time() + 180
+    while time.time() < deadline:
+        if _is_server_ready():
+            break
+        time.sleep(1)
+    else:
+        proc.terminate()
+        raise RuntimeError("Cannot start API server: templates.api:app did not become healthy")
+
+    try:
+        yield
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            proc.kill()
+
+
+@pytest.mark.integration
+def test_api_endpoints_suite(ensure_api_server):
+    results = run_all()
+    failed = [r for r in results if not r.get("success")]
+    assert not failed, f"API endpoint suite failed: {failed}"

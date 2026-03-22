@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from typing import Dict, List, Any
+from typing import Dict
 import sys
 import os
 import csv
@@ -9,9 +9,9 @@ import io
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.logging_config import get_logger
-from utils.schemas import Product, NutritionItem, FoodLabel
 
 logger = get_logger(__name__)
+
 def clean_csv_raw_text(raw_text: str) -> str:
     text = raw_text.strip()
     text = re.sub(r"```(?:csv)?\s*([\s\S]*?)```", r"\1", text, flags=re.IGNORECASE)
@@ -198,114 +198,161 @@ def convert_food_csv_to_json(text):
         "image_quality": dishes_raw[0].get("image_quality", "unknown")
     }
 
-def parse_list_field(s: str):
-    """
-    Convert "[milk, sugar]" → ["milk", "sugar"]
-    """
-    s = s.strip()
-    if s.startswith("[") and s.endswith("]"):
-        s = s[1:-1]
-    return [x.strip() for x in s.split(",") if x.strip()]
-
 def convert_label_csv_to_json(text: str):
-    parts = [p.strip() for p in text.split("\n\n") if p.strip()]
-    if not parts:
-        return FoodLabel(
-            product=Product(product_id=0, name="No label detected", serving_value=0, serving_unit="", package_value=0, package_unit=""),
-            nutrition=[], ingredients=[], allergens=[]
-        )
-
-    product_block = parts[0]
-    nutrition_block = parts[1] if len(parts) > 1 else ""
-    ingredient_block = parts[2] if len(parts) > 2 else None
-    allergen_block = parts[3] if len(parts) > 3 else None
-
-    # 🔹 Product
-    product_rows = parse_csv_block(product_block)
-    if not product_rows:
-         return FoodLabel(
-            product=Product(product_id=0, name="No label detected", serving_value=0, serving_unit="", package_value=0, package_unit=""),
-            nutrition=[], ingredients=[], allergens=[]
-        )
-    product_row = product_rows[0]
-    product = Product(
-        product_id=int(product_row.get("product_id", 0)),
-        name=product_row.get("name", "Unknown"),
-        brand=product_row.get("brand", ""),
-        serving_value=safe_float(product_row.get("serving_value")),
-        serving_unit=product_row.get("serving_unit", ""),
-        package_value=safe_float(product_row.get("package_value")),
-        package_unit=product_row.get("package_unit", ""),
-    )
-
-    # 🔹 Nutrition
-    nutrition_rows = parse_csv_block(nutrition_block)
-    nutrition = [
-        NutritionItem(
-            nutrient=row.get("nutrient", ""),
-            value=safe_float(row.get("value")),
-            unit=row.get("unit", ""),
-        )
-        for row in nutrition_rows
-    ]
-
-    # 🔹 Ingredients
-    ingredients = []
-    if ingredient_block:
-        for pid, raw_val in _parse_bracket_table(ingredient_block):
-            ingredients.extend(parse_list_field(raw_val))
-
-    # 🔹 Allergens
-    allergens = []
-    if allergen_block:
-        for pid, raw_val in _parse_bracket_table(allergen_block):
-            allergens.extend(parse_list_field(raw_val))
-
-    return FoodLabel(
-        product=product,
-        nutrition=nutrition,
-        ingredients=ingredients,
-        allergens=allergens
-    )
-
-def _parse_bracket_table(csv_text: str) -> list:
-    """Parse bảng CSV dạng 'product_id,[item1, item2]'
-    csv.DictReader không xử lý được dấu phẩy bên trong [...],
-    nên ta split thủ công trên dấu phẩy đầu tiên.
-    Returns: list of (product_id, raw_bracket_value)
     """
-    lines = csv_text.strip().split("\n")
-    if len(lines) < 2:
-        return []
-    results = []
-    for line in lines[1:]:  # Bỏ header
-        line = line.strip()
-        if not line:
-            continue
-        # Split tại dấu phẩy đầu tiên: "1,[milk, sugar]" → ("1", "[milk, sugar]")
-        parts = line.split(",", 1)
-        if len(parts) == 2:
-            pid = parts[0].strip()
-            raw_val = parts[1].strip()
-            results.append((pid, raw_val))
-    return results
+    Convert multi-section CSV format to JSON.
 
+    Input: raw text with 4 CSV sections separated by blank lines:
+        1. Product info (product_id, name, brand, serving_value, serving_unit, confidence, note)
+        2. Nutrition facts (product_id, nutrient, value, unit, dv_percentage)
+        3. Ingredients (product_id, ingredient) - ingredient is list format "[item1, item2, ...]"
+        4. Allergens (product_id, allergen) - allergen is list format "[item1, item2, ...]"
+
+    Output: JSON with structure:
+        {
+            "labels": [
+                {
+                    "product_id": int,
+                    "name": str,
+                    "brand": str,
+                    "serving_value": float,
+                    "serving_unit": str,
+                    "nutrition": [{"nutrient": str, "value": float, "unit": str}, ...],
+                    "ingredients": [str, ...],
+                    "allergens": [str, ...],
+                    "confidence": float,
+                    "note": str
+                }
+            ]
+        }
+    """
+    text = text.strip()
+
+    # Split into sections by double newline
+    sections = [s.strip() for s in text.split("\n\n") if s.strip()]
+
+    if len(sections) < 4:
+        logger.error(f"Expected 4 CSV sections, found {len(sections)}")
+        raise ValueError(f"Need 4 CSV sections, found {len(sections)}")
+
+    # Parse each section
+    products_data = parse_csv_block(sections[0])
+    nutrition_data = parse_csv_block(sections[1])
+
+    logger.debug(f"Parsed {len(products_data)} products, {len(nutrition_data)} nutrition rows")
+
+    # Group nutrition by product_id
+    nutrition_map = {}
+    for row in nutrition_data:
+        product_id = row["product_id"]
+        nutrition_map.setdefault(product_id, []).append(row)
+
+    # Helper function to parse list format "[item1, item2, ...]"
+    def parse_list_field(field_str):
+        """Extract items from bracket-notation list"""
+        if not field_str:
+            return []
+        field_str = field_str.strip()
+        if field_str.startswith("[") and field_str.endswith("]"):
+            field_str = field_str[1:-1]
+        return [item.strip() for item in field_str.split(",") if item.strip()]
+
+    # Parse ingredients manually (CSV parser splits on commas inside brackets)
+    def parse_ingredient_section(section_text):
+        """Parse ingredient section manually due to bracket notation"""
+        result = {}
+        lines = section_text.split("\n")
+        header = lines[0].split(",")  # ["product_id", "ingredient"]
+
+        for line in lines[1:]:
+            if not line.strip():
+                continue
+            # Split only on first comma to preserve bracket notation
+            parts = line.split(",", 1)
+            if len(parts) == 2:
+                product_id = parts[0].strip()
+                ingredient_str = parts[1].strip()
+                result[product_id] = parse_list_field(ingredient_str)
+        return result
+
+    # Parse allergens manually (same reason as ingredients)
+    def parse_allergen_section(section_text):
+        """Parse allergen section manually due to bracket notation"""
+        result = {}
+        lines = section_text.split("\n")
+        header = lines[0].split(",")  # ["product_id", "allergen"]
+
+        for line in lines[1:]:
+            if not line.strip():
+                continue
+            # Split only on first comma to preserve bracket notation
+            parts = line.split(",", 1)
+            if len(parts) == 2:
+                product_id = parts[0].strip()
+                allergen_str = parts[1].strip()
+                result[product_id] = parse_list_field(allergen_str)
+        return result
+
+    # Group ingredients by product_id
+    ingredients_map = parse_ingredient_section(sections[2])
+
+    # Group allergens by product_id
+    allergens_map = parse_allergen_section(sections[3])
+
+    # Build output
+    labels = []
+    for product in products_data:
+        product_id = product["product_id"]
+
+        # Build nutrition array
+        nutrition = []
+        for n in nutrition_map.get(product_id, []):
+            nutrition.append({
+                "nutrient": n.get("nutrient", ""),
+                "value": safe_float(n.get("value")),
+                "unit": n.get("unit", "")
+            })
+
+        label = {
+            "product_id": int(product_id),
+            "name": product.get("name", ""),
+            "brand": product.get("brand", ""),
+            "serving_value": safe_float(product.get("serving_value")),
+            "serving_unit": product.get("serving_unit", ""),
+            "nutrition": nutrition,
+            "ingredients": ingredients_map.get(product_id, []),
+            "allergens": allergens_map.get(product_id, []),
+            "confidence": safe_float(product.get("confidence")),
+            "note": product.get("note", "")
+        }
+
+        labels.append(label)
+
+    logger.info(f"Successfully converted {len(labels)} labels to JSON")
+    return {"labels": labels}
+    
 if __name__ == "__main__":
-    raw = """product_id,name,brand,serving_value,serving_unit,package_value,package_unit
-1,Milk,Vinamilk,100,ml,1000,ml
+    raw = """
+product_id,name,brand,serving_value,serving_unit,confidence,note
+1,Mì Ăn Liền,Doraemon,75,g,0.9,Per serving size
 
-product_id,nutrient,value,unit
-1,Calories,75.9,kcal
-1,Protein,3.1,g
+product_id,nutrient,value,unit,dv_percentage
+1,Calories,350,kcal,1.5
+1,Protein,6.9,g,3.2
+1,Carbohydrate,51.4,g,1.8
+1,Fat,13.0,g,2.0
 
 product_id,ingredient
-1,[milk, sugar]
+1,[bột mì, dầu thực vật, chất chống oxy hóa, chất điều chỉnh độ acid, bột nghệ, chất tạo màu tự nhiên, chất tạo ngọt tổng hợp]
 
 product_id,allergen
-1,[milk, soy]
+1,[wheat, soy]
 """
 
     clean = clean_csv_raw_text(raw)
     print(clean)
     result = convert_label_csv_to_json(clean)
-    print(result.model_dump())
+    print(result)
+    with open("test_output.json", "w", encoding="utf-8") as f:
+        import json
+        print(json.dump(result, f, ensure_ascii=True, indent=2))

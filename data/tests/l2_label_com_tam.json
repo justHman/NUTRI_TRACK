@@ -2,13 +2,27 @@
   "product": {
     "product_id": 1,
     "name": "Vietnamese Pork Chop Rice Plate",
-    "brand": "",
+    "brand": "Unknown",
     "serving_value": 1.0,
     "serving_unit": "plate",
     "package_value": 0.0,
     "package_unit": ""
   },
-  "nutrition": [],
-  "ingredients": [],
+  "nutrition": [
+    {
+      "nutrient": "Calories",
+      "value": 650.0,
+      "unit": "kcal"
+    },
+    {
+      "nutrient": "[rice",
+      "value": 0.0,
+      "unit": "fried egg"
+    }
+  ],
+  "ingredients": [
+    "egg",
+    "fish"
+  ],
   "allergens": []
 }

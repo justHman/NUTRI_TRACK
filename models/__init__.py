@@ -15,8 +15,8 @@ Pydantic schemas:
 
 from utils.schemas import (
     NutritionItem,
-    Product,
-    FoodLabel,
+    LabelItem,
+    LabelList,
     NutritionInfo,
     Ingredient,
     FoodItem,

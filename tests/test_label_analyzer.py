@@ -44,7 +44,7 @@ PRICE_PER_1K_INPUT = 0.00053
 PRICE_PER_1K_OUTPUT = 0.00266
 
 
-def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool) -> dict:
+def test_label_image(qwen, image_path: str, image_name: str, expect_label: bool) -> dict:
     """Run a single label analysis test"""
     result = {
         "method": "label_ocr",
@@ -152,7 +152,7 @@ def run_all(qwen) -> list:
             print(f"    {passed}/{total} passed {s_icon}", flush=True)
 
         for img_path, img_name, expect_label in TEST_CASES:
-            r = _test_label_image(qwen, img_path, img_name, expect_label)
+            r = test_label_image(qwen, img_path, img_name, expect_label)
             all_results.append(r)
             detail = r.get("notes", "")
             if r.get("time_s"):

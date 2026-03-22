@@ -49,7 +49,7 @@ PRICE_PER_1K_INPUT = 0.00053
 PRICE_PER_1K_OUTPUT = 0.00266
 
 
-def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: str) -> dict:
+def test_pipeline(qwen, client, image_path: str, image_name: str, method: str) -> dict:
     """Run a single pipeline test and record metrics."""
     result = {
         "method": f"{method}",
@@ -77,19 +77,19 @@ def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: 
     try:
         from scripts.pipeline import analyze_nutrition
 
-        cache_before = usda_client.cache_stats()
+        cache_before = client.cache_stats()
         qwen.reset_usage()
 
         start = time.time()
         data = analyze_nutrition(
             image_path=image_path,
             qwen=qwen,
-            usda_client=usda_client,
+            client=client,
             method=method
         )
         elapsed = time.time() - start
 
-        cache_after = usda_client.cache_stats()
+        cache_after = client.cache_stats()
 
         result["time_s"] = round(elapsed, 2)
         result["raw_output"] = data
@@ -134,12 +134,12 @@ def _test_pipeline(qwen, usda_client, image_path: str, image_name: str, method: 
     return result
 
 
-def run_all(qwen, usda_client) -> list:
+def run_all(qwen, client) -> list:
     """Run all pipeline tests.
 
     Args:
         qwen: Pre-initialized Qwen3VL instance
-        usda_client: Pre-initialized USDAClient instance
+        client: Pre-initialized USDAClient instance
 
     Returns:
         List of result dicts (4 tests: 2 methods × 2 images)
@@ -178,7 +178,7 @@ def run_all(qwen, usda_client) -> list:
         for method, group_tag in METHODS:
             group_cases = []
             for img_path, img_name in TEST_IMAGES:
-                r = _test_pipeline(qwen, usda_client, img_path, img_name, method)
+                r = test_pipeline(qwen, client, img_path, img_name, method)
                 all_results.append(r)
                 group_cases.append(_to_case(r))
             _print_group(group_tag, group_cases)
@@ -196,6 +196,6 @@ if __name__ == "__main__":
     from third_apis.USDA import USDAClient
     
     qwen = Qwen3VL()
-    usda_client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
+    client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
     
-    run_all(qwen, usda_client)
+    run_all(qwen, client)

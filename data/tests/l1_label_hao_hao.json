@@ -5,8 +5,8 @@
     "brand": "Doraemon",
     "serving_value": 75.0,
     "serving_unit": "g",
-    "package_value": 75.0,
-    "package_unit": "g"
+    "package_value": 0.0,
+    "package_unit": ""
   },
   "nutrition": [
     {
@@ -15,15 +15,14 @@
       "unit": "kcal"
     },
     {
-      "nutrient": "[Bột mì (bột sắn vị chát: kẽm",
+      "nutrient": "[bột mì",
       "value": 0.0,
-      "unit": "dầu thực vật (dầu cọ"
+      "unit": "chất chống oxy hóa"
     }
   ],
   "ingredients": [
     "wheat",
-    "soy",
-    "fish"
+    "soy"
   ],
   "allergens": []
 }

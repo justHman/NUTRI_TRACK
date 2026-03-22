@@ -50517,7 +50517,7 @@
             "scaling_factor": 1.36
           },
           "portion_source": "consensus_matcher",
-          "processing_time_ms": 7.2269439697265625,
+          "processing_time_ms": 136.4877223968506,
           "restored_from_supabase": true,
           "search_method": "sql_gpt_selected",
           "supabase_cached_at": "2026-03-17T23:00:29.720925",
@@ -50572,7 +50572,7 @@
       },
       "found": true,
       "message": "ingredient found",
-      "_ts": 1773968151.0011184
+      "_ts": 1774111305.42932
     }
   },
   "barcodes": {
