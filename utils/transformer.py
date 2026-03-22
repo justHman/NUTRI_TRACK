@@ -1,17 +1,18 @@
 import re
 import unicodedata
-from typing import Dict, List, Any
+from typing import Dict
 import sys
 import os
 import csv
 import io
+import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.logging_config import get_logger
-from utils.schemas import Product, NutritionItem, FoodLabel
 
 logger = get_logger(__name__)
+
 def clean_csv_raw_text(raw_text: str) -> str:
     text = raw_text.strip()
     text = re.sub(r"```(?:csv)?\s*([\s\S]*?)```", r"\1", text, flags=re.IGNORECASE)
@@ -119,21 +120,129 @@ def normalize_number(x):
     except:
         return x
 
-def parse_csv_block(csv_text):
-    """Parse CSV string to list of dict"""
-    reader = csv.DictReader(io.StringIO(csv_text.strip()))
-    return [dict(row) for row in reader]
+def parse_table_block(block_text, delimiter=None):
+    """Parse a table block into list[dict] with configurable/auto delimiter."""
+    lines = [ln for ln in block_text.splitlines() if ln.strip()]
+    if not lines:
+        return []
+
+    header_line = lines[0]
+    delim = delimiter if delimiter is not None else ("|" if "|" in header_line else ",")
+    reader = csv.DictReader(io.StringIO("\n".join(lines)), delimiter=delim)
+
+    parsed_rows = []
+    for row in reader:
+        normalized_row = {}
+        for k, v in row.items():
+            if k is None:
+                continue
+            # Normalize header/value to avoid KeyError from spaces or BOM in keys.
+            nk = str(k).strip().lstrip("\ufeff")
+            nv = v.strip() if isinstance(v, str) else v
+            normalized_row[nk] = nv
+        parsed_rows.append(normalized_row)
+    return parsed_rows
+
+def parse_list_field_with_nesting(field_str):
+    """Extract list items, preserving commas inside paired (), [] or {}."""
+    if not field_str:
+        return []
+    field_str = field_str.strip()
+    if field_str.startswith("[") and field_str.endswith("]"):
+        field_str = field_str[1:-1]
+
+    items = []
+    buf = []
+    paren_depth = 0
+    square_depth = 0
+    curly_depth = 0
+
+    for ch in field_str:
+        if ch == "(":
+            paren_depth += 1
+        elif ch == ")" and paren_depth > 0:
+            paren_depth -= 1
+        elif ch == "[":
+            square_depth += 1
+        elif ch == "]" and square_depth > 0:
+            square_depth -= 1
+        elif ch == "{":
+            curly_depth += 1
+        elif ch == "}" and curly_depth > 0:
+            curly_depth -= 1
+
+        # Split only when comma is not nested in paired delimiters.
+        if ch == "," and paren_depth == 0 and square_depth == 0 and curly_depth == 0:
+            item = "".join(buf).strip()
+            if item:
+                items.append(item)
+            buf = []
+            continue
+
+        buf.append(ch)
+
+    tail = "".join(buf).strip()
+    if tail:
+        items.append(tail)
+
+    return items
+
+def parse_key_value_section(section_text, value_parser=None):
+    """Parse lines in format key|value with only first pipe as splitter."""
+    parser = value_parser or (lambda x: x)
+    result = {}
+    lines = section_text.split("\n")
+
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        parts = line.split("|", 1)
+        if len(parts) == 2:
+            key = parts[0].strip()
+            value = parts[1].strip()
+            result[key] = parser(value)
+    return result
 
 def convert_food_csv_to_json(text):
     """
     Input: raw text chứa 2 bảng CSV (có thể dính nhau hoặc cách nhau bởi dòng trống)
     Output: JSON format cũ
     """
-    text = text.strip()
+    text = (text or "").strip()
 
-    # 🔹 Tìm vị trí bắt đầu của bảng 2 (Ingredient table)
-    # Cả 2 bảng đều bắt đầu bằng header 'dish_id,', ta tìm lần xuất hiện thứ 2 ở đầu dòng.
-    matches = list(re.finditer(r"^dish_id,", text, re.MULTILINE))
+    if not text:
+        return {
+            "dishes": [],
+            "image_quality": None
+        }
+
+    # Non-food / no-dish shortcut contract:
+    # {
+    #   "dishes": [],
+    #   "image_quality": null
+    # }
+    if text.startswith("{"):
+        try:
+            payload = json.loads(text)
+            if isinstance(payload, dict) and isinstance(payload.get("dishes"), list):
+                dishes = payload.get("dishes") or []
+                if len(dishes) == 0:
+                    logger.info("Detected non-food JSON payload with empty dishes")
+                    return {
+                        "dishes": [],
+                        "image_quality": None
+                    }
+                # Keep compatibility if upstream starts returning non-empty dishes as JSON.
+                return {
+                    "dishes": dishes,
+                    "image_quality": payload.get("image_quality")
+                }
+        except json.JSONDecodeError:
+            logger.debug("Input starts with '{' but is not valid JSON, fallback to CSV parsing")
+
+    # Find the second table start. Both table headers start with dish_id
+    # and can be either pipe-delimited or comma-delimited.
+    matches = list(re.finditer(r"^dish_id[|,]", text, re.MULTILINE))
 
     if len(matches) < 2:
         # Fallback cho trường hợp format không chuẩn hoặc chỉ có 1 bảng
@@ -147,31 +256,52 @@ def convert_food_csv_to_json(text):
         dish_csv = text[:matches[1].start()].strip()
         ingredient_csv = text[matches[1].start():].strip()
 
-    dishes_raw = parse_csv_block(dish_csv)
-    ingredients_raw = parse_csv_block(ingredient_csv)
+    dishes_raw = parse_table_block(dish_csv)
+    ingredients_raw = parse_table_block(ingredient_csv)
 
     # 🔹 Group ingredients theo dish_id
     ingredient_map = {}
     for ing in ingredients_raw:
-        dish_id = ing["dish_id"]
+        dish_id = (ing.get("dish_id") or "").strip()
+        if not dish_id:
+            logger.debug("convert_food_csv_to_json: skip ingredient row without dish_id: %s", ing)
+            continue
         ingredient_map.setdefault(dish_id, []).append(ing)
 
     dishes = []
 
+    def parse_optional_int(value):
+        """Parse optional integer values; return None for empty/non-numeric placeholders."""
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s or s == "-":
+            return None
+        try:
+            return int(float(s))
+        except (TypeError, ValueError):
+            return None
+
+    # New prompt format may store this in header: scale_reference/image_quality
+    # We expose only image_quality at top-level and keep per-dish scale_reference.
+    image_quality = "unknown"
+
     for d in dishes_raw:
-        dish_id = d["dish_id"]
+        dish_id = (d.get("dish_id") or "").strip()
+        if not dish_id:
+            logger.debug("convert_food_csv_to_json: skip dish row without dish_id: %s", d)
+            continue
 
         ingredients = []
         for ing in ingredient_map.get(dish_id, []):
             ingredients.append({
-                "name": ing["name"],
-                "vi_name": ing["vi_name"],
-                "weight": normalize_number(ing["weight"]),
+                "name": ing.get("name", ""),
+                "weight": normalize_number(ing.get("weight", 0)),
                 "nutritions": {
-                    "calories": normalize_number(ing["calories"]),
-                    "protein": normalize_number(ing["protein"]),
-                    "carbs": normalize_number(ing["carbs"]),
-                    "fat": normalize_number(ing["fat"]),
+                    "calories": normalize_number(ing.get("calories", 0)),
+                    "protein": normalize_number(ing.get("protein", 0)),
+                    "carbs": normalize_number(ing.get("carbs", 0)),
+                    "fat": normalize_number(ing.get("fat", 0)),
                 },
                 "confidence": safe_float(ing.get("confidence"), 0.9),
                 "note": ing.get("note", "")
@@ -179,7 +309,8 @@ def convert_food_csv_to_json(text):
 
         dishes.append({
             "name": d.get("name", ""),
-            "vi_name": d.get("vi_name", ""),
+            "serving_value": normalize_number(d.get("serving_value", 0)),
+            "serving_unit": d.get("serving_unit", ""),
             "confidence": safe_float(d.get("confidence"), 0.9),
             "cooking_method": d.get("cooking_method", ""),
             "ingredients": ingredients,
@@ -190,122 +321,143 @@ def convert_food_csv_to_json(text):
                 "carbs": normalize_number(d.get("carbs", 0)),
                 "fat": normalize_number(d.get("fat", 0)),
             },
-            "scale_reference": d.get("scale_reference_used", "")
+            "expiry_days": parse_optional_int(d.get("expiry_days")),
+            "scale_reference": d.get("scale_reference", "")
         })
+
+        # Backward/forward compatibility for merged column naming.
+        merged_scale_quality = d.get("scale_reference/image_quality", "")
+        if merged_scale_quality and image_quality == "unknown":
+            image_quality = merged_scale_quality
+
+        if d.get("image_quality") and image_quality == "unknown":
+            image_quality = d.get("image_quality")
 
     return {
         "dishes": dishes,
-        "image_quality": dishes_raw[0].get("image_quality", "unknown")
+        "image_quality": image_quality
     }
 
-def parse_list_field(s: str):
-    """
-    Convert "[milk, sugar]" → ["milk", "sugar"]
-    """
-    s = s.strip()
-    if s.startswith("[") and s.endswith("]"):
-        s = s[1:-1]
-    return [x.strip() for x in s.split(",") if x.strip()]
-
 def convert_label_csv_to_json(text: str):
-    parts = [p.strip() for p in text.split("\n\n") if p.strip()]
-    if not parts:
-        return FoodLabel(
-            product=Product(product_id=0, name="No label detected", serving_value=0, serving_unit="", package_value=0, package_unit=""),
-            nutrition=[], ingredients=[], allergens=[]
-        )
-
-    product_block = parts[0]
-    nutrition_block = parts[1] if len(parts) > 1 else ""
-    ingredient_block = parts[2] if len(parts) > 2 else None
-    allergen_block = parts[3] if len(parts) > 3 else None
-
-    # 🔹 Product
-    product_rows = parse_csv_block(product_block)
-    if not product_rows:
-         return FoodLabel(
-            product=Product(product_id=0, name="No label detected", serving_value=0, serving_unit="", package_value=0, package_unit=""),
-            nutrition=[], ingredients=[], allergens=[]
-        )
-    product_row = product_rows[0]
-    product = Product(
-        product_id=int(product_row.get("product_id", 0)),
-        name=product_row.get("name", "Unknown"),
-        brand=product_row.get("brand", ""),
-        serving_value=safe_float(product_row.get("serving_value")),
-        serving_unit=product_row.get("serving_unit", ""),
-        package_value=safe_float(product_row.get("package_value")),
-        package_unit=product_row.get("package_unit", ""),
-    )
-
-    # 🔹 Nutrition
-    nutrition_rows = parse_csv_block(nutrition_block)
-    nutrition = [
-        NutritionItem(
-            nutrient=row.get("nutrient", ""),
-            value=safe_float(row.get("value")),
-            unit=row.get("unit", ""),
-        )
-        for row in nutrition_rows
-    ]
-
-    # 🔹 Ingredients
-    ingredients = []
-    if ingredient_block:
-        for pid, raw_val in _parse_bracket_table(ingredient_block):
-            ingredients.extend(parse_list_field(raw_val))
-
-    # 🔹 Allergens
-    allergens = []
-    if allergen_block:
-        for pid, raw_val in _parse_bracket_table(allergen_block):
-            allergens.extend(parse_list_field(raw_val))
-
-    return FoodLabel(
-        product=product,
-        nutrition=nutrition,
-        ingredients=ingredients,
-        allergens=allergens
-    )
-
-def _parse_bracket_table(csv_text: str) -> list:
-    """Parse bảng CSV dạng 'product_id,[item1, item2]'
-    csv.DictReader không xử lý được dấu phẩy bên trong [...],
-    nên ta split thủ công trên dấu phẩy đầu tiên.
-    Returns: list of (product_id, raw_bracket_value)
     """
-    lines = csv_text.strip().split("\n")
-    if len(lines) < 2:
-        return []
-    results = []
-    for line in lines[1:]:  # Bỏ header
-        line = line.strip()
-        if not line:
+    Convert multi-section CSV format to JSON.
+
+    Input: raw text with 4 CSV sections separated by blank lines (pipe-delimited):
+        1. Product info (product_id|name|brand|serving_value|serving_unit|confidence|note)
+        2. Nutrition facts (product_id|nutrient|value|unit|dv_percentage)
+        3. Ingredients (product_id|ingredients) - ingredients is comma-separated list "item1,item2,..."
+        4. Allergens (product_id|allergens) - allergens is comma-separated list "item1,item2,..."
+
+    Output: JSON with structure:
+        {
+            "labels": [
+                {
+                    "product_id": int,
+                    "name": str,
+                    "brand": str,
+                    "serving_value": float,
+                    "serving_unit": str,
+                    "nutrition": [{"nutrient": str, "value": float, "unit": str, "dv_percentage": float}, ...],
+                    "ingredients": [str, ...],
+                    "allergens": [str, ...],
+                    "confidence": float,
+                    "note": str
+                }
+            ]
+        }
+    """
+    text = (text or "").strip()
+
+    if not text:
+        return {"labels": []}
+
+    # Non-label shortcut: accept exact JSON contract
+    # {
+    #   "labels": [],
+    #   "image_quality": null
+    # }
+    if text.startswith("{"):
+        try:
+            payload = json.loads(text)
+            if isinstance(payload, dict) and isinstance(payload.get("labels"), list):
+                labels = payload.get("labels") or []
+                if len(labels) == 0:
+                    logger.info("Detected non-label JSON payload with empty labels")
+                    return {"labels": []}
+                # If upstream returns non-empty labels as JSON, keep compatibility.
+                return {"labels": labels}
+        except json.JSONDecodeError:
+            logger.debug("Input starts with '{' but is not valid JSON, fallback to CSV parsing")
+
+    # Split into sections by double newline
+    sections = [s.strip() for s in text.split("\n\n") if s.strip()]
+
+    if len(sections) < 2:
+        logger.error(f"Expected at least 2 CSV sections, found {len(sections)}")
+        raise ValueError(f"Need at least 2 CSV sections, found {len(sections)}")
+
+    # Parse each section (pipe-delimited)
+    products_data = parse_table_block(sections[0], delimiter="|")
+    nutrition_data = parse_table_block(sections[1], delimiter="|")
+
+    logger.debug(f"Parsed {len(products_data)} products, {len(nutrition_data)} nutrition rows")
+
+    # Group nutrition by product_id
+    nutrition_map = {}
+    for row in nutrition_data:
+        product_id = (row.get("product_id") or "").strip()
+        if not product_id:
             continue
-        # Split tại dấu phẩy đầu tiên: "1,[milk, sugar]" → ("1", "[milk, sugar]")
-        parts = line.split(",", 1)
-        if len(parts) == 2:
-            pid = parts[0].strip()
-            raw_val = parts[1].strip()
-            results.append((pid, raw_val))
-    return results
+        nutrition_map.setdefault(product_id, []).append(row)
 
+    # Group ingredients/allergens by product_id (optional sections)
+    ingredients_map = parse_key_value_section(sections[2], value_parser=parse_list_field_with_nesting) if len(sections) >= 3 else {}
+    allergens_map = parse_key_value_section(sections[3], value_parser=parse_list_field_with_nesting) if len(sections) >= 4 else {}
+
+    # Build output
+    labels = []
+    for product in products_data:
+        product_id = (product.get("product_id") or "").strip()
+        if not product_id:
+            continue
+
+        # Build nutrition array
+        nutrition = []
+        for n in nutrition_map.get(product_id, []):
+            nutrition.append({
+                "nutrient": n.get("nutrient", ""),
+                "value": safe_float(n.get("value")),
+                "unit": n.get("unit", ""),
+                "dv_percentage": safe_float(n.get("dv_percentage"))
+            })
+
+        label = {
+            "product_id": int(product_id) if product_id.isdigit() else product_id,
+            "name": product.get("name", ""),
+            "brand": product.get("brand", ""),
+            "serving_value": safe_float(product.get("serving_value")),
+            "serving_unit": product.get("serving_unit", ""),
+            "nutrition": nutrition,
+            "ingredients": ingredients_map.get(product_id, []),
+            "allergens": allergens_map.get(product_id, []),
+            "confidence": safe_float(product.get("confidence")),
+            "note": product.get("note", "")
+        }
+
+        labels.append(label)
+
+    logger.info(f"Successfully converted {len(labels)} labels to JSON")
+    return {"labels": labels}
+    
 if __name__ == "__main__":
-    raw = """product_id,name,brand,serving_value,serving_unit,package_value,package_unit
-1,Milk,Vinamilk,100,ml,1000,ml
-
-product_id,nutrient,value,unit
-1,Calories,75.9,kcal
-1,Protein,3.1,g
-
-product_id,ingredient
-1,[milk, sugar]
-
-product_id,allergen
-1,[milk, soy]
+    raw = """{
+    "labels":  [
+    ], 
+    "image_quality": null
+}
 """
 
     clean = clean_csv_raw_text(raw)
     print(clean)
     result = convert_label_csv_to_json(clean)
-    print(result.model_dump())
+    print(result)

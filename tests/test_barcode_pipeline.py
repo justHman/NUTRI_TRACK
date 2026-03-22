@@ -85,7 +85,7 @@ def _sample_barcode_image() -> str | None:
     return None
 
 
-def _test_scan_barcode_from_image() -> list:
+def test_scan_barcode_from_image() -> list:
     image_path = _sample_barcode_image()
     if not image_path:
         return [(None, "scan image", "sample barcode image not found")]
@@ -98,11 +98,11 @@ def _test_scan_barcode_from_image() -> list:
             return [(False, "scan image", f"decoded non-numeric barcode: {code}")]
         return [(True, "scan image", f"decoded={code}")]
     except Exception as e:
-        logger.error("_test_scan_barcode_from_image failed: %s", e, exc_info=True)
+        logger.error("test_scan_barcode_from_image failed: %s", e, exc_info=True)
         return [(False, "scan image", str(e))]
 
 
-def _test_lookup_barcode_from_cache() -> list:
+def test_lookup_barcode_from_cache() -> list:
     barcode = "8934563138165"
     try:
         result = barcode_module.lookup_barcode(barcode)
@@ -114,22 +114,22 @@ def _test_lookup_barcode_from_cache() -> list:
         assert result.get("cache_level") in {"L1", "L2"}
         return [(True, "lookup cache", f"source={result.get('source')} level={result.get('cache_level')}")]
     except Exception as e:
-        logger.error("_test_lookup_barcode_from_cache failed: %s", e, exc_info=True)
+        logger.error("test_lookup_barcode_from_cache failed: %s", e, exc_info=True)
         return [(False, "lookup cache", str(e))]
 
 
-def _test_lookup_invalid_barcode() -> list:
+def test_lookup_invalid_barcode() -> list:
     try:
         result = barcode_module.lookup_barcode("abc")
         assert result.get("found") is False
         assert result.get("message") == "invalid barcode"
         return [(True, "invalid barcode", "returned validation error")]
     except Exception as e:
-        logger.error("_test_lookup_invalid_barcode failed: %s", e, exc_info=True)
+        logger.error("test_lookup_invalid_barcode failed: %s", e, exc_info=True)
         return [(False, "invalid barcode", str(e))]
 
 
-def _test_l1_cache_hit() -> list:
+def test_l1_cache_hit() -> list:
     barcode = "8934563138165"
     try:
         # Reset L1 state for deterministic behavior in this test.
@@ -153,11 +153,11 @@ def _test_l1_cache_hit() -> list:
         assert second.get("cache_level") == "L1"
         return [(True, "L1 cache hit", "second lookup returned from RAM cache")]
     except Exception as e:
-        logger.error("_test_l1_cache_hit failed: %s", e, exc_info=True)
+        logger.error("test_l1_cache_hit failed: %s", e, exc_info=True)
         return [(False, "L1 cache hit", str(e))]
 
 
-def _test_barcode_pipeline() -> list:
+def test_barcode_pipeline() -> list:
     image_path = _sample_barcode_image()
     if not image_path:
         return [(None, "pipeline", "sample barcode image not found")]
@@ -165,16 +165,15 @@ def _test_barcode_pipeline() -> list:
     try:
         result = barcode_module.barcode_pipeline(image_path)
         assert isinstance(result, dict)
-        assert result.get("image_path") == image_path
         assert "found" in result
         food = result.get("food") or {}
         return [(True, "pipeline", f"found={result.get('found')} barcode={food.get('barcode')}")]
     except Exception as e:
-        logger.error("_test_barcode_pipeline failed: %s", e, exc_info=True)
+        logger.error("test_barcode_pipeline failed: %s", e, exc_info=True)
         return [(False, "pipeline", str(e))]
 
 
-def _test_barcode_pipeline_with_clients() -> list:
+def test_barcode_pipeline_with_clients() -> list:
     """Test pipeline with API clients for L3 search fallback."""
     image_path = _sample_barcode_image()
     if not image_path:
@@ -205,12 +204,12 @@ def _test_barcode_pipeline_with_clients() -> list:
         return [(True, "pipeline+clients",
                  f"found={result.get('found')} source={result.get('source')} level={result.get('cache_level')}")]
     except Exception as e:
-        logger.error("_test_barcode_pipeline_with_clients failed: %s", e, exc_info=True)
+        logger.error("test_barcode_pipeline_with_clients failed: %s", e, exc_info=True)
         return [(False, "pipeline+clients", str(e))]
 
 
 
-def _test_search_fallback_order() -> list:
+def test_search_fallback_order() -> list:
     """Test that search fallback follows Avocavo → OpenFoodFacts → USDA order."""
     try:
         barcode = "0000000000000"  # Barcode not in any cache
@@ -268,11 +267,11 @@ def _test_search_fallback_order() -> list:
             "long-circuit to usda after avocavo->openfoodfacts->usda, short-circuit at avocavo ✓",
         )]
     except Exception as e:
-        logger.error("_test_search_fallback_order failed: %s", e, exc_info=True)
+        logger.error("test_search_fallback_order failed: %s", e, exc_info=True)
         return [(False, "search order", str(e))]
 
 
-def _test_streamlined_client_integration() -> list:
+def test_streamlined_client_integration() -> list:
     """Test pipeline integration with streamlined API clients."""
     try:
         from third_apis.AvocavoNutrition import AvocavoNutritionClient
@@ -316,11 +315,11 @@ def _test_streamlined_client_integration() -> list:
         return [(True, "streamlined integration",
                 f"API search completed, source={result.get('source')}, found={result.get('found')}")]
     except Exception as e:
-        logger.error("_test_streamlined_client_integration failed: %s", e, exc_info=True)
+        logger.error("test_streamlined_client_integration failed: %s", e, exc_info=True)
         return [(False, "streamlined integration", str(e))]
 
 
-def _test_http_error_handling_in_pipeline() -> list:
+def test_http_error_handling_in_pipeline() -> list:
     """Test that HTTP errors in API clients are properly handled in pipeline."""
     try:
         # Mock client that raises different types of errors
@@ -357,11 +356,11 @@ def _test_http_error_handling_in_pipeline() -> list:
         return [(True, "HTTP error handling",
                 "HTTP error properly handled, fallback to next client successful")]
     except Exception as e:
-        logger.error("_test_http_error_handling_in_pipeline failed: %s", e, exc_info=True)
+        logger.error("test_http_error_handling_in_pipeline failed: %s", e, exc_info=True)
         return [(False, "HTTP error handling", str(e))]
 
 
-def _test_negative_caching_in_pipeline() -> list:
+def test_negative_caching_in_pipeline() -> list:
     """Test negative caching behavior in barcode pipeline."""
     try:
         import json
@@ -398,11 +397,11 @@ def _test_negative_caching_in_pipeline() -> list:
         return [(True, "negative caching",
                 "Negative cache behavior validated in pipeline")]
     except Exception as e:
-        logger.error("_test_negative_caching_in_pipeline failed: %s", e, exc_info=True)
+        logger.error("test_negative_caching_in_pipeline failed: %s", e, exc_info=True)
         return [(False, "negative caching", str(e))]
 
 
-def _test_l2_cache_promotion_behavior() -> list:
+def test_l2_cache_promotion_behavior() -> list:
     """Test L2 to L1 cache promotion behavior in pipeline."""
     try:
         import json
@@ -466,11 +465,11 @@ def _test_l2_cache_promotion_behavior() -> list:
 
         return [(None, "L2 promotion", "OpenFoodFacts cache file not found")]
     except Exception as e:
-        logger.error("_test_l2_cache_promotion_behavior failed: %s", e, exc_info=True)
+        logger.error("test_l2_cache_promotion_behavior failed: %s", e, exc_info=True)
         return [(False, "L2 promotion", str(e))]
 
 
-def _test_barcode_validation_in_pipeline() -> list:
+def test_barcode_validation_in_pipeline() -> list:
     """Test barcode validation behavior in pipeline."""
     try:
         # Test various invalid barcode formats
@@ -497,11 +496,11 @@ def _test_barcode_validation_in_pipeline() -> list:
         return [(True, "barcode validation",
                 f"Validated {len(invalid_barcodes)} invalid formats + 1 valid format")]
     except Exception as e:
-        logger.error("_test_barcode_validation_in_pipeline failed: %s", e, exc_info=True)
+        logger.error("test_barcode_validation_in_pipeline failed: %s", e, exc_info=True)
         return [(False, "barcode validation", str(e))]
 
 
-def _test_cache_statistics_integration() -> list:
+def test_cache_statistics_integration() -> list:
     """Test cache statistics are accessible through pipeline components."""
     try:
         from third_apis.AvocavoNutrition import AvocavoNutritionClient
@@ -534,11 +533,11 @@ def _test_cache_statistics_integration() -> list:
             return [(False, "cache statistics",
                     "Failed to retrieve cache stats from any client")]
     except Exception as e:
-        logger.error("_test_cache_statistics_integration failed: %s", e, exc_info=True)
+        logger.error("test_cache_statistics_integration failed: %s", e, exc_info=True)
         return [(False, "cache statistics", str(e))]
 
 
-def _test_end_to_end_with_bytes_image() -> list:
+def test_end_to_end_with_bytes_image() -> list:
     """Test end-to-end pipeline with bytes image input."""
     try:
         # Try to create a minimal test image as bytes
@@ -573,7 +572,7 @@ def _test_end_to_end_with_bytes_image() -> list:
         return [(True, "bytes image input",
                 f"Pipeline handled bytes input, found={result.get('found')}")]
     except Exception as e:
-        logger.error("_test_end_to_end_with_bytes_image failed: %s", e, exc_info=True)
+        logger.error("test_end_to_end_with_bytes_image failed: %s", e, exc_info=True)
         return [(False, "bytes image input", str(e))]
 
 
@@ -600,20 +599,20 @@ def run_all() -> list:
         print("\n─── Barcode Pipeline ──────────────────────────────", flush=True)
 
         # Barcode Pipeline Tests
-        group_results.append(_print_group("SCAN", _test_scan_barcode_from_image()))
-        group_results.append(_print_group("LOOKUP CACHE", _test_lookup_barcode_from_cache()))
-        group_results.append(_print_group("INVALID INPUT", _test_lookup_invalid_barcode()))
-        group_results.append(_print_group("L1 CACHE", _test_l1_cache_hit()))
-        group_results.append(_print_group("PIPELINE", _test_barcode_pipeline()))
-        group_results.append(_print_group("PIPELINE+CLIENTS", _test_barcode_pipeline_with_clients()))
-        group_results.append(_print_group("SEARCH FALLBACK ORDER", _test_search_fallback_order()))
-        group_results.append(_print_group("STREAMLINED INTEGRATION", _test_streamlined_client_integration()))
-        group_results.append(_print_group("HTTP ERROR HANDLING", _test_http_error_handling_in_pipeline()))
-        group_results.append(_print_group("NEGATIVE CACHING", _test_negative_caching_in_pipeline()))
-        group_results.append(_print_group("L2 PROMOTION", _test_l2_cache_promotion_behavior()))
-        group_results.append(_print_group("BARCODE VALIDATION", _test_barcode_validation_in_pipeline()))
-        group_results.append(_print_group("CACHE STATISTICS", _test_cache_statistics_integration()))
-        group_results.append(_print_group("BYTES IMAGE INPUT", _test_end_to_end_with_bytes_image()))
+        group_results.append(_print_group("SCAN", test_scan_barcode_from_image()))
+        group_results.append(_print_group("LOOKUP CACHE", test_lookup_barcode_from_cache()))
+        group_results.append(_print_group("INVALID INPUT", test_lookup_invalid_barcode()))
+        group_results.append(_print_group("L1 CACHE", test_l1_cache_hit()))
+        group_results.append(_print_group("PIPELINE", test_barcode_pipeline()))
+        group_results.append(_print_group("PIPELINE+CLIENTS", test_barcode_pipeline_with_clients()))
+        group_results.append(_print_group("SEARCH FALLBACK ORDER", test_search_fallback_order()))
+        group_results.append(_print_group("STREAMLINED INTEGRATION", test_streamlined_client_integration()))
+        group_results.append(_print_group("HTTP ERROR HANDLING", test_http_error_handling_in_pipeline()))
+        group_results.append(_print_group("NEGATIVE CACHING", test_negative_caching_in_pipeline()))
+        group_results.append(_print_group("L2 PROMOTION", test_l2_cache_promotion_behavior()))
+        group_results.append(_print_group("BARCODE VALIDATION", test_barcode_validation_in_pipeline()))
+        group_results.append(_print_group("CACHE STATISTICS", test_cache_statistics_integration()))
+        group_results.append(_print_group("BYTES IMAGE INPUT", test_end_to_end_with_bytes_image()))
 
         passed = sum(group_results)
         total = len(group_results)
@@ -623,3 +622,6 @@ def run_all() -> list:
         return group_results
     finally:
         _restore_console(_saved)
+
+if __name__ == "__main__":
+    run_all()

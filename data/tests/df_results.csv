@@ -1,5 +1,9 @@
 method,image,status,time_s,dishes,ingredients,bedrock_calls,usda_calls,usda_cache_hits,token_input,price_input,token_output,price_output,notes
-tools,com_tam,pass,15.78,3,12,2,12,0,2967,0.0016,783,0.0021,"3 dish(es), 12 ingredient(s)"
-tools,fast_food,pass,25.85,12,22,2,12,12,3799,0.002,1715,0.0046,"12 dish(es), 22 ingredient(s)"
-manual,com_tam,pass,17.51,3,13,1,8,24,827,0.0004,638,0.0017,"3 dish(es), 13 ingredient(s)"
-manual,fast_food,pass,43.34,12,38,1,24,32,1094,0.0006,1743,0.0046,"12 dish(es), 38 ingredient(s)"
+tools,fast_food,pass,22.11,12,12,2,12,0,3477,0.0018,1488,0.004,"12 dish(es), 12 ingredient(s)"
+tools,steak,pass,11.52,6,6,2,6,12,2550,0.0014,740,0.002,"6 dish(es), 6 ingredient(s)"
+tools,human,pass,0.83,0,0,1,0,18,811,0.0004,11,0.0,Correctly returned no dishes for non-food image
+tools,label,pass,2.9,0,0,1,0,18,1333,0.0007,11,0.0,Correctly returned no dishes for non-food image
+manual,fast_food,pass,21.58,11,11,1,11,18,982,0.0005,1291,0.0034,"11 dish(es), 11 ingredient(s)"
+manual,steak,pass,7.47,4,6,1,4,29,854,0.0005,387,0.001,"4 dish(es), 6 ingredient(s)"
+manual,human,pass,0.75,0,0,1,0,33,557,0.0003,11,0.0,Correctly returned no dishes for non-food image
+manual,label,pass,3.97,0,0,1,0,33,1078,0.0006,11,0.0,Correctly returned no dishes for non-food image

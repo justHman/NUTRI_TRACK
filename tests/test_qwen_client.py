@@ -70,7 +70,7 @@ def _make_result(method: str, image: str) -> dict:
     }
 
 
-def _test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
+def test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
     """Test Method 1: analyze_food() — Converse API with manual JSON parsing."""
     result = _make_result("method1", image_name)
 
@@ -109,7 +109,7 @@ def _test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
     return result
 
 
-def _test_method2_instructor(qwen, image_path: str, image_name: str) -> dict:
+def test_method2_instructor(qwen, image_path: str, image_name: str) -> dict:
     """Test Method 2: analyze_with_instructor() — Expected to fail (not implemented)."""
     result = _make_result("method2", image_name)
 
@@ -149,7 +149,7 @@ def _test_method2_instructor(qwen, image_path: str, image_name: str) -> dict:
     return result
 
 
-def _test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
+def test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
     """Test Method 3: analyze_food_with_tools() — Converse API + Tool Calling."""
     result = _make_result("method3", image_name)
 
@@ -160,19 +160,19 @@ def _test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
     try:
         from third_apis.USDA import USDAClient
 
-        usda_client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
-        cache_before = usda_client.cache_stats()
+        client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
+        cache_before = client.cache_stats()
 
         qwen.reset_usage()
         start = time.time()
         food_list = qwen.analyze_food_with_tools(
             image_path=image_path,
-            usda_client=usda_client,
+            client=client,
             max_tool_rounds=2
         )
         elapsed = time.time() - start
 
-        cache_after = usda_client.cache_stats()
+        cache_after = client.cache_stats()
 
         result["time_s"] = round(elapsed, 2)
         result["token_input"] = qwen.input_tokens
@@ -223,9 +223,9 @@ def run_all(qwen) -> list:
         ]
 
         METHOD_GROUPS = [
-            ("method1", "CONVERSE METHOD",   _test_method1_converse),
-            ("method2", "INSTRUCTOR METHOD", _test_method2_instructor),
-            ("method3", "TOOLS METHOD",      _test_method3_tools),
+            ("method1", "CONVERSE METHOD",   test_method1_converse),
+            ("method2", "INSTRUCTOR METHOD", test_method2_instructor),
+            ("method3", "TOOLS METHOD",      test_method3_tools),
         ]
 
         def _to_case(r):

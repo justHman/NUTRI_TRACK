@@ -306,26 +306,24 @@ def lookup_barcode(code: str) -> Dict:
 # ─── Full Pipeline ───────────────────────────────────────────────────────────
 
 def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
-    """End-to-end barcode pipeline: scan image → cache lookup → API search fallback.
-
-    Args:
-        image_source: File path (str) or image bytes.
-        clients: Optional dict of API client instances keyed by source name
-                 (e.g. {"avocavo": ..., "openfoodfacts": ..., "usda": ...}).
-                 If provided and L1+L2 cache miss, API search calls are made
-                 in order: Avocavo → OpenFoodFacts → USDA.
-
-    Returns:
-        Dict with keys: barcode, found, image_path (if str input),
-        source, cache_level, product info, and timing metadata.
+    """
+    - Input: image bytes or file path
+    - Output:
+    {
+        "image_path": str or None,
+        "food": dict,
+        "found": bool,
+        "message": str,
+        "source": str (e.g. "L1 RAM cache", "openfoodfacts", "avocavo", "usda", "api miss"),
+        "cache_level": str (e.g. "L1", "L2", "L3", "MISS"),
+        "scan_time_s": float,
+        "total_time_s": float,
+    }
     """
     start = time.time()
     logger.info("Starting barcode pipeline")
 
-    result = {
-        "image_path": image_source if isinstance(image_source, str) else None,
-    }
-
+    result = {}
     # Step 1: Scan barcode from image
     code = scan_barcode_from_image(image_source)
     elapsed_scan = time.time() - start
@@ -338,9 +336,6 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
         result["total_time_s"] = round(time.time() - start, 3)
         logger.warning("Pipeline finished: no barcode detected (%.3fs)", elapsed_scan)
         return result
-
-    result["barcode"] = code
-    logger.info("Barcode scanned: %s (%.3fs)", code, elapsed_scan)
 
     # Step 2: Lookup barcode in L1 → L2 caches
     lookup_result = lookup_barcode(code)

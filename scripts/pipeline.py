@@ -34,7 +34,7 @@ from utils.caculator import calculate_ingredient_nutrition, calculate_total_nutr
 logger = get_logger(__name__)
 
 
-def analyze_nutrition(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = None, usda_client: Optional[USDAClient] = None,
+def analyze_nutrition(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = None, client: Optional[USDAClient] = None,
                       method: str = "tools", image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> dict:
     """
     Full pipeline: Image → Qwen3VL → USDA → Nutrition Results
@@ -54,25 +54,25 @@ def analyze_nutrition(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] 
     else:
         logger.debug("Using pre-initialized Qwen3VL client")
 
-    if usda_client is None:
+    if client is None:
         logger.info("Initializing USDAClient...")
-        usda_client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
+        client = USDAClient(api_key=os.getenv("USDA_API_KEY"))
     else:
         logger.debug("Using pre-initialized USDAClient")
 
     if method == "tools":
-        return _analyze_with_tools(image_path, image_bytes, filename, qwen, usda_client, pipeline_start)
+        return _analyze_with_tools(image_path, image_bytes, filename, qwen, client, pipeline_start)
     else:
-        return _analyze_manual(image_path, image_bytes, filename, qwen, usda_client, pipeline_start)
+        return _analyze_manual(image_path, image_bytes, filename, qwen, client, pipeline_start)
 
 
 def _analyze_with_tools(image_path: Optional[str], image_bytes: Optional[bytes], filename: Optional[str],
-                         qwen: Qwen3VL, usda_client: USDAClient, pipeline_start: float) -> dict:
+                         qwen: Qwen3VL, client: USDAClient, pipeline_start: float) -> dict:
     """Tool-calling pipeline"""
     logger.title("Pipeline Mode: Tool Calling")
 
     step_start = time.time()
-    food_list: FoodList = qwen.analyze_food_with_tools(image_path=image_path, image_bytes=image_bytes, filename=filename, usda_client=usda_client, max_tool_rounds=1)
+    food_list: FoodList = qwen.analyze_food_with_tools(image_path=image_path, image_bytes=image_bytes, filename=filename, client=client, max_tool_rounds=1)
     logger.info("Pipeline tool-calling analysis complete: %d dish(es) in %.1fs",
                 len(food_list.dishes), time.time() - step_start)
     
@@ -81,7 +81,7 @@ def _analyze_with_tools(image_path: Optional[str], image_bytes: Optional[bytes],
 
 
 def _analyze_manual(image_path: Optional[str], image_bytes: Optional[bytes], filename: Optional[str],
-                     qwen: Qwen3VL, usda_client: USDAClient, pipeline_start: float) -> dict:
+                     qwen: Qwen3VL, client: USDAClient, pipeline_start: float) -> dict:
     """Manual 2-step pipeline"""
     logger.title("Pipeline Mode: Manual (2-step)")
 
@@ -98,8 +98,8 @@ def _analyze_manual(image_path: Optional[str], image_bytes: Optional[bytes], fil
     step_start = time.time()
 
     for food_idx, food in enumerate(food_list.dishes, 1):
-        logger.info("Processing dish %d/%d: %s (%s)",
-                     food_idx, len(food_list.dishes), food.name, food.vi_name or "N/A")
+        logger.info("Processing dish %d/%d: %s",
+                     food_idx, len(food_list.dishes), food.name)
                      
         ingredient_nutritions = []
 
@@ -108,7 +108,7 @@ def _analyze_manual(image_path: Optional[str], image_bytes: Optional[bytes], fil
             logger.debug("  Ingredient %d/%d: %s (weight=%.1fg)",
                          ing_idx, len(food.ingredients), ing.name, weight)
 
-            usda_100g = usda_client.get_nutritions(ing.name)
+            usda_100g = client.get_nutritions(ing.name)
             
             # If USDA returned data, override the model's estimated_nutritions
             if usda_100g and any(usda_100g.get(k, 0) > 0 for k in ["calories", "protein", "carbs", "fat"]):
@@ -154,10 +154,9 @@ def print_report(results: dict):
 
     for food in dishes:
         name = food.get("name", "Unknown")
-        vi_name = food.get("vi_name", "")
         cooking_method = food.get("cooking_method", "N/A")
-        
-        print(f"🍽️  MÓN: {name} ({vi_name}) | Cách chế biến: {cooking_method}")
+
+        print(f"🍽️  MÓN: {name} | Cách chế biến: {cooking_method}")
         
         ingredients = food.get("ingredients", [])
         if ingredients:

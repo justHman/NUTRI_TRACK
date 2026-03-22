@@ -2,17 +2,16 @@ import boto3
 from botocore.config import Config
 import json
 import os
-import re
-from typing import Any, List, Optional, Type
+from typing import Any, List, Optional
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from utils.processor import prepare_image_for_bedrock
 from utils.transformer import batch_to_csv, convert_food_csv_to_json, clean_csv_raw_text, convert_label_csv_to_json
+from utils.counter import count_tokens
 from config.logging_config import get_logger
 from config.prompt_config import (FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT,
                                   LABEL_VISION_SYSTEM_PROMPT, LABEL_VISION_USER_PROMPT)
-from utils.schemas import (NutritionItem, Product, FoodLabel, NutritionInfo, 
-                      Ingredient, FoodItem, FoodList)
+from utils.schemas import LabelList, FoodList
 
 logger = get_logger(__name__)
 
@@ -70,7 +69,7 @@ class Qwen3VL:
 
     # ─── Method 1: Converse API (Manual JSON parsing) ────────────────────
 
-    def analyze(self, image_path: Optional[str] = None, prompt: str = "", response_model = None,
+    def analyze(self, image_path: Optional[str] = None, prompt: str = "",
                 system_prompt: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> BaseModel:
         """Generic image analysis with structured Pydantic output (Converse API)"""
         if image_bytes is None:
@@ -83,10 +82,10 @@ class Qwen3VL:
         logger.debug("[Converse] Image ready: format=%s, size=%.2fMB",
                      img_format, len(image_bytes) / 1024 / 1024)
 
-        logger.info("[Converse] Analyzing with '%s' → %s...", self.model_id, response_model.__name__)
+        logger.info("[Converse] Analyzing with '%s'", self.model_id)
         if system_prompt:
-            logger.info("[Converse] System prompt (%d chars): %s...", len(system_prompt), str(system_prompt)[:500])
-        logger.info("[Converse] User prompt (%d chars): %s...", len(prompt), str(prompt)[:500])
+            logger.info("[Converse] System prompt (%d tokens): %s...", count_tokens(system_prompt), str(system_prompt)[:500])
+        logger.info("[Converse] User prompt (%d tokens): %s...", count_tokens(prompt), str(prompt)[:500])
 
         # Build API kwargs
         converse_kwargs = {
@@ -117,14 +116,12 @@ class Qwen3VL:
             self.output_tokens += response["usage"].get("outputTokens", 0)
 
         raw_text = response["output"]["message"]["content"][0]["text"]
-        logger.debug("[Converse] Raw response length: %d chars", len(raw_text))
-
         return raw_text
     # ─── Method 2: Converse API + Tool Calling (Function Calling) ────────
 
     # Tool definition for USDA nutrition lookup
     def analyze_with_tool_calling(self, image_path: Optional[str] = None, prompt: str = "",
-                                   usda_client=None, system_prompt: Optional[str] = None,
+                                   client=None, system_prompt: Optional[str] = None,
                                    max_tool_rounds: int = 1, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> str:
         """Image analysis with tool calling (Converse API + toolConfig)"""
         if image_bytes is None:
@@ -159,8 +156,8 @@ class Qwen3VL:
         }
         if system_prompt:
             converse_kwargs["system"] = [{"text": system_prompt}]
-            logger.info("[ToolCalling] System prompt (%d chars): %s...", len(system_prompt), str(system_prompt)[:500])
-        logger.info("[ToolCalling] User prompt (%d chars): %s...", len(prompt), str(prompt)[:500])
+            logger.info("[ToolCalling] System prompt (%d tokens): %s...", count_tokens(str(system_prompt)), str(system_prompt)[:500])
+        logger.info("[ToolCalling] User prompt (%d tokens): %s...", count_tokens(str(prompt)), str(prompt)[:500])
 
         logger.info("[ToolCalling] Sending initial request to '%s' with %d tools...",
                     self.model_id, len(NUTRITION_TOOL_CONFIG.get("tools", [])))
@@ -182,7 +179,7 @@ class Qwen3VL:
             # If model is done (no more tool calls), return the text
             if stop_reason != "tool_use":
                 final_text = "".join(block.get("text", "") for block in output_message.get("content", []) if "text" in block)
-                logger.info("[ToolCalling] Final response received (%d chars): %s\n...", len(final_text), str(final_text)[:500])
+                logger.info("[ToolCalling] Final response received (%d tokens): %s\n...", count_tokens(str(final_text)), str(final_text)[:500])
                 return final_text
 
             # Model requested tool use — process each tool call
@@ -232,7 +229,7 @@ class Qwen3VL:
                 try:
                     if tool_name.startswith("get_batch"):
                         items = tool_input.get("items", [])
-                        result = usda_client.get_batch(items)
+                        result = client.get_batch(items)
                         if result is None:
                             raise ValueError(f"No batch data found for '{items}'")
                         logger.info("[ToolCalling] ✅ get_batch() → processed %d items", len(items))
@@ -241,7 +238,7 @@ class Qwen3VL:
                     
                     # Convert to CSV format
                     processed_result = batch_to_csv(result)
-                    logger.info("[ToolCalling] ✅ get_batch() → processed %s", processed_result)
+                    logger.info("[ToolCalling] ✅ get_batch() → processed \n%s", processed_result)
 
                     tool_results.append({
                         "toolResult": {
@@ -283,7 +280,7 @@ class Qwen3VL:
         output_message = response["output"]["message"]
         final_text = "".join(block.get("text", "") for block in output_message.get("content", []) if "text" in block)
         
-        logger.info("[ToolCalling] Final attempt received (%d chars): %s", len(final_text), str(final_text)[:500])
+        logger.info("[ToolCalling] Final attempt received (%d tokens): %s", count_tokens(final_text), str(final_text)[:500])
         return final_text
 
     # ─── Food Analysis Wrappers ──────────────────────────────────────────
@@ -296,22 +293,21 @@ class Qwen3VL:
             image_bytes=image_bytes,
             filename=filename,
             prompt=FOOD_VISION_USER_PROMPT,
-            response_model=FoodList,
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
         )
-        logger.info("[Converse] Raw response:\n %s\n...", str(raw_text)[:500])
+        logger.info("[Converse] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
 
-        cleaned_text = clean_csv_raw_text(raw_text)
-        logger.info("[Converse] Cleaned response:\n %s\n...", str(cleaned_text)[:500])
+        cleaned_text = clean_csv_raw_text(str(raw_text))
+        logger.info("[Converse] Cleaned response:\n%s\n...", str(cleaned_text)[:500])
 
         result = convert_food_csv_to_json(cleaned_text)
-        logger.info("[Converse] Convert_food_csv_to_json response:\n %s\n...", str(result)[:500])
+        logger.info("[Converse] Convert_food_csv_to_json response:\n%s\n...", str(result)[:500])
 
         validated_result = FoodList.model_validate(result)
-        logger.info("[Converse] Successfully parsed response into %s", FoodList.__name__)
+        logger.info("[Converse] Successfully parsed response:\n%s\n...", str(validated_result)[:500])
         return validated_result
 
-    def analyze_label(self, image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> FoodLabel:
+    def analyze_label(self, image_path: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> LabelList:
         """Analyze nutrition label on product packaging using OCR (Method 1 Converse API)
         
         Returns FoodList with product as dish and nutritional info as ingredients.
@@ -323,22 +319,21 @@ class Qwen3VL:
             image_bytes=image_bytes,
             filename=filename,
             prompt=LABEL_VISION_USER_PROMPT,
-            response_model=FoodLabel,
             system_prompt=LABEL_VISION_SYSTEM_PROMPT,
         )
-        logger.info("[Converse] Raw response:\n %s\n...", str(raw_text))
+        logger.info("[Converse] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
 
-        cleaned_text = clean_csv_raw_text(raw_text)
-        logger.info("[Converse] Cleaned response:\n %s\n...", str(cleaned_text))
+        cleaned_text = clean_csv_raw_text(str(raw_text))
+        logger.info("[Converse] Cleaned response:\n%s\n...", str(cleaned_text)[:500])
 
         result = convert_label_csv_to_json(cleaned_text)
-        logger.info("[Converse] Successfully parsed response:\n %s\n...", str(result))
+        logger.info("[Converse] Convert_label_csv_to_json response:\n%s\n...", str(result)[:500])
 
-        validated_result = FoodLabel.model_validate(result)
-        logger.info("[Converse] Successfully parsed response:\n %s\n...", str(validated_result)[:500])
+        validated_result = LabelList.model_validate(result)
+        logger.info("[Converse] Successfully parsed response:\n%s\n...", str(validated_result)[:500])
         return validated_result
 
-    def analyze_food_with_tools(self, image_path: Optional[str] = None, usda_client=None, max_tool_rounds: int = 1, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> FoodList:
+    def analyze_food_with_tools(self, image_path: Optional[str] = None, client=None, max_tool_rounds: int = 1, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> FoodList:
         """Analyze food using Converse API + Tool Calling (Method 3)
 
         The model identifies food items from the image, then calls USDA tools:
@@ -357,20 +352,20 @@ class Qwen3VL:
             image_bytes=image_bytes,
             filename=filename,
             prompt=tool_prompt,
-            usda_client=usda_client,
+            client=client,
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
             max_tool_rounds=max_tool_rounds
         )
-        logger.info("[ToolCalling] Raw response:\n %s\n...", str(raw_text)[:500])
+        logger.info("[ToolCalling] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
 
-        cleaned_text = clean_csv_raw_text(raw_text)
-        logger.info("[ToolCalling] Clean response:\n %s\n...", str(cleaned_text)[:500])
+        cleaned_text = clean_csv_raw_text(str(raw_text))
+        logger.info("[ToolCalling] Clean response:\n%s\n...", str(cleaned_text)[:500])
 
         result = convert_food_csv_to_json(cleaned_text)
-        logger.info("[ToolCalling] Convert_food_csv_to_json response:\n %s\n...", str(result)[:500])
+        logger.info("[ToolCalling] Convert_food_csv_to_json response:\n%s\n...", str(result)[:500])
 
         validated_result = FoodList.model_validate(result)
-        logger.info("[ToolCalling] Successfully parsed response into FoodList (%d dishes):\n %s\n...", len(validated_result.dishes), str(validated_result)[:500])
+        logger.info("[ToolCalling] Successfully parsed response into FoodList (%d dishes):\n%s\n...", len(validated_result.dishes), str(validated_result)[:500])
         return validated_result
 
 if __name__ == "__main__":

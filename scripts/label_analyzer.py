@@ -3,7 +3,7 @@ NutriTrack Label Analyzer Script
 =================================
 Analyze nutrition labels on product packaging using Qwen3VL OCR.
 
-Pipeline: Image → Qwen3VL (analyze_label) → FoodLabel JSON
+Pipeline: Image → Qwen3VL (analyze_label) → LabelList JSON
 
 Usage:
     python -m app.scripts.label_analyzer <image_path>
@@ -25,7 +25,7 @@ load_dotenv(os.path.join(project_root, "config", ".env"))
 from config.logging_config import get_logger
 from typing import Optional
 from models.QWEN3VL import Qwen3VL
-from utils.schemas import FoodLabel
+from utils.schemas import LabelList
 
 logger = get_logger(__name__)
 
@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 def analyze_label(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = None,
                   image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> dict:
     """
-    Analyze a nutrition label image and return structured FoodLabel data.
+    Analyze a nutrition label image and return structured LabelList data.
     """
     logger.title("Label Analysis Pipeline")
     logger.info("Image: %s", image_path or filename)
@@ -47,16 +47,13 @@ def analyze_label(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = No
         logger.debug("Using pre-initialized Qwen3VL client")
 
     step_start = time.time()
-    label_result: FoodLabel = qwen.analyze_label(
+    label_result: LabelList = qwen.analyze_label(
         image_path=image_path,
         image_bytes=image_bytes,
         filename=filename
     )
-    logger.info("Label analysis complete for product: %s in %.1fs",
-                label_result.product.name, time.time() - step_start)
-
-    total_time = time.time() - pipeline_start
-    logger.info("Pipeline complete in %.1fs", total_time)
+    logger.info("Label analysis complete %s product in %.1fs",
+                len(label_result.labels), time.time() - step_start)
 
     return label_result.model_dump()
 

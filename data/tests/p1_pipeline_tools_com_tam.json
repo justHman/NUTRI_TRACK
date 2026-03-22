@@ -2,13 +2,13 @@
   "dishes": [
     {
       "name": "Vietnamese Pork Chop Rice Plate",
-      "vi_name": "Cơm Tấm Sườn Nướng",
+      "serving_value": 1.0,
+      "serving_unit": "plate",
       "confidence": 0.95,
-      "cooking_method": "Grilled,Fried,Steamed",
+      "cooking_method": "grilled,fried,raw",
       "ingredients": [
         {
           "name": "white rice",
-          "vi_name": "cơm trắng",
           "weight": 150.0,
           "nutritions": {
             "calories": 534.0,
@@ -21,189 +21,135 @@
         },
         {
           "name": "grilled pork chop",
-          "vi_name": "sườn nướng",
           "weight": 180.0,
           "nutritions": {
             "calories": 342.0,
-            "protein": 33.0,
-            "carbs": 14.0,
-            "fat": 16.0
+            "protein": 33.07,
+            "carbs": 14.08,
+            "fat": 16.27
           },
           "confidence": 0.95,
-          "note": "grilled with glaze"
+          "note": "grilled"
         },
         {
           "name": "fried egg",
-          "vi_name": "trứng ốp la",
           "weight": 60.0,
           "nutritions": {
-            "calories": 118.0,
-            "protein": 8.0,
-            "carbs": 1.0,
-            "fat": 9.0
+            "calories": 117.6,
+            "protein": 8.16,
+            "carbs": 0.5,
+            "fat": 8.88
           },
           "confidence": 0.95,
-          "note": "fried sunny-side up"
+          "note": "fried"
         },
         {
-          "name": "Vietnamese meatloaf",
-          "vi_name": "chả lụa",
-          "weight": 50.0,
+          "name": "pickled carrot and daikon",
+          "weight": 30.0,
           "nutritions": {
-            "calories": 109.0,
-            "protein": 6.0,
-            "carbs": 14.0,
-            "fat": 3.0
+            "calories": 11.4,
+            "protein": 0.0,
+            "carbs": 2.31,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "fermented"
+        },
+        {
+          "name": "cucumber slices",
+          "weight": 25.0,
+          "nutritions": {
+            "calories": 8.5,
+            "protein": 0.12,
+            "carbs": 1.7,
+            "fat": 0.03
+          },
+          "confidence": 0.9,
+          "note": "raw"
+        },
+        {
+          "name": "tomato slices",
+          "weight": 30.0,
+          "nutritions": {
+            "calories": 27.0,
+            "protein": 1.31,
+            "carbs": 3.81,
+            "fat": 0.71
+          },
+          "confidence": 0.9,
+          "note": "raw"
+        },
+        {
+          "name": "lettuce leaves",
+          "weight": 20.0,
+          "nutritions": {
+            "calories": 3.6,
+            "protein": 0.24,
+            "carbs": 0.47,
+            "fat": 0.0
+          },
+          "confidence": 0.9,
+          "note": "raw"
+        },
+        {
+          "name": "fish cake",
+          "weight": 40.0,
+          "nutritions": {
+            "calories": 84.8,
+            "protein": 5.45,
+            "carbs": 4.16,
+            "fat": 5.06
           },
           "confidence": 0.85,
-          "note": "steamed,sliced"
+          "note": "steamed"
         },
         {
           "name": "crispy fried shallots",
-          "vi_name": "hành phi",
           "weight": 10.0,
           "nutritions": {
-            "calories": 7.0,
-            "protein": 0.0,
-            "carbs": 2.0,
-            "fat": 0.0
+            "calories": 7.2,
+            "protein": 0.25,
+            "carbs": 1.68,
+            "fat": 0.01
           },
           "confidence": 0.8,
           "note": "fried"
         },
         {
           "name": "green onions",
-          "vi_name": "hành lá",
           "weight": 5.0,
           "nutritions": {
             "calories": 0.0,
-            "protein": 0.0,
-            "carbs": 0.0,
+            "protein": 0.17,
+            "carbs": 0.33,
             "fat": 0.0
           },
           "confidence": 0.8,
-          "note": "chopped garnish"
+          "note": "raw"
         },
         {
-          "name": "chili pepper",
-          "vi_name": "ớt",
-          "weight": 3.0,
+          "name": "chili sauce",
+          "weight": 15.0,
           "nutritions": {
-            "calories": 3.0,
+            "calories": 17.7,
             "protein": 0.0,
-            "carbs": 0.0,
+            "carbs": 3.52,
             "fat": 0.0
           },
-          "confidence": 0.7,
-          "note": "fresh garnish"
-        },
-        {
-          "name": "lettuce leaves",
-          "vi_name": "xà lách",
-          "weight": 20.0,
-          "nutritions": {
-            "calories": 4.0,
-            "protein": 0.0,
-            "carbs": 0.0,
-            "fat": 0.0
-          },
-          "confidence": 0.7,
-          "note": "raw,for wrapping"
+          "confidence": 0.8,
+          "note": "condiment"
         }
       ],
       "weight": 550.0,
       "nutritions": {
-        "calories": 850.0,
-        "protein": 55.0,
-        "carbs": 140.0,
-        "fat": 30.0
+        "calories": 1275.0,
+        "protein": 61.5,
+        "carbs": 151.7,
+        "fat": 30.2
       },
-      "scale_reference": "Standard plate"
-    },
-    {
-      "name": "Pickled Vegetable Side",
-      "vi_name": "Dưa Chua",
-      "confidence": 0.85,
-      "cooking_method": "Pickled",
-      "ingredients": [
-        {
-          "name": "pickled carrot and daikon",
-          "vi_name": "dưa cải chua",
-          "weight": 30.0,
-          "nutritions": {
-            "calories": 11.0,
-            "protein": 0.0,
-            "carbs": 2.0,
-            "fat": 0.0
-          },
-          "confidence": 0.85,
-          "note": "pickled with rice vinegar"
-        },
-        {
-          "name": "cucumber slices",
-          "vi_name": "dưa leo",
-          "weight": 25.0,
-          "nutritions": {
-            "calories": 9.0,
-            "protein": 0.0,
-            "carbs": 2.0,
-            "fat": 0.0
-          },
-          "confidence": 0.8,
-          "note": "raw,sliced"
-        },
-        {
-          "name": "tomato slices",
-          "vi_name": "cà chua",
-          "weight": 30.0,
-          "nutritions": {
-            "calories": 27.0,
-            "protein": 1.0,
-            "carbs": 4.0,
-            "fat": 1.0
-          },
-          "confidence": 0.8,
-          "note": "raw,sliced"
-        }
-      ],
-      "weight": 55.0,
-      "nutritions": {
-        "calories": 20.0,
-        "protein": 0.0,
-        "carbs": 4.0,
-        "fat": 0.0
-      },
-      "scale_reference": "Standard plate"
-    },
-    {
-      "name": "Fish Sauce Dip",
-      "vi_name": "Nước Mắm",
-      "confidence": 0.75,
-      "cooking_method": "Raw",
-      "ingredients": [
-        {
-          "name": "fish sauce",
-          "vi_name": "nước mắm",
-          "weight": 5.0,
-          "nutritions": {
-            "calories": 2.0,
-            "protein": 0.0,
-            "carbs": 0.0,
-            "fat": 0.0
-          },
-          "confidence": 0.75,
-          "note": "dipping sauce"
-        }
-      ],
-      "weight": 5.0,
-      "nutritions": {
-        "calories": 2.0,
-        "protein": 0.0,
-        "carbs": 0.0,
-        "fat": 0.0
-      },
-      "scale_reference": "Small bowl"
+      "expiry_days": 2,
+      "scale_reference": ""
     }
   ],
-  "image_quality": "0.95"
+  "image_quality": "plate,chopsticks"
 }
