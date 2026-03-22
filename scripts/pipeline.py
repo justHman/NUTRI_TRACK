@@ -98,8 +98,8 @@ def _analyze_manual(image_path: Optional[str], image_bytes: Optional[bytes], fil
     step_start = time.time()
 
     for food_idx, food in enumerate(food_list.dishes, 1):
-        logger.info("Processing dish %d/%d: %s (%s)",
-                     food_idx, len(food_list.dishes), food.name, food.vi_name or "N/A")
+        logger.info("Processing dish %d/%d: %s",
+                     food_idx, len(food_list.dishes), food.name)
                      
         ingredient_nutritions = []
 
@@ -154,10 +154,9 @@ def print_report(results: dict):
 
     for food in dishes:
         name = food.get("name", "Unknown")
-        vi_name = food.get("vi_name", "")
         cooking_method = food.get("cooking_method", "N/A")
-        
-        print(f"🍽️  MÓN: {name} ({vi_name}) | Cách chế biến: {cooking_method}")
+
+        print(f"🍽️  MÓN: {name} | Cách chế biến: {cooking_method}")
         
         ingredients = food.get("ingredients", [])
         if ingredients:

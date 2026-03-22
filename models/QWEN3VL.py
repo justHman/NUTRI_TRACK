@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from utils.processor import prepare_image_for_bedrock
 from utils.transformer import batch_to_csv, convert_food_csv_to_json, clean_csv_raw_text, convert_label_csv_to_json
+from utils.counter import count_tokens
 from config.logging_config import get_logger
 from config.prompt_config import (FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT,
                                   LABEL_VISION_SYSTEM_PROMPT, LABEL_VISION_USER_PROMPT)
@@ -83,8 +84,8 @@ class Qwen3VL:
 
         logger.info("[Converse] Analyzing with '%s'", self.model_id)
         if system_prompt:
-            logger.info("[Converse] System prompt (%d chars): %s...", len(system_prompt), str(system_prompt)[:500])
-        logger.info("[Converse] User prompt (%d chars): %s...", len(prompt), str(prompt)[:500])
+            logger.info("[Converse] System prompt (%d tokens): %s...", count_tokens(system_prompt), str(system_prompt)[:500])
+        logger.info("[Converse] User prompt (%d tokens): %s...", count_tokens(prompt), str(prompt)[:500])
 
         # Build API kwargs
         converse_kwargs = {
@@ -155,8 +156,8 @@ class Qwen3VL:
         }
         if system_prompt:
             converse_kwargs["system"] = [{"text": system_prompt}]
-            logger.info("[ToolCalling] System prompt (%d chars): %s...", len(system_prompt), str(system_prompt)[:500])
-        logger.info("[ToolCalling] User prompt (%d chars): %s...", len(prompt), str(prompt)[:500])
+            logger.info("[ToolCalling] System prompt (%d tokens): %s...", count_tokens(str(system_prompt)), str(system_prompt)[:500])
+        logger.info("[ToolCalling] User prompt (%d tokens): %s...", count_tokens(str(prompt)), str(prompt)[:500])
 
         logger.info("[ToolCalling] Sending initial request to '%s' with %d tools...",
                     self.model_id, len(NUTRITION_TOOL_CONFIG.get("tools", [])))
@@ -178,7 +179,7 @@ class Qwen3VL:
             # If model is done (no more tool calls), return the text
             if stop_reason != "tool_use":
                 final_text = "".join(block.get("text", "") for block in output_message.get("content", []) if "text" in block)
-                logger.info("[ToolCalling] Final response received (%d chars): %s\n...", len(final_text), str(final_text)[:500])
+                logger.info("[ToolCalling] Final response received (%d tokens): %s\n...", count_tokens(str(final_text)), str(final_text)[:500])
                 return final_text
 
             # Model requested tool use — process each tool call
@@ -279,7 +280,7 @@ class Qwen3VL:
         output_message = response["output"]["message"]
         final_text = "".join(block.get("text", "") for block in output_message.get("content", []) if "text" in block)
         
-        logger.info("[ToolCalling] Final attempt received (%d tokens): %s", len(str(final_text).split()), str(final_text)[:500])
+        logger.info("[ToolCalling] Final attempt received (%d tokens): %s", count_tokens(final_text), str(final_text)[:500])
         return final_text
 
     # ─── Food Analysis Wrappers ──────────────────────────────────────────
@@ -294,7 +295,7 @@ class Qwen3VL:
             prompt=FOOD_VISION_USER_PROMPT,
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
         )
-        logger.info("[Converse] Raw response (~%d tokens):\n%s\n...", len(str(raw_text).split()), str(raw_text)[:500])
+        logger.info("[Converse] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
 
         cleaned_text = clean_csv_raw_text(str(raw_text))
         logger.info("[Converse] Cleaned response:\n%s\n...", str(cleaned_text)[:500])
@@ -320,7 +321,7 @@ class Qwen3VL:
             prompt=LABEL_VISION_USER_PROMPT,
             system_prompt=LABEL_VISION_SYSTEM_PROMPT,
         )
-        logger.info("[Converse] Raw response (~%d tokens):\n%s\n...", len(str(raw_text).split()), str(raw_text)[:500])
+        logger.info("[Converse] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
 
         cleaned_text = clean_csv_raw_text(str(raw_text))
         logger.info("[Converse] Cleaned response:\n%s\n...", str(cleaned_text)[:500])
@@ -355,7 +356,7 @@ class Qwen3VL:
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
             max_tool_rounds=max_tool_rounds
         )
-        logger.info("[ToolCalling] Raw response (~%d tokens):\n%s\n...", len(str(raw_text).split()), str(raw_text)[:500])
+        logger.info("[ToolCalling] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
 
         cleaned_text = clean_csv_raw_text(str(raw_text))
         logger.info("[ToolCalling] Clean response:\n%s\n...", str(cleaned_text)[:500])

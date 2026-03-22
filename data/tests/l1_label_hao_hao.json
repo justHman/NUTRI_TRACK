@@ -1,28 +1,54 @@
 {
-  "product": {
-    "product_id": 1,
-    "name": "Mì Ăn Liền",
-    "brand": "Doraemon",
-    "serving_value": 75.0,
-    "serving_unit": "g",
-    "package_value": 0.0,
-    "package_unit": ""
-  },
-  "nutrition": [
+  "labels": [
     {
-      "nutrient": "Calories",
-      "value": 350.0,
-      "unit": "kcal"
-    },
-    {
-      "nutrient": "[bột mì",
-      "value": 0.0,
-      "unit": "chất chống oxy hóa"
+      "product_id": 1,
+      "name": "",
+      "brand": "",
+      "serving_value": 30.0,
+      "serving_unit": "g",
+      "nutrition": [
+        {
+          "nutrient": "Calories",
+          "value": 150.0,
+          "unit": "kcal"
+        },
+        {
+          "nutrient": "Total Fat",
+          "value": 7.0,
+          "unit": "g"
+        },
+        {
+          "nutrient": "Saturated Fat",
+          "value": 3.0,
+          "unit": "g"
+        },
+        {
+          "nutrient": "Sodium",
+          "value": 240.0,
+          "unit": "mg"
+        },
+        {
+          "nutrient": "Total Carbohydrate",
+          "value": 20.0,
+          "unit": "g"
+        },
+        {
+          "nutrient": "Sugars",
+          "value": 3.0,
+          "unit": "g"
+        },
+        {
+          "nutrient": "Protein",
+          "value": 2.0,
+          "unit": "g"
+        }
+      ],
+      "ingredients": [],
+      "allergens": [],
+      "expiry_days": null,
+      "confidence": 0.9,
+      "note": ""
     }
   ],
-  "ingredients": [
-    "wheat",
-    "soy"
-  ],
-  "allergens": []
+  "image_quality": null
 }

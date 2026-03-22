@@ -6,6 +6,7 @@ class NutritionItem(BaseModel):
     nutrient: str
     value: float
     unit: str
+    dv_percentage: Optional[float] = Field(default=None, description="Daily value percentage, if available")
 
 class LabelItem(BaseModel):
     product_id: int
@@ -16,6 +17,7 @@ class LabelItem(BaseModel):
     nutrition: List[NutritionItem]
     ingredients: List[str]
     allergens: List[str]
+    expiry_days: Optional[int] = Field(default=None, description="Number of days the food can be used before expiration, measured in days")
     confidence: Optional[float] = Field(default=None, description="Confidence score 0.0 - 1.0 for the overall label analysis")
     note: Optional[str] = Field(default=None, description="Optional note, e.g., 'inferred from similar product'")
 

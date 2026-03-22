@@ -44,8 +44,8 @@ def load_disk_cache(cache_file: str, cache_dir=None, cache_key=None) -> dict:
     try:
         with open(cache_file, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        logger.debug("L2 cache loaded: %d entries (%d foods, %d barcodes) from %s",
-                     len(raw.get("foods", {})) + len(raw.get("barcodes", {})),
+        logger.debug("%s loaded: %d entries (%d foods, %d barcodes) from %s",
+                     cache_file, len(raw.get("foods", {})) + len(raw.get("barcodes", {})),
                      len(raw.get("foods", {})), len(raw.get("barcodes", {})), cache_file)
         return raw
     except Exception as e:

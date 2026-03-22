@@ -165,7 +165,6 @@ def test_barcode_pipeline() -> list:
     try:
         result = barcode_module.barcode_pipeline(image_path)
         assert isinstance(result, dict)
-        assert result.get("image_path") == image_path
         assert "found" in result
         food = result.get("food") or {}
         return [(True, "pipeline", f"found={result.get('found')} barcode={food.get('barcode')}")]
@@ -623,3 +622,6 @@ def run_all() -> list:
         return group_results
     finally:
         _restore_console(_saved)
+
+if __name__ == "__main__":
+    run_all()

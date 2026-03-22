@@ -35,9 +35,10 @@ def _restore_console(saved):
         h.setLevel(level)
 
 # Test images
-LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "hao_hao.jpg")
-NON_LABEL_IMG = os.path.join(project_root, "..", "data", "images", "food", "com_tam.jpg")
-
+LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "unknow.png")
+HUMAN_IMG = os.path.join(project_root, "data", "images", "non_task", "human.jpg")
+FAST_FOOD_IMG = os.path.join(project_root, "..", "data", "images", "food", "fast_food.jpg")
+STEAK_IMG = os.path.join(project_root, "..", "data", "images", "food", "steak.png")
 
 # Bedrock pricing (approximate — adjust as needed)
 PRICE_PER_1K_INPUT = 0.00053
@@ -86,15 +87,44 @@ def test_label_image(qwen, image_path: str, image_name: str, expect_label: bool)
         result["price_input"] = round(qwen.input_tokens / 1000 * PRICE_PER_1K_INPUT, 4)
         result["price_output"] = round(qwen.output_tokens / 1000 * PRICE_PER_1K_OUTPUT, 4)
 
-        product = data.get("product")
-        ingredients = data.get("ingredients", [])
-        allergens = data.get("allergens", [])
+        # Label analyzer now returns LabelList schema: {"labels": [ ... ]}
+        labels = data.get("labels", []) if isinstance(data, dict) else []
 
-        result["dishes"] = 1 if product else 0
+        # Backward-compatibility for older format: {"product": ..., "ingredients": ..., "allergens": ...}
+        note = ""
+        nutrition = []
+        if labels:
+            first_label = labels[0]
+            product = {
+                "name": first_label.get("name", ""),
+                "brand": first_label.get("brand", ""),
+            }
+            ingredients = first_label.get("ingredients", [])
+            allergens = first_label.get("allergens", [])
+            nutrition = first_label.get("nutrition", [])
+            note = str(first_label.get("note", "") or "")
+        else:
+            product = data.get("product") if isinstance(data, dict) else None
+            ingredients = data.get("ingredients", []) if isinstance(data, dict) else []
+            allergens = data.get("allergens", []) if isinstance(data, dict) else []
+
+        # Heuristic: inferred/no-official-label outputs should count as non-label detections.
+        note_lc = note.lower()
+        inferred_non_label = any(k in note_lc for k in [
+            "no label detected",
+            "no official",
+            "inferred",
+            "visual meal",
+            "meal composition",
+        ])
+
+        has_label_evidence = bool(product) and (len(nutrition) > 0 or len(ingredients) > 0 or len(allergens) > 0) and not inferred_non_label
+
+        result["dishes"] = 1 if has_label_evidence else 0
         result["ingredients"] = len(ingredients)
 
         if expect_label:
-            if product:
+            if has_label_evidence:
                 result["status"] = "pass"
                 result["success"] = True
                 result["notes"] = f"Detected product: {product.get('name')}"
@@ -102,15 +132,14 @@ def test_label_image(qwen, image_path: str, image_name: str, expect_label: bool)
                 result["status"] = "fail"
                 result["notes"] = "Expected label detection but got no product"
         else:
-            # For non-label images, no product is the expected result
-            if not product:
+            # For non-label images, no product is the expected result (strict)
+            if not has_label_evidence:
                 result["status"] = "pass"
                 result["success"] = True
                 result["notes"] = "Correctly returned no product for non-label image"
             else:
-                # Model detected something — still mark as pass (it might find partial label info)
-                result["status"] = "pass"
-                result["success"] = True
+                result["status"] = "fail"
+                result["success"] = False
                 result["notes"] = f"Unexpectedly detected product: {product.get('name')}"
 
     except Exception as e:
@@ -121,7 +150,7 @@ def test_label_image(qwen, image_path: str, image_name: str, expect_label: bool)
     return result
 
 
-def run_all(qwen) -> list:
+def run_all(qwen) -> dict:
     """Run all label analyzer tests.
 
     Args:
@@ -138,7 +167,9 @@ def run_all(qwen) -> list:
 
         TEST_CASES = [
             (LABEL_IMG,     "hao_hao", True),
-            (NON_LABEL_IMG, "com_tam", False),
+            (HUMAN_IMG,     "human", False),
+            (FAST_FOOD_IMG, "fast_food", False),
+            (STEAK_IMG,     "steak", False),
         ]
 
         def _print_group(tag, cases):

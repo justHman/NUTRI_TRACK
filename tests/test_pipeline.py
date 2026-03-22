@@ -40,7 +40,8 @@ def _restore_console(saved):
         h.setLevel(level)
 
 # Test images
-COM_TAM_IMG = os.path.join(project_root, "..", "data", "images", "food", "com_tam.jpg")
+HUMAN_IMG = os.path.join(project_root, "data", "images", "non_task", "human.jpg")
+LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "unknow.png")
 FAST_FOOD_IMG = os.path.join(project_root, "..", "data", "images", "food", "fast_food.jpg")
 STEAK_IMG = os.path.join(project_root, "..", "data", "images", "food", "steak.png")
 
@@ -49,7 +50,7 @@ PRICE_PER_1K_INPUT = 0.00053
 PRICE_PER_1K_OUTPUT = 0.00266
 
 
-def test_pipeline(qwen, client, image_path: str, image_name: str, method: str) -> dict:
+def test_pipeline(qwen, client, image_path: str, image_name: str, method: str, expect_dishes: bool = True) -> dict:
     """Run a single pipeline test and record metrics."""
     result = {
         "method": f"{method}",
@@ -116,16 +117,32 @@ def test_pipeline(qwen, client, image_path: str, image_name: str, method: str) -
             # Check that at least one dish has nutritions
             has_nutritions = any(d.get("nutritions") for d in dishes)
             if has_nutritions:
+                if expect_dishes:
+                    result["status"] = "pass"
+                    result["success"] = True
+                    result["notes"] = f"{len(dishes)} dish(es), {result['ingredients']} ingredient(s)"
+                else:
+                    result["status"] = "fail"
+                    result["success"] = False
+                    result["notes"] = f"Unexpectedly detected {len(dishes)} dish(es)"
+            else:
+                if expect_dishes:
+                    result["status"] = "partial"
+                    result["success"] = True
+                    result["notes"] = f"{len(dishes)} dish(es) detected but no total nutritions calculated"
+                else:
+                    result["status"] = "fail"
+                    result["success"] = False
+                    result["notes"] = f"Unexpectedly detected {len(dishes)} dish(es)"
+        else:
+            if expect_dishes:
+                result["status"] = "fail"
+                result["success"] = False
+                result["notes"] = "No dishes detected"
+            else:
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = f"{len(dishes)} dish(es), {result['ingredients']} ingredient(s)"
-            else:
-                result["status"] = "partial"
-                result["success"] = True
-                result["notes"] = f"{len(dishes)} dish(es) detected but no total nutritions calculated"
-        else:
-            result["status"] = "fail"
-            result["notes"] = "No dishes detected"
+                result["notes"] = "Correctly returned no dishes for non-food image"
 
     except Exception as e:
         result["notes"] = str(e)
@@ -150,8 +167,11 @@ def run_all(qwen, client) -> list:
         all_results = []
 
         TEST_IMAGES = [
-            (COM_TAM_IMG,   "com_tam"),
-            (FAST_FOOD_IMG, "fast_food"),
+            # (COM_TAM_IMG,   "com_tam"),
+            (FAST_FOOD_IMG, "fast_food", True),
+            (STEAK_IMG,     "steak", True),
+            (HUMAN_IMG,     "human", False),
+            (LABEL_IMG,     "label", False),
         ]
 
         METHODS = [
@@ -177,8 +197,8 @@ def run_all(qwen, client) -> list:
 
         for method, group_tag in METHODS:
             group_cases = []
-            for img_path, img_name in TEST_IMAGES:
-                r = test_pipeline(qwen, client, img_path, img_name, method)
+            for img_path, img_name, expect_dishes in TEST_IMAGES:
+                r = test_pipeline(qwen, client, img_path, img_name, method, expect_dishes=expect_dishes)
                 all_results.append(r)
                 group_cases.append(_to_case(r))
             _print_group(group_tag, group_cases)

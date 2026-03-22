@@ -50573,6 +50573,91 @@
       "found": true,
       "message": "ingredient found",
       "_ts": 1774111305.42932
+    },
+    "__expiredtest_avocavo__": {
+      "food": {
+        "ingredient": "__expiredtest_avocavo__",
+        "input_vs_normalized": {
+          "input": "__expiredtest_avocavo__",
+          "normalized": {
+            "ingredient": "avocado",
+            "quantity": 1.0,
+            "unit": ""
+          }
+        },
+        "metadata": {
+          "alternatives": [],
+          "cache_type": "consensus_versioned",
+          "cached": true,
+          "candidates_found": 1,
+          "category": "fruits",
+          "confidence": 0.8,
+          "data_quality": {
+            "data_type": "consensus_validated",
+            "source": "USDA FoodData Central"
+          },
+          "match_quality": "good",
+          "method_used": "consensus_matcher",
+          "portion_info": {
+            "household_equivalent": "about 3/4 cup",
+            "original_usda_per_100g": true,
+            "scaling_factor": 1.36
+          },
+          "portion_source": "consensus_matcher",
+          "processing_time_ms": 8.20469856262207,
+          "search_method": "sql_gpt_selected",
+          "usable": true,
+          "usda_link": "https://fdc.nal.usda.gov/fdc-app.html#/food-details/171706/nutrients",
+          "usda_match": {
+            "data_type": "consensus_match",
+            "description": "Avocados, raw, California",
+            "fdc_id": 171706
+          },
+          "validated": true,
+          "verified": true,
+          "warning": null
+        },
+        "nutrition": {
+          "calcium": 17.68,
+          "calories": 227.12,
+          "carbohydrates": 11.75,
+          "cholesterol": 0.0,
+          "fiber": 9.25,
+          "folate": 121.04,
+          "iron": 0.83,
+          "magnesium": 39.44,
+          "monounsaturated_fat": 13.33,
+          "niacin": 2.6,
+          "phosphorus": 73.44,
+          "polyunsaturated_fat": 2.47,
+          "potassium": 689.52,
+          "protein": 2.67,
+          "riboflavin": 0.19,
+          "saturated_fat": 2.9,
+          "selenium": 0.54,
+          "sodium": 10.88,
+          "sugar": 0.41,
+          "thiamin": 0.1,
+          "total_fat": 20.96,
+          "trans_fat": null,
+          "vitamin_a": 9.52,
+          "vitamin_b12": null,
+          "vitamin_b6": 0.39,
+          "vitamin_c": 11.97,
+          "vitamin_d_iu": null,
+          "vitamin_e": 2.68,
+          "vitamin_k": 28.56,
+          "zinc": 0.92
+        },
+        "parsing": {
+          "estimated_grams": 136.0,
+          "ingredient_name": "avocado"
+        },
+        "success": true
+      },
+      "found": true,
+      "message": "ingredient found",
+      "_ts": 1774167370.6454268
     }
   },
   "barcodes": {
