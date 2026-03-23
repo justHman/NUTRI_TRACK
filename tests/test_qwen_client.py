@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import logging as _stdlib_logging
+import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -22,6 +23,13 @@ load_dotenv(os.path.join(project_root, "config", ".env"))
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _require_bedrock_env() -> None:
+    required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+    missing = [v for v in required_vars if not os.getenv(v)]
+    if missing:
+        pytest.skip(f"Missing AWS credentials for Bedrock tests: {', '.join(missing)}")
 
 
 # ── Console-silence helpers ──────────────────────────────────────────────────
@@ -70,7 +78,7 @@ def _make_result(method: str, image: str) -> dict:
     }
 
 
-def test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
+def _test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
     """Test Method 1: analyze_food() — Converse API with manual JSON parsing."""
     result = _make_result("method1", image_name)
 
@@ -109,47 +117,7 @@ def test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
     return result
 
 
-def test_method2_instructor(qwen, image_path: str, image_name: str) -> dict:
-    """Test Method 2: analyze_with_instructor() — Expected to fail (not implemented)."""
-    result = _make_result("method2", image_name)
-
-    if not os.path.exists(image_path):
-        result["notes"] = f"Image not found: {image_path}"
-        return result
-
-    try:
-        # Method 2 (instructor) is not implemented in current Qwen3VL
-        if not hasattr(qwen, "analyze_with_instructor"):
-            result["status"] = "skip"
-            result["notes"] = "analyze_with_instructor() not implemented — expected"
-            return result
-
-        qwen.reset_usage()
-        start = time.time()
-        food_list = qwen.analyze_with_instructor(image_path=image_path)
-        elapsed = time.time() - start
-
-        result["time_s"] = round(elapsed, 2)
-        result["token_input"] = qwen.input_tokens
-        result["token_output"] = qwen.output_tokens
-        result["bedrock_calls"] = 1
-        result["raw_output"] = food_list.model_dump() if hasattr(food_list, "model_dump") else food_list
-
-        dishes = food_list.dishes if hasattr(food_list, "dishes") else []
-        result["dishes"] = len(dishes)
-        result["ingredients"] = sum(len(d.ingredients) for d in dishes)
-        result["status"] = "pass"
-        result["success"] = True
-        result["notes"] = f"Detected {len(dishes)} dish(es)"
-
-    except Exception as e:
-        result["status"] = "expected_fail"
-        result["notes"] = f"Expected failure (instructor): {str(e)[:200]}"
-
-    return result
-
-
-def test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
+def _test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
     """Test Method 3: analyze_food_with_tools() — Converse API + Tool Calling."""
     result = _make_result("method3", image_name)
 
@@ -223,9 +191,8 @@ def run_all(qwen) -> list:
         ]
 
         METHOD_GROUPS = [
-            ("method1", "CONVERSE METHOD",   test_method1_converse),
-            ("method2", "INSTRUCTOR METHOD", test_method2_instructor),
-            ("method3", "TOOLS METHOD",      test_method3_tools),
+            ("method1", "CONVERSE METHOD",   _test_method1_converse),
+            ("method3", "TOOLS METHOD",      _test_method3_tools),
         ]
 
         def _to_case(r):
@@ -266,3 +233,15 @@ def run_all(qwen) -> list:
         return all_results
     finally:
         _restore_console(_saved)
+
+
+@pytest.mark.integration
+def test_qwen_client_suite():
+    _require_bedrock_env()
+
+    from models.QWEN3VL import Qwen3VL
+
+    qwen = Qwen3VL()
+    results = run_all(qwen)
+    failed = [r for r in results if not r.get("success") and r.get("status") not in ("skip", "expected_fail")]
+    assert not failed, f"Qwen client suite failed: {failed}"

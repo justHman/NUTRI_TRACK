@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import logging as _stdlib_logging
+import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -50,7 +51,7 @@ QUERIES = [
 # ── Individual test functions ─────────────────────────────────────────────────
 # Each returns list of (ok: bool|None, label: str, detail: str) — one tuple per case.
 
-def test_get_nutritions(usda_client) -> list:
+def _test_get_nutritions(usda_client) -> list:
     """Tests all QUERIES. Returns list of (ok, label, detail) per query."""
     results = []
     for q in QUERIES:
@@ -70,7 +71,7 @@ def test_get_nutritions(usda_client) -> list:
     return results
 
 
-def test_get_ingredients(usda_client) -> list:
+def _test_get_ingredients(usda_client) -> list:
     query = "chocolate"
     try:
         r = usda_client.get_ingredients(query)
@@ -82,7 +83,7 @@ def test_get_ingredients(usda_client) -> list:
         return [(False, f"'{query}'", str(e))]
 
 
-def test_nutritions_and_ingredients(usda_client) -> list:
+def _test_nutritions_and_ingredients(usda_client) -> list:
     query = "chicken breast"
     try:
         r = usda_client.get_nutritions_and_ingredients(query)
@@ -98,7 +99,7 @@ def test_nutritions_and_ingredients(usda_client) -> list:
         return [(False, f"'{query}'", str(e))]
 
 
-def test_nutritions_by_weight(usda_client) -> list:
+def _test_nutritions_by_weight(usda_client) -> list:
     query, weight_g = "chicken breast", 150.0
     try:
         r = usda_client.get_nutritions_and_ingredients_by_weight(query, weight_g)
@@ -114,7 +115,7 @@ def test_nutritions_by_weight(usda_client) -> list:
         return [(False, f"'{query}' {weight_g:.0f}g", str(e))]
 
 
-def test_cache_l1_hit(usda_client) -> list:
+def _test_cache_l1_hit(usda_client) -> list:
     query = "chicken breast"
     try:
         usda_client.get_nutritions(query)  # warm up
@@ -127,7 +128,7 @@ def test_cache_l1_hit(usda_client) -> list:
         return [(False, f"'{query}'", str(e))]
 
 
-def test_cache_l2_hit(usda_client) -> list:
+def _test_cache_l2_hit(usda_client) -> list:
     try:
         from third_apis.USDA import _l2, _l1_foods, get_now_ts, _MISSING, USDAClient
         query = "__l2test_chicken__"
@@ -163,7 +164,7 @@ def test_cache_l2_hit(usda_client) -> list:
         USDAClient.clear_l1_cache()
 
 
-def test_mock_data(usda_client) -> list:
+def _test_mock_data() -> list:
     """Tests 3 queries against DEMO_KEY client — each should return mock fallback data."""
     from third_apis.USDA import USDAClient
     mock_client = USDAClient(api_key="DEMO_KEY")
@@ -181,7 +182,7 @@ def test_mock_data(usda_client) -> list:
     return results
 
 
-def test_cache_stats(usda_client) -> list:
+def _test_cache_stats(usda_client) -> list:
     try:
         s = usda_client.cache_stats()
         assert isinstance(s, dict)
@@ -193,7 +194,7 @@ def test_cache_stats(usda_client) -> list:
         return [(False, "cache_stats()", str(e))]
 
 
-def test_normalize_query(usda_client) -> list:
+def _test_normalize_query(usda_client) -> list:
     """Tests all normalization cases. Returns one (ok, label, detail) per case."""
     from utils.transformer import normalize_query
     cases = [
@@ -219,7 +220,7 @@ def test_normalize_query(usda_client) -> list:
     return results
 
 
-def test_search_by_barcode(usda_client) -> list:
+def _test_search_by_barcode(usda_client) -> list:
     """Test search_by_barcode() returns streamlined response format."""
     cases = [
         ("8934563138165", "found=False"),  # numeric barcode not in USDA
@@ -271,7 +272,7 @@ def test_search_by_barcode(usda_client) -> list:
     return results
 
 
-def test_barcode_cache(usda_client) -> list:
+def _test_barcode_cache(usda_client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import USDA as usda_module
@@ -370,17 +371,17 @@ def run_all(usda_client) -> list:
 
     try:
         print("\n─── USDA Client Tests ─────────────────────────────────────────────────", flush=True)
-        group_results.append(_print_group("NUTRITION TESTS",  test_get_nutritions(usda_client)))
-        group_results.append(_print_group("INGREDIENTS TEST", test_get_ingredients(usda_client)))
-        group_results.append(_print_group("NUTR+ING TEST",    test_nutritions_and_ingredients(usda_client)))
-        group_results.append(_print_group("BY WEIGHT TEST",   test_nutritions_by_weight(usda_client)))
-        group_results.append(_print_group("CACHE L1 TEST",    test_cache_l1_hit(usda_client)))
-        group_results.append(_print_group("CACHE STATS TEST", test_cache_stats(usda_client)))
-        group_results.append(_print_group("NORMALIZE TESTS",  test_normalize_query(usda_client)))
-        group_results.append(_print_group("BARCODE TEST",     test_search_by_barcode(usda_client)))
-        group_results.append(_print_group("BARCODE CACHE TEST", test_barcode_cache(usda_client)))
-        group_results.append(_print_group("CACHE L2 TEST",    test_cache_l2_hit(usda_client)))
-        group_results.append(_print_group("MOCK TEST",        test_mock_data(usda_client)))
+        group_results.append(_print_group("NUTRITION TESTS",  _test_get_nutritions(usda_client)))
+        group_results.append(_print_group("INGREDIENTS TEST", _test_get_ingredients(usda_client)))
+        group_results.append(_print_group("NUTR+ING TEST",    _test_nutritions_and_ingredients(usda_client)))
+        group_results.append(_print_group("BY WEIGHT TEST",   _test_nutritions_by_weight(usda_client)))
+        group_results.append(_print_group("CACHE L1 TEST",    _test_cache_l1_hit(usda_client)))
+        group_results.append(_print_group("CACHE STATS TEST", _test_cache_stats(usda_client)))
+        group_results.append(_print_group("NORMALIZE TESTS",  _test_normalize_query(usda_client)))
+        group_results.append(_print_group("BARCODE TEST",     _test_search_by_barcode(usda_client)))
+        group_results.append(_print_group("BARCODE CACHE TEST", _test_barcode_cache(usda_client)))
+        group_results.append(_print_group("CACHE L2 TEST",    _test_cache_l2_hit(usda_client)))
+        group_results.append(_print_group("MOCK TEST",        _test_mock_data()))
 
         passed = sum(group_results)
         total = len(group_results)
@@ -390,3 +391,11 @@ def run_all(usda_client) -> list:
         return group_results
     finally:
         _restore_console(_saved)
+
+
+def test_usda_client_suite():
+    from third_apis.USDA import USDAClient
+
+    client = USDAClient(api_key=os.getenv("USDA_API_KEY", "DEMO_KEY"))
+    group_results = run_all(client)
+    assert all(group_results), f"USDA client suite failed: {group_results}"

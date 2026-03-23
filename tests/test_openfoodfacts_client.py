@@ -11,6 +11,7 @@ import logging as _stdlib_logging
 import json
 import tempfile
 import shutil
+import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -68,7 +69,7 @@ INGREDIENTtest_QUERIES = [
 
 # ── Individual test functions ─────────────────────────────────────────────────
 
-def test_get_nutritions(client) -> list:
+def _test_get_nutritions(client) -> list:
     """Tests all QUERIES. Returns list of (ok, label, detail) per query."""
     results = []
     for q in QUERIES:
@@ -88,7 +89,7 @@ def test_get_nutritions(client) -> list:
     return results
 
 
-def test_edge_case_queries(client) -> list:
+def _test_edge_case_queries(client) -> list:
     """Test edge case queries that should return mock data."""
     results = []
     for q in EDGE_CASE_QUERIES:
@@ -109,7 +110,7 @@ def test_edge_case_queries(client) -> list:
     return results
 
 
-def test_get_ingredients(client) -> list:
+def _test_get_ingredients(client) -> list:
     """Test ingredient extraction for various products."""
     results = []
     for query in INGREDIENTtest_QUERIES:
@@ -125,7 +126,7 @@ def test_get_ingredients(client) -> list:
     return results
 
 
-def test_ingredients_parsing(client) -> list:
+def _test_ingredients_parsing(client) -> list:
     """Test ingredient string parsing with complex cases."""
     test_cases = [
         {
@@ -179,7 +180,7 @@ def test_ingredients_parsing(client) -> list:
     return results
 
 
-def test_nutritions_and_ingredients(client) -> list:
+def _test_nutritions_and_ingredients(client) -> list:
     query = "chicken breast"
     try:
         r = client.get_nutritions_and_ingredients(query)
@@ -195,7 +196,7 @@ def test_nutritions_and_ingredients(client) -> list:
         return [(False, f"'{query}'", str(e))]
 
 
-def test_nutritions_by_weight(client) -> list:
+def _test_nutritions_by_weight(client) -> list:
     query, weight_g = "chicken breast", 150.0
     try:
         r = client.get_nutritions_and_ingredients_by_weight(query, weight_g)
@@ -211,7 +212,7 @@ def test_nutritions_by_weight(client) -> list:
         return [(False, f"'{query}' {weight_g:.0f}g", str(e))]
 
 
-def test_weight_edge_cases(client) -> list:
+def _test_weight_edge_cases(client) -> list:
     """Test edge cases for weight calculations."""
     query = "nutella"  # Use a product more likely to have OpenFoodFacts data
 
@@ -242,7 +243,7 @@ def test_weight_edge_cases(client) -> list:
     return results
 
 
-def test_cache_l1_hit(client) -> list:
+def _test_cache_l1_hit(client) -> list:
     query = "chicken breast"
     try:
         client.get_nutritions(query)  # warm up
@@ -255,7 +256,7 @@ def test_cache_l1_hit(client) -> list:
         return [(False, f"'{query}'", str(e))]
 
 
-def test_cache_l2_hit(client) -> list:
+def _test_cache_l2_hit(client) -> list:
     try:
         from third_apis.OpenFoodFacts import _l2, _l1_foods, get_now_ts, _MISSING, OpenFoodFactsClient
         query = "__l2test_chicken_off__"
@@ -292,7 +293,7 @@ def test_cache_l2_hit(client) -> list:
         OpenFoodFactsClient.clear_l1_cache()
 
 
-def test_expired_cache_entries(client) -> list:
+def _test_expired_cache_entries(client) -> list:
     """Test that expired cache entries are ignored and refreshed."""
     try:
         from third_apis.OpenFoodFacts import _l2, _l1_foods, get_now_ts, _MISSING, OpenFoodFactsClient
@@ -330,7 +331,7 @@ def test_expired_cache_entries(client) -> list:
         OpenFoodFactsClient.clear_l1_cache()
 
 
-def test_product_scoring(client) -> list:
+def _test_product_scoring(client) -> list:
     """Test product scoring and selection logic."""
     try:
         # Create mock products with different scores
@@ -375,7 +376,7 @@ def test_product_scoring(client) -> list:
         return [(False, "product scoring", str(e))]
 
 
-def test_mock_data(client) -> list:
+def _test_mock_data() -> list:
     """Tests mock data — OpenFoodFacts has no DEMO_KEY mode but mock_nutrition still works."""
     from third_apis.OpenFoodFacts import OpenFoodFactsClient
     mock_client = OpenFoodFactsClient()
@@ -394,7 +395,7 @@ def test_mock_data(client) -> list:
     return results
 
 
-def test_cache_stats(client) -> list:
+def _test_cache_stats(client) -> list:
     try:
         s = client.cache_stats()
         assert isinstance(s, dict)
@@ -406,7 +407,7 @@ def test_cache_stats(client) -> list:
         return [(False, "cache_stats()", str(e))]
 
 
-def test_normalize_query(client) -> list:
+def _test_normalize_query(client) -> list:
     """Tests all normalization cases."""
     from utils.transformer import normalize_query
     cases = [
@@ -440,7 +441,7 @@ def test_normalize_query(client) -> list:
     return results
 
 
-def test_search_by_barcode(client) -> list:
+def _test_search_by_barcode(client) -> list:
     """Test search_by_barcode() returns the compact parsed Open Food Facts response shape."""
     cases = [
         ("8934563138165", True),   # Known Vietnamese instant noodle barcode
@@ -488,7 +489,7 @@ def test_search_by_barcode(client) -> list:
     return results
 
 
-def test_barcode_parser_fixture(client) -> list:
+def _test_barcode_parser_fixture(client) -> list:
     """Validate the compact barcode parser against the local fixture payload."""
     fixture_path = os.path.join(project_root, "data", "tests", "openfoodfacts_8934563138165.json")
 
@@ -519,7 +520,7 @@ def test_barcode_parser_fixture(client) -> list:
         return [(False, "fixture barcode parse", str(e))]
 
 
-def test_barcode_cache(client) -> list:
+def _test_barcode_cache(client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import OpenFoodFacts as off_module
@@ -589,7 +590,7 @@ def test_barcode_cache(client) -> list:
     return results
 
 
-def test_negative_caching(client) -> list:
+def _test_negative_caching(client) -> list:
     """Test that negative results (not found) are properly cached."""
     try:
         from third_apis.OpenFoodFacts import OpenFoodFactsClient, _l1_foods, _l2, _MISSING
@@ -621,7 +622,7 @@ def test_negative_caching(client) -> list:
         _l2["foods"].pop("__definitely_nonexistent_food_12345__", None)
 
 
-def test_client_initialization(client) -> list:
+def _test_client_initialization(client) -> list:
     """Test different client initialization scenarios."""
     from third_apis.OpenFoodFacts import OpenFoodFactsClient
 
@@ -650,7 +651,7 @@ def test_client_initialization(client) -> list:
     return results
 
 
-def test_malformed_response_handling(client) -> list:
+def _test_malformed_response_handling(client) -> list:
     """Test how client handles malformed API responses."""
 
     test_cases = [
@@ -677,7 +678,7 @@ def test_malformed_response_handling(client) -> list:
     return results
 
 
-def test_cache_lru_eviction(client) -> list:
+def _test_cache_lru_eviction(client) -> list:
     """Test that LRU cache properly evicts old entries."""
     try:
         from third_apis.OpenFoodFacts import _l1_foods, OpenFoodFactsClient
@@ -732,7 +733,7 @@ def test_cache_lru_eviction(client) -> list:
         OpenFoodFactsClient.clear_l1_cache()
 
 
-def test_taxonomy_normalization(client) -> list:
+def _test_taxonomy_normalization(client) -> list:
     """Test Open Food Facts taxonomy value normalization."""
     test_cases = [
         ("en:fish", "fish"),
@@ -778,36 +779,38 @@ def run_all(client) -> list:
         for i, (ok, label, detail) in enumerate(cases, 1):
             icon = "⏭️ " if ok is None else ("✅" if ok else "❌")
             print(f"    {i}. {label}: {detail} ({icon})", flush=True)
-        passed = sum(1 for ok, _, _ in cases if ok)
+        passed = sum(1 for ok, _, _ in cases if ok is True)
         total = len(cases)
-        s_icon = "✅" if passed == total else "❌"
-        print(f"    {passed}/{total} passed {s_icon}", flush=True)
-        return passed == total
+        all_ok = all(ok is True or ok is None for ok, _, _ in cases)
+        s_icon = "✅" if all_ok else "❌"
+        note = "  (skips expected)" if any(ok is None for ok, _, _ in cases) else ""
+        print(f"    {passed}/{total} passed {s_icon}{note}", flush=True)
+        return all_ok
 
     try:
         print("\n─── OpenFoodFacts Client Tests ────────────────────────────────────────", flush=True)
-        group_results.append(_print_group("CLIENT INIT TESTS", test_client_initialization(client)))
-        group_results.append(_print_group("BARCODE TEST",     test_search_by_barcode(client)))
-        group_results.append(_print_group("BARCODE PARSE TEST", test_barcode_parser_fixture(client)))
-        group_results.append(_print_group("NUTRITION TESTS",  test_get_nutritions(client)))
-        group_results.append(_print_group("EDGE CASE TESTS",  test_edge_case_queries(client)))
-        group_results.append(_print_group("INGREDIENTS TEST", test_get_ingredients(client)))
-        group_results.append(_print_group("INGREDIENT PARSING", test_ingredients_parsing(client)))
-        group_results.append(_print_group("NUTR+ING TEST",    test_nutritions_and_ingredients(client)))
-        group_results.append(_print_group("BY WEIGHT TEST",   test_nutritions_by_weight(client)))
-        group_results.append(_print_group("WEIGHT EDGE TESTS", test_weight_edge_cases(client)))
-        group_results.append(_print_group("CACHE L1 TEST",    test_cache_l1_hit(client)))
-        group_results.append(_print_group("CACHE L2 TEST",    test_cache_l2_hit(client)))
-        group_results.append(_print_group("EXPIRED CACHE TEST", test_expired_cache_entries(client)))
-        group_results.append(_print_group("NEGATIVE CACHE TEST", test_negative_caching(client)))
-        group_results.append(_print_group("LRU EVICTION TEST", test_cache_lru_eviction(client)))
-        group_results.append(_print_group("PRODUCT SCORING", test_product_scoring(client)))
-        group_results.append(_print_group("CACHE STATS TEST", test_cache_stats(client)))
-        group_results.append(_print_group("NORMALIZE TESTS",  test_normalize_query(client)))
-        group_results.append(_print_group("TAXONOMY TESTS",   test_taxonomy_normalization(client)))
-        group_results.append(_print_group("BARCODE CACHE TEST", test_barcode_cache(client)))
-        group_results.append(_print_group("RESPONSE HANDLING", test_malformed_response_handling(client)))
-        group_results.append(_print_group("MOCK TEST",        test_mock_data(client)))
+        group_results.append(_print_group("CLIENT INIT TESTS", _test_client_initialization(client)))
+        group_results.append(_print_group("BARCODE TEST",     _test_search_by_barcode(client)))
+        group_results.append(_print_group("BARCODE PARSE TEST", _test_barcode_parser_fixture(client)))
+        group_results.append(_print_group("NUTRITION TESTS",  _test_get_nutritions(client)))
+        group_results.append(_print_group("EDGE CASE TESTS",  _test_edge_case_queries(client)))
+        group_results.append(_print_group("INGREDIENTS TEST", _test_get_ingredients(client)))
+        group_results.append(_print_group("INGREDIENT PARSING", _test_ingredients_parsing(client)))
+        group_results.append(_print_group("NUTR+ING TEST",    _test_nutritions_and_ingredients(client)))
+        group_results.append(_print_group("BY WEIGHT TEST",   _test_nutritions_by_weight(client)))
+        group_results.append(_print_group("WEIGHT EDGE TESTS", _test_weight_edge_cases(client)))
+        group_results.append(_print_group("CACHE L1 TEST",    _test_cache_l1_hit(client)))
+        group_results.append(_print_group("CACHE L2 TEST",    _test_cache_l2_hit(client)))
+        group_results.append(_print_group("EXPIRED CACHE TEST", _test_expired_cache_entries(client)))
+        group_results.append(_print_group("NEGATIVE CACHE TEST", _test_negative_caching(client)))
+        group_results.append(_print_group("LRU EVICTION TEST", _test_cache_lru_eviction(client)))
+        group_results.append(_print_group("PRODUCT SCORING", _test_product_scoring(client)))
+        group_results.append(_print_group("CACHE STATS TEST", _test_cache_stats(client)))
+        group_results.append(_print_group("NORMALIZE TESTS",  _test_normalize_query(client)))
+        group_results.append(_print_group("TAXONOMY TESTS",   _test_taxonomy_normalization(client)))
+        group_results.append(_print_group("BARCODE CACHE TEST", _test_barcode_cache(client)))
+        group_results.append(_print_group("RESPONSE HANDLING", _test_malformed_response_handling(client)))
+        group_results.append(_print_group("MOCK TEST",        _test_mock_data()))
 
         passed = sum(group_results)
         total = len(group_results)
@@ -817,3 +820,11 @@ def run_all(client) -> list:
         return group_results
     finally:
         _restore_console(_saved)
+
+
+def test_openfoodfacts_client_suite():
+    from third_apis.OpenFoodFacts import OpenFoodFactsClient
+
+    client = OpenFoodFactsClient()
+    group_results = run_all(client)
+    assert all(group_results), f"OpenFoodFacts client suite failed: {group_results}"

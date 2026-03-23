@@ -1,8 +1,12 @@
-# Sử dụng Python 3.11 slim để giảm dung lượng image (pyrxing>=1.1.0 yêu cầu Python>=3.11)
-FROM python:3.11-slim
+FROM python:3.10.11-slim
 
 # Thiết lập thư mục làm việc trong container
 WORKDIR /app
+
+# Tạo virtual environment trong container
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN python -m venv $VIRTUAL_ENV
 
 # Cài đặt các thư viện hệ thống cần thiết (nếu có)
 RUN apt-get update && apt-get install -y \
@@ -28,4 +32,4 @@ ENV PYTHONUNBUFFERED=1
 
 # Lệnh khởi chạy ứng dụng
 # Lưu ý: file api.py nằm trong folder templates/
-CMD ["uvicorn", "templates.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/opt/venv/bin/uvicorn", "templates.api:app", "--host", "0.0.0.0", "--port", "8000"]
