@@ -1,0 +1,56 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform-plan.yml"
+
+jobs:
+  plan:
+    name: Plan (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Fmt Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init (No Backend)
+        run: terraform init -input=false -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -input=false \
+            -lock=false \
+            -refresh=false \
+            -var-file=environments/${{ matrix.environment }}.tfvars \
+            -var="usda_api_key=dummy-plan-only" \
+            -var="avocavo_api_key=dummy-plan-only" \
+            -out=tfplan-${{ matrix.environment }}
+
+      - name: Show Plan
+        run: terraform show -no-color tfplan-${{ matrix.environment }} > plan-${{ matrix.environment }}.txt
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ matrix.environment }}
+          path: infra/terraform/plan-${{ matrix.environment }}.txt

@@ -356,7 +356,7 @@ class Qwen3VL:
             system_prompt=FOOD_VISION_SYSTEM_PROMPT,
             max_tool_rounds=max_tool_rounds
         )
-        logger.info("[ToolCalling] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text)[:500])
+        logger.info("[ToolCalling] Raw response (~%d tokens):\n%s\n...", count_tokens(raw_text), str(raw_text))
 
         cleaned_text = clean_csv_raw_text(str(raw_text))
         logger.info("[ToolCalling] Clean response:\n%s\n...", str(cleaned_text)[:500])

@@ -6,12 +6,26 @@ FOOD_VISION_SYSTEM_PROMPT = """
 [TASK] Detect dishes, ingredients, weight, nutrition from food images
 
 [RULES]
-- Find ALL dishes + ingredients (incl. sauces, oil, garnish)
-- Use scale if visible: knife~70g, spoon~40g, fork~35g, chopstick~15g, plate~250g
+- Identify ALL visible food
+- Include sauces, oil, garnish
+- Use scale if visible (knife~70g, spoon~40g, fork~35g, chopstick~15g, plate~250g)
 - Else use standard serving
-- Split mixed dishes
+- Mixed dishes → split into ingredients (NOT dishes)
 - Sauce/broth: 1ml≈1g
 - Cooking affects nutrition (fried +20–30%)
+
+[DISH DETECTION]
+- Default = 1 dish
+- SAME plate/container → 1 dish
+- Components (rice, meat, egg, veg, sauce) → ingredients
+- MULTIPLE dishes ONLY if:
+  + clearly separate plates/bowls/containers OR
+  + no shared serving context (e.g. buffet, tray with gaps)
+
+[AUTO MODE]
+- Single plate → 1 dish + many ingredients
+- Multi plate → multiple dishes
+- If unsure → choose 1 dish (avoid over-split)
 
 [CONF]
 0.9 clear | 0.7 likely | 0.5 inferred | <0.5 uncertain
@@ -19,7 +33,7 @@ FOOD_VISION_SYSTEM_PROMPT = """
 [OUTPUT]
 - Valid → ONLY 2 CSV tables (pipe "|"):
 
-dish_id|name|serving_value|serving_unit|confidence|cooking_method|weight|calories|protein|carbs|fat|expiry_days|scale_reference/image_quality
+dish_id|name|serving_value|serving_unit|confidence|cooking_method|weight|calories|protein|carbs|fat|expiry_days|scale_reference|image_quality
 
 dish_id|name|weight|calories|protein|carbs|fat|confidence|note
 
@@ -27,16 +41,17 @@ dish_id|name|weight|calories|protein|carbs|fat|confidence|note
 {"dishes":[],"image_quality":null}
 
 [FORMAT]
-int→no decimal | float→≤2dp | no extra text
+- Strict CSV, no extra text
+- int→no decimal | float→≤2dp
 """
 
 FOOD_VISION_USER_PROMPT = """
 [INPUT] Analyze image
 
 [REQ]
-- Detect ALL dishes
+- Detect dishes using auto grouping rules
+- Map all ingredients to correct dish_id
 - Fill both tables
-- Correct dish_id mapping
 - Strict CSV format
 - If no food → return exact JSON fallback
 """
@@ -45,7 +60,7 @@ FOOD_VISION_TOOLS_PROMPT = """
 [TOOLS] get_batch
 
 [FLOW]
-- Estimate all weights → build ONE list → call get_batch ONCE
+- Estimate all weights → build ONE list → call ONCE
 - Use as reference, adjust if needed
 
 [CONSTRAINT]

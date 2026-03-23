@@ -60,3 +60,6 @@ apprunner.yaml
 # File .py
 utils/craw_data2cache.py
 pytest.ini
+
+# Infra
+infra/
