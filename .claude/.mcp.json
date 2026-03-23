@@ -34,6 +34,12 @@
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
+    },
+    "code-review-graph": {
+      "command": "d:\\Project\\Code\\nutritrack-documentation\\.venv\\Scripts\\code-review-graph.exe",
+      "args": [
+        "serve"
+      ]
     }
   }
 }

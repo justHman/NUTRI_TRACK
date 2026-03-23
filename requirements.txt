@@ -6,6 +6,6 @@ requests>=2.32.3
 boto3>=1.34.135
 pydantic>=2.7.4
 pillow>=10.3.0
-instructor>=1.3.3
 concurrent-log-handler>=0.9.25
-pyrxing>=1.1.0
+pyrxing==0.2.0
+gradio>=6.9.0

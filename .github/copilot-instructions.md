@@ -33,3 +33,28 @@ FoodList → dishes: List[FoodItem] → ingredients: List[Ingredient] → estima
 For deeper context on specific subsystems, reference these files in your Copilot Chat:
 - `#nutritrack-architecture` — full pipeline data flow, caching, Pydantic schemas
 - `#usda-client` — USDA client method signatures, cache layers, S3 sync
+
+## Copilot Bridge To .claude
+- Treat `.claude/` as the source of truth for project-specific rules, skills, and MCP context.
+- Before proposing code changes, prioritize these files when relevant:
+	- `.claude/CLAUDE.md`
+	- `.claude/rules/python-conventions.instructions.md`
+	- `.claude/rules/api-patterns.instructions.md`
+	- `.claude/rules/bedrock-integration.instructions.md`
+	- `.claude/rules/test-conventions.instructions.md`
+	- `.claude/skills/nutritrack-architecture.md`
+	- `.claude/skills/usda-client.md`
+- If guidance conflicts, follow this precedence:
+	1. `.github/copilot-instructions.md`
+	2. Matching `.claude/rules/*.instructions.md`
+	3. `.claude/skills/*.md`
+	4. `.claude/CLAUDE.md`
+
+## Prompt And Instruction Files
+- Prompt file example: `.github/prompts/plan-claudeFolderSetup.prompt.md`.
+- Use prompt files for planning/workflow generation.
+- Use `.instructions.md` files for coding behavior and style constraints.
+
+## MCP Tooling (Copilot In VS Code)
+- Register MCP servers via VS Code MCP config (workspace-level), not only `.claude/.mcp.json`.
+- Keep `.claude/.mcp.json` as Claude-oriented config and mirror active servers into `.vscode/mcp.json` for Copilot usage.

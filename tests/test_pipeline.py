@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import logging as _stdlib_logging
+import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -21,6 +22,13 @@ load_dotenv(os.path.join(project_root, "config", ".env"))
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _require_bedrock_env() -> None:
+    required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+    missing = [v for v in required_vars if not os.getenv(v)]
+    if missing:
+        pytest.skip(f"Missing AWS credentials for Bedrock tests: {', '.join(missing)}")
 
 
 # ── Console-silence helpers ──────────────────────────────────────────────────
@@ -50,7 +58,7 @@ PRICE_PER_1K_INPUT = 0.00053
 PRICE_PER_1K_OUTPUT = 0.00266
 
 
-def test_pipeline(qwen, client, image_path: str, image_name: str, method: str, expect_dishes: bool = True) -> dict:
+def _test_pipeline(qwen, client, image_path: str, image_name: str, method: str, expect_dishes: bool = True) -> dict:
     """Run a single pipeline test and record metrics."""
     result = {
         "method": f"{method}",
@@ -198,7 +206,7 @@ def run_all(qwen, client) -> list:
         for method, group_tag in METHODS:
             group_cases = []
             for img_path, img_name, expect_dishes in TEST_IMAGES:
-                r = test_pipeline(qwen, client, img_path, img_name, method, expect_dishes=expect_dishes)
+                r = _test_pipeline(qwen, client, img_path, img_name, method, expect_dishes=expect_dishes)
                 all_results.append(r)
                 group_cases.append(_to_case(r))
             _print_group(group_tag, group_cases)
@@ -210,6 +218,20 @@ def run_all(qwen, client) -> list:
         return all_results
     finally:
         _restore_console(_saved)
+
+
+@pytest.mark.integration
+def test_pipeline_suite():
+    _require_bedrock_env()
+
+    from models.QWEN3VL import Qwen3VL
+    from third_apis.USDA import USDAClient
+
+    qwen = Qwen3VL()
+    client = USDAClient(api_key=os.getenv("USDA_API_KEY", "DEMO_KEY"))
+    results = run_all(qwen, client)
+    failed = [r for r in results if not r.get("success")]
+    assert not failed, f"Pipeline suite failed: {failed}"
 
 if __name__ == "__main__":
     from models.QWEN3VL import Qwen3VL
