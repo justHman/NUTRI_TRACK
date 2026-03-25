@@ -62,30 +62,44 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      - name: Start VM for cache upload
+      - name: Wake app before cache upload
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          MACHINE_ID=$(flyctl machine list -a "$APP_NAME" -q | head -n 1)
-          if [ -z "$MACHINE_ID" ]; then
-            echo "No machine found for app $APP_NAME"
-            exit 1
-          fi
-          echo "Using machine: $MACHINE_ID"
-          flyctl machine start "$MACHINE_ID" -a "$APP_NAME" || true
-          echo "MACHINE_ID=$MACHINE_ID" >> "$GITHUB_ENV"
-          sleep 15
+          for i in 1 2 3 4 5; do
+            if curl -fsS "https://$APP_NAME.fly.dev/health" > /dev/null; then
+              echo "App is awake."
+              break
+            fi
+            echo "Waiting for app to start... attempt $i/5"
+            sleep 8
+          done
 
       - name: Upload cache files to Fly volume
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          flyctl ssh sftp put data/usda_cache.json /app/data/usda_cache.json -a "$APP_NAME" --machine "$MACHINE_ID"
-          flyctl ssh sftp put data/avocavo_cache.json /app/data/avocavo_cache.json -a "$APP_NAME" --machine "$MACHINE_ID"
-          flyctl ssh sftp put data/openfoodfacts_cache.json /app/data/openfoodfacts_cache.json -a "$APP_NAME" --machine "$MACHINE_ID"
+          upload_with_retry() {
+            local src="$1"
+            local dst="$2"
+            for i in 1 2 3 4 5; do
+              if flyctl ssh sftp put "$src" "$dst" -a "$APP_NAME"; then
+                echo "Uploaded $src"
+                return 0
+              fi
+              echo "Upload failed for $src. Retry $i/5..."
+              sleep 8
+            done
+            echo "Failed to upload $src after retries"
+            return 1
+          }
+
+          upload_with_retry data/usda_cache.json /app/data/usda_cache.json
+          upload_with_retry data/avocavo_cache.json /app/data/avocavo_cache.json
+          upload_with_retry data/openfoodfacts_cache.json /app/data/openfoodfacts_cache.json
 
       - name: Verify uploaded cache files
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          flyctl ssh console -a "$APP_NAME" --machine "$MACHINE_ID" -C "ls -lh /app/data/*.json"
+          flyctl ssh console -a "$APP_NAME" -C "ls -lh /app/data/*.json"
