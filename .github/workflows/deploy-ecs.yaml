@@ -100,8 +100,26 @@ jobs:
       - name: Login DockerHub
         uses: docker/login-action@v3
         with:
+          registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Validate DockerHub token scopes
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          IMAGE_REPO: ${{ env.IMAGE_REPO }}
+        run: |
+          STATUS_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -u "${DOCKERHUB_USERNAME}:${DOCKERHUB_TOKEN}" \
+            "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${IMAGE_REPO}:pull,push")
+
+          if [ "$STATUS_CODE" != "200" ]; then
+            echo "::error::Docker Hub token validation failed (HTTP ${STATUS_CODE})."
+            echo "::error::Ensure DOCKERHUB_TOKEN has Read + Write scopes and can access repository ${IMAGE_REPO}."
+            echo "::error::Ensure DOCKERHUB_USERNAME is the Docker Hub ID that owns (or is granted access to) ${IMAGE_REPO}."
+            exit 1
+          fi
 
       # 🚀 build cache giúp build nhanh hơn ~3x
       - name: Build & Push ARM64 Image
