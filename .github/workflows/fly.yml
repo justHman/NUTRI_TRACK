@@ -79,15 +79,114 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
+          mkdir -p .cache-sync/remote
+
+          # Best effort: download existing remote caches for two-way merge.
+          fetch_remote() {
+          local name="$1"
+          local remote="/app/data/$name"
+          local local_path=".cache-sync/remote/$name"
+          if flyctl ssh sftp get "$remote" "$local_path" -a "$APP_NAME"; then
+            echo "Downloaded remote cache: $remote"
+          else
+            echo "::warning::Remote cache not found yet for $remote. Using local seed only."
+          fi
+          }
+
+          fetch_remote usda_cache.json
+          fetch_remote avocavo_cache.json
+          fetch_remote openfoodfacts_cache.json
+
+          python <<'PY'
+          import json
+          from pathlib import Path
+          from typing import Any, Dict
+
+
+          def load_cache(path: Path) -> Dict[str, Any]:
+              if not path.exists():
+                  return {"foods": {}, "barcodes": {}}
+              try:
+                  with path.open("r", encoding="utf-8") as f:
+                      data = json.load(f)
+                  if not isinstance(data, dict):
+                      return {"foods": {}, "barcodes": {}}
+                  data.setdefault("foods", {})
+                  data.setdefault("barcodes", {})
+                  return data
+              except Exception:
+                  return {"foods": {}, "barcodes": {}}
+
+
+          def get_ts(entry: Any) -> float:
+              if isinstance(entry, dict):
+                  ts = entry.get("_ts", 0)
+                  try:
+                      return float(ts)
+                  except Exception:
+                      return 0.0
+              return 0.0
+
+
+          def merge_bucket(remote_bucket: Dict[str, Any], local_bucket: Dict[str, Any]) -> Dict[str, Any]:
+              merged: Dict[str, Any] = {}
+              keys = set(remote_bucket.keys()) | set(local_bucket.keys())
+              for key in keys:
+                  has_remote = key in remote_bucket
+                  has_local = key in local_bucket
+                  if has_remote and not has_local:
+                      merged[key] = remote_bucket[key]
+                  elif has_local and not has_remote:
+                      merged[key] = local_bucket[key]
+                  else:
+                      r_val = remote_bucket[key]
+                      l_val = local_bucket[key]
+                      # Keep the fresher entry; tie goes to remote to preserve server state.
+                      merged[key] = r_val if get_ts(r_val) >= get_ts(l_val) else l_val
+              return merged
+
+
+          def merge_cache(remote: Dict[str, Any], local: Dict[str, Any]) -> Dict[str, Any]:
+              merged = dict(remote)
+              merged["foods"] = merge_bucket(remote.get("foods", {}), local.get("foods", {}))
+              merged["barcodes"] = merge_bucket(remote.get("barcodes", {}), local.get("barcodes", {}))
+              return merged
+
+
+          cache_names = [
+              "usda_cache.json",
+              "avocavo_cache.json",
+              "openfoodfacts_cache.json",
+          ]
+
+          for name in cache_names:
+              local_path = Path("data") / name
+              remote_path = Path(".cache-sync/remote") / name
+              local_cache = load_cache(local_path)
+              remote_cache = load_cache(remote_path)
+              merged_cache = merge_cache(remote_cache, local_cache)
+              local_path.parent.mkdir(parents=True, exist_ok=True)
+              with local_path.open("w", encoding="utf-8") as f:
+                  json.dump(merged_cache, f, ensure_ascii=False, indent=2)
+              foods_count = len(merged_cache.get("foods", {}))
+              barcodes_count = len(merged_cache.get("barcodes", {}))
+              print(f"Merged {name}: foods={foods_count}, barcodes={barcodes_count}")
+          PY
+
           upload_with_retry() {
             local src="$1"
             local dst="$2"
+            local dst_new
+            dst_new="${dst%.json}_new.json"
             for i in 1 2 3 4 5; do
-              if flyctl ssh sftp put "$src" "$dst" -a "$APP_NAME"; then
-                echo "Uploaded $src"
-                return 0
+              if flyctl ssh sftp put "$src" "$dst_new" -a "$APP_NAME"; then
+                if flyctl ssh console -a "$APP_NAME" -C "mv -f '$dst_new' '$dst'"; then
+                  echo "Uploaded $dst_new and replaced $dst"
+                  return 0
+                fi
               fi
               echo "Upload failed for $src. Retry $i/5..."
+              flyctl ssh console -a "$APP_NAME" -C "rm -f '$dst_new'" >/dev/null 2>&1 || true
               sleep 8
             done
             echo "Failed to upload $src after retries"
