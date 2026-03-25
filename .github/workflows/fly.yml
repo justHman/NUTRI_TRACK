@@ -68,7 +68,7 @@ jobs:
         run: |
           for i in 1 2 3 4 5; do
             if curl -fsS "https://$APP_NAME.fly.dev/health" > /dev/null; then
-              echo "App is awake."
+              echo "App is awake attempt $i/5."
               break
             fi
             echo "Waiting for app to start... attempt $i/5"
@@ -83,14 +83,18 @@ jobs:
 
           # Best effort: download existing remote caches for two-way merge.
           fetch_remote() {
-          local name="$1"
-          local remote="/app/data/$name"
-          local local_path=".cache-sync/remote/$name"
-          if flyctl ssh sftp get "$remote" "$local_path" -a "$APP_NAME"; then
-            echo "Downloaded remote cache: $remote"
-          else
-            echo "::warning::Remote cache not found yet for $remote. Using local seed only."
-          fi
+            local name="$1"
+            local remote="/app/data/$name"
+            local local_path=".cache-sync/remote/$name"
+            if flyctl ssh console -a "$APP_NAME" -C "test -f '$remote'" >/dev/null 2>&1; then
+              if flyctl ssh sftp get "$remote" "$local_path" -a "$APP_NAME"; then
+                echo "Downloaded remote cache: $remote"
+              else
+                echo "::warning::Failed to download remote cache $remote. Using local seed only."
+              fi
+            else
+              echo "::warning::Remote cache not found yet for $remote. Using local seed only."
+            fi
           }
 
           fetch_remote usda_cache.json
@@ -201,4 +205,18 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          flyctl ssh console -a "$APP_NAME" -C "ls -lh /app/data/*.json"
+          flyctl ssh console -a "$APP_NAME" -C "ls -lh /app/data || true"
+
+          check_remote_file() {
+            local file_name="$1"
+            if flyctl ssh console -a "$APP_NAME" -C "test -f /app/data/$file_name" >/dev/null 2>&1; then
+              echo "Found /app/data/$file_name"
+            else
+              echo "::warning::Missing /app/data/$file_name"
+            fi
+          }
+
+          check_remote_file usda_cache.json
+          check_remote_file avocavo_cache.json
+          check_remote_file openfoodfacts_cache.json
+          exit 0
