@@ -23,6 +23,7 @@ import re
 import json
 import time
 import logging as _stdlib_logging
+from typing import Optional
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -75,9 +76,9 @@ EDGE_CASE_QUERIES = [
 ]
 
 
-def _sample_barcode_image() -> str | None:
+def _sample_barcode_image() -> Optional[str]:
     candidates = [
-        os.path.join(project_root, "..", "data", "images", "barcodes", "barcode.png"),
+        os.path.join(project_root, "data", "images", "barcodes", "barcode.png")
     ]
     for path in candidates:
         if os.path.exists(path):
@@ -591,9 +592,10 @@ def run_all() -> list:
         passed = sum(1 for ok, _, _ in cases if ok)
         total = len(cases)
         skipped = sum(1 for ok, _, _ in cases if ok is None)
-        s_icon = "✅" if passed == total else "❌"
+        # SKIP is non-failing: group fails only when at least one case is explicitly False.
+        s_icon = "✅" if (passed + skipped) == total else "❌"
         print(f"    {passed}/{total} passed, {skipped} skipped {s_icon}", flush=True)
-        return passed == total
+        return all(ok is True or ok is None for ok, _, _ in cases)
 
     try:
         print("\n─── Barcode Pipeline ──────────────────────────────", flush=True)

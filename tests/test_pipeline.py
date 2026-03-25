@@ -50,8 +50,8 @@ def _restore_console(saved):
 # Test images
 HUMAN_IMG = os.path.join(project_root, "data", "images", "non_task", "human.jpg")
 LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "unknow.png")
-FAST_FOOD_IMG = os.path.join(project_root, "..", "data", "images", "food", "fast_food.jpg")
-STEAK_IMG = os.path.join(project_root, "..", "data", "images", "food", "steak.png")
+FAST_FOOD_IMG = os.path.join(project_root, "data", "images", "food", "fast_food.jpg")
+STEAK_IMG = os.path.join(project_root, "data", "images", "food", "steak.png")
 
 # Bedrock pricing (approximate — adjust as needed)
 PRICE_PER_1K_INPUT = 0.00053

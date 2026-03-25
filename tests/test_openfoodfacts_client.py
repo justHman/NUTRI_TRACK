@@ -9,9 +9,6 @@ import sys
 import time
 import logging as _stdlib_logging
 import json
-import tempfile
-import shutil
-import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
