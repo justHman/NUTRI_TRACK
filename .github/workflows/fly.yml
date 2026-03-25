@@ -26,23 +26,21 @@ jobs:
           pip install -r requirements-dev.txt
           pip install -r requirements.txt
 
-      - name: Run Pytest (non-integration)
+      - name: Run Pytest 
+        id: run-pytest
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
           AVOCAVO_NUTRITION_API_KEY: ${{ secrets.AVOCAVO_NUTRITION_API_KEY }}
+        run: pytest tests
+        continue-on-error: true
+
+      - name: Warn if tests failed
+        if: steps.run-pytest.outcome == 'failure'
         run: |
-          set +e
-          pytest -m "not integration" tests -v
-          TEST_EXIT_CODE=$?
-          if [ $TEST_EXIT_CODE -ne 0 ]; then
-            echo "::warning::Pytest failed (exit code $TEST_EXIT_CODE). Skipping test gate and continuing to deploy."
-          else
-            echo "Pytest passed."
-          fi
-          exit 0
+          echo "::warning::Pytest reported failures, but pipeline is configured to continue with build and deploy."
 
   deploy:
     name: Deploy to Fly.io

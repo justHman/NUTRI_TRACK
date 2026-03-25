@@ -150,7 +150,7 @@ def _test_pipeline(qwen, client, image_path: str, image_name: str, method: str, 
             else:
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = "Correctly returned no dishes for non-food image"
+                result["notes"] = f"Correctly returned no dishes for non-food image at {image_path}"
 
     except Exception as e:
         result["notes"] = str(e)

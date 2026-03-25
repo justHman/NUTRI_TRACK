@@ -135,7 +135,7 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
             if has_label_evidence:
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = f"Detected product: {product.get('name')}"
+                result["notes"] = f"Detected product: {product.get('name', 'Unknown')} at {image_path}"
             else:
                 result["status"] = "fail"
                 result["notes"] = "Expected label detection but got no product"
@@ -144,11 +144,11 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
             if not has_label_evidence:
                 result["status"] = "pass"
                 result["success"] = True
-                result["notes"] = "Correctly returned no product for non-label image"
+                result["notes"] = f"Correctly returned no product for non-label image: {image_path}"
             else:
                 result["status"] = "fail"
                 result["success"] = False
-                result["notes"] = f"Unexpectedly detected product: {product.get('name')}"
+                result["notes"] = f"Unexpectedly detected product: {product.get('name', 'Unknown')} at {image_path}"
 
     except Exception as e:
         err_text = str(e)
