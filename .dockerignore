@@ -28,8 +28,6 @@ ENV/
 Thumbs.db
 
 # Project Specific (Data, Weights, Logs)
-data/
-logs/
 *.log
 *.pt
 *.pth
@@ -40,26 +38,36 @@ logs/
 # Notebooks & Docs
 .ipynb_checkpoints/
 *.ipynb
-docs/
 *.md
 
-# Tests & CI
-tests/
+# CI
 .github/
 
 # Docker & Git
 .git
-.gitignore
-Dockerfile
 .dockerignore
+.gitignore
+.mcp.json
 apprunner.yaml
+Dockerfile
+fly.toml
+requirements-dev.txt
 
 # AI
-.claude/
+.claude
+.code-review-graph
+.github
+.pytest_cache
+.vscode
+
+config/.env
 
 # File .py
 utils/craw_data2cache.py
 pytest.ini
 
-# Infra
+logs/
+data/
 infra/
+logs/
+tests/

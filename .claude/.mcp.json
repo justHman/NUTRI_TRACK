@@ -2,7 +2,10 @@
   "mcpServers": {
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ]
     },
     "aws-core": {
       "command": "uvx",
@@ -36,8 +39,9 @@
       }
     },
     "code-review-graph": {
-      "command": "d:\\Project\\Code\\nutritrack-documentation\\.venv\\Scripts\\code-review-graph.exe",
+      "command": "uvx",
       "args": [
+        "code-review-graph",
         "serve"
       ]
     }

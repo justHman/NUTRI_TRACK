@@ -6,7 +6,7 @@
     "markdown": true,
     "scminput": true
   },
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
   "python.analysis.extraPaths": [
     "./app"
   ],
@@ -17,5 +17,50 @@
   "python.linting.mypyEnabled": false,
   "python.linting.pylintArgs": [
     "--disable=C0114,C0115,C0116,W0613,W0603,W0602,W0604,W0621,W0622,W0623,W0624,W0625,W0626,W0627,W0628,W0629,W0630,W0631,W0632,W0633,W0634,W0635,W0636,W0637,W0638,W0639,W0640,W0641,W0642,W0643,W0644,W0645,W0646,W0647,W0648,W0649,W0650,W0651,W0652,W0653,W0654,W0655,W0656,W0657,W0658,W0659,W0660,W0661,W0662,W0663,W0664,W0665,W0666,W0667,W0668,W0669,W0670,W0671,W0672,W0673,W0674,W0675,W0676,W0677,W0678,W0679,W0680,W0681,W0682,W0683,W0684,W0685,W0686,W0687,W0688,W0689,W0690,W0691,W0692,W0693,W0694,W0695,W0696,W0697,W0698,W0699,W0700,W0701,W0702,W0703,W0704,W0705,W0706,W0707,W0708,W0709,W0710,W0711,W0712,W0713,W0714,W0715,W0716,W0717,W0718,W0719,W0720,W0721,W0722,W0723,W0724,W0725,W0726,W0727,W0728,W0729,W0730,W0731,W0732,W0733,W0734,W0735,W0736,W0737,W0738,W0739,W0740,W0741,W0742,W0743,W0744,W0745,W0746,W0747,W0748,W0749,W0750,W0751,W0752,W0753,W0754,W0755,W0756,W0757,W0758,W0759,W0760,W0761,W0762,W0763,W0764,W0765,W0766,W0767,W0768,W0769,W0770,W0771,W0772,W0773,W0774,W0775,W0776,W0777,W0778,W0779,W0780,W0781,W0782,W0783,W0784,W0785,W0786,W0787,W0788,W0789,W0790,W0791,W0792,W0793,W0794,W0795,W0796,W0797,W0798,W0799,W0800,W0801,W0802,W0803,W0804,W0805,W0806,W0807,W0808,W0809,W0810,W0811,W0812,W0813,W0814,W0815,W0816,W0817,W0818,W0819,W0820,W0821,W0822,W0823,W0824,W0825,W0826,W0827,W0828,W0829,W0830,W0831,W0832,W0833,W0834,W0835,W0836,W0837,W0838,W0839,W0840,W0841,W0842,W0843,W0844,W0845,W0846,W0847,W0848,W0849,W0850,W0851,W0852,W0853,W0854,W0855,W0856,W0857,W0858,W0859,W0860,W0861,W0862,W0863,W0864,W0865,W0866,W0867,W0868,W0869,W0870,W0871,W0872,W0873,W0874,W0875,W0876,W0877,W0878,W0879,W0880,W0881,W0882,W0883,W0884,W0885,W0886,W0887,W0888,W0889,W0890,W0891,W0892,W0893,W0894,W0895,W0896,W0897,W0898,W0899,W0900,W0901,W0902,W0903,W0904,W0905,W0906,W0907,W0908,W0909,W0910,W0911,W0912,W0913,W0914,W0915,W0916,W0917,W0918,W0919,W0920,W0921,W0922,W0923,W0924,W0925,W0926,W0927,W0928,W0929,W0930,W0931,W0"
-  ]
+  ],
+  "chat.mcp.serverSampling": {
+    "app/.vscode/mcp.json: fetch": {
+      "allowedModels": [
+        "copilot/auto",
+        "claude-code/claude-haiku-4.5",
+        "copilot/claude-haiku-4.5",
+        "copilotcli/claude-haiku-4.5",
+        "claude-code/claude-opus-4.5",
+        "claude-code/claude-opus-4.6",
+        "claude-code/claude-opus-4.6-fast",
+        "claude-code/claude-sonnet-4",
+        "claude-code/claude-sonnet-4.5",
+        "claude-code/claude-sonnet-4.6",
+        "copilot/gemini-2.5-pro",
+        "copilot/gemini-3-flash-preview",
+        "copilot/gemini-3-pro-preview",
+        "copilotcli/gemini-3-pro-preview",
+        "copilot/gemini-3.1-pro-preview",
+        "copilot/gpt-4.1",
+        "copilotcli/gpt-4.1",
+        "copilot/gpt-4o",
+        "copilot/gpt-5-mini",
+        "copilotcli/gpt-5-mini",
+        "copilot/gpt-5.1",
+        "copilotcli/gpt-5.1",
+        "copilot/gpt-5.1-codex",
+        "copilotcli/gpt-5.1-codex",
+        "copilot/gpt-5.1-codex-max",
+        "copilotcli/gpt-5.1-codex-max",
+        "copilotcli/gpt-5.1-codex-mini",
+        "copilot/gpt-5.1-codex-mini",
+        "copilot/gpt-5.2",
+        "copilotcli/gpt-5.2",
+        "copilot/gpt-5.2-codex",
+        "copilotcli/gpt-5.2-codex",
+        "copilot/gpt-5.3-codex",
+        "copilotcli/gpt-5.3-codex",
+        "copilot/gpt-5.4-mini",
+        "copilot/grok-code-fast-1",
+        "huggingface/openai/gpt-oss-120b:together",
+        "huggingface/Qwen/Qwen3-Coder-Next:fastest",
+        "copilot/oswe-vscode-prime"
+      ]
+    }
+  }
 }

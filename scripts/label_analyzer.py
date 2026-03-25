@@ -38,8 +38,6 @@ def analyze_label(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = No
     logger.title("Label Analysis Pipeline")
     logger.info("Image: %s", image_path or filename)
 
-    pipeline_start = time.time()
-
     if qwen is None:
         logger.info("Initializing Qwen3VL client...")
         qwen = Qwen3VL()

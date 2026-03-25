@@ -360,9 +360,11 @@ def convert_label_csv_to_json(text: str):
                     "nutrition": [{"nutrient": str, "value": float, "unit": str, "dv_percentage": float}, ...],
                     "ingredients": [str, ...],
                     "allergens": [str, ...],
+                    "expiry_days": Optional[int],
                     "confidence": float,
                     "note": str
-                }
+                },
+                "image_quality": str
             ]
         }
     """
@@ -370,31 +372,27 @@ def convert_label_csv_to_json(text: str):
 
     if not text:
         return {"labels": []}
-
-    # Non-label shortcut: accept exact JSON contract
-    # {
-    #   "labels": [],
-    #   "image_quality": null
-    # }
+    
     if text.startswith("{"):
         try:
             payload = json.loads(text)
             if isinstance(payload, dict) and isinstance(payload.get("labels"), list):
                 labels = payload.get("labels") or []
+                image_quality = payload.get("image_quality")
                 if len(labels) == 0:
                     logger.info("Detected non-label JSON payload with empty labels")
                     return {"labels": []}
                 # If upstream returns non-empty labels as JSON, keep compatibility.
-                return {"labels": labels}
+                return {"labels": labels, "image_quality": image_quality}
         except json.JSONDecodeError:
             logger.debug("Input starts with '{' but is not valid JSON, fallback to CSV parsing")
 
     # Split into sections by double newline
     sections = [s.strip() for s in text.split("\n\n") if s.strip()]
 
-    if len(sections) < 2:
-        logger.error(f"Expected at least 2 CSV sections, found {len(sections)}")
-        raise ValueError(f"Need at least 2 CSV sections, found {len(sections)}")
+    if len(sections) < 1:
+        logger.warning("No sections found in label CSV text, returning empty labels")
+        return {"labels": []}
 
     # Parse each section (pipe-delimited)
     products_data = parse_table_block(sections[0], delimiter="|")
@@ -416,8 +414,9 @@ def convert_label_csv_to_json(text: str):
 
     # Build output
     labels = []
+    print(products_data)
     for product in products_data:
-        product_id = (product.get("product_id") or "").strip()
+        product_id = (product.get("product_id") or "").strip() if isinstance(product.get("product_id"), str) else product.get("product_id")
         if not product_id:
             continue
 
@@ -440,6 +439,7 @@ def convert_label_csv_to_json(text: str):
             "nutrition": nutrition,
             "ingredients": ingredients_map.get(product_id, []),
             "allergens": allergens_map.get(product_id, []),
+            "expiry_days": int(product.get("expiry_days")) if str(product.get("expiry_days", "")).isdigit() else None,
             "confidence": safe_float(product.get("confidence")),
             "note": product.get("note", "")
         }
@@ -450,11 +450,18 @@ def convert_label_csv_to_json(text: str):
     return {"labels": labels}
     
 if __name__ == "__main__":
-    raw = """{
-    "labels":  [
-    ], 
-    "image_quality": null
-}
+    raw = """
+product_id|name|brand|serving_value|serving_unit|expiry_days|confidence|image_quality|note
+1|||30|g||0.9|high|
+
+product_id|nutrient|value|unit|dv_percentage
+1|Calories|150|kcal|0
+1|Total Fat|7.0|g|9
+1|Saturated Fat|3.0|g|15
+1|Sodium|240|mg|10
+1|Total Carbohydrate|20.0|g|7
+1|Sugars|3.0|g|0
+1|Protein|2.0|g|0
 """
 
     clean = clean_csv_raw_text(raw)

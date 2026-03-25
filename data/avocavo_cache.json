@@ -50604,8 +50604,10 @@
             "scaling_factor": 1.36
           },
           "portion_source": "consensus_matcher",
-          "processing_time_ms": 9.629964828491211,
+          "processing_time_ms": 108.34431648254395,
+          "restored_from_supabase": true,
           "search_method": "sql_gpt_selected",
+          "supabase_cached_at": "2026-03-22T06:58:19.875109",
           "usable": true,
           "usda_link": "https://fdc.nal.usda.gov/fdc-app.html#/food-details/171706/nutrients",
           "usda_match": {
@@ -50657,7 +50659,7 @@
       },
       "found": true,
       "message": "ingredient found",
-      "_ts": 1774203950.358236
+      "_ts": 1774431644.4257815
     }
   },
   "barcodes": {
