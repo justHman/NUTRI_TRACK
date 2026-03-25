@@ -205,18 +205,4 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          flyctl ssh console -a "$APP_NAME" -C "ls -lh /app/data || true"
-
-          check_remote_file() {
-            local file_name="$1"
-            if flyctl ssh console -a "$APP_NAME" -C "test -f /app/data/$file_name" >/dev/null 2>&1; then
-              echo "Found /app/data/$file_name"
-            else
-              echo "::warning::Missing /app/data/$file_name"
-            fi
-          }
-
-          check_remote_file usda_cache.json
-          check_remote_file avocavo_cache.json
-          check_remote_file openfoodfacts_cache.json
-          exit 0
+          flyctl ssh console -a "$APP_NAME" -C "sh -c 'ls /app/data/*.json'" 
