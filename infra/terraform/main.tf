@@ -56,8 +56,12 @@ module "ecs" {
   source = "./modules/ecs"
 
   name_prefix          = local.name_prefix
-  cluster_name         = "${local.name_prefix}-cluster"
-  service_name         = "${local.name_prefix}-service"
+  cluster_name         = coalesce(var.ecs_cluster_name, "${local.name_prefix}-cluster")
+  service_name         = coalesce(var.ecs_service_name, "${local.name_prefix}-service")
+  task_family          = coalesce(var.ecs_task_family, "${local.name_prefix}-task")
+  secondary_enabled    = var.ecs_arm_spot_enabled
+  secondary_service_name = coalesce(var.ecs_service_arm_spot_name, "${local.name_prefix}-spot-service")
+  secondary_desired_count = var.ecs_arm_spot_desired_count
   region               = var.aws_region
   container_name       = var.container_name
   container_image      = var.container_image

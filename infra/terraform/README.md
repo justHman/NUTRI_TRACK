@@ -51,6 +51,11 @@ Required repository secrets for apply:
 - `deployment_mode`: `public` or `private_alb`
 - `container_image`: Docker image URI used by ECS task definition
 - `usda_api_key`: stored in Secrets Manager and injected into ECS task
+- `ecs_cluster_name`: optional exact ECS cluster name override
+- `ecs_task_family`: optional exact ECS task definition family override
+- `ecs_service_name`: optional exact primary ECS service name override
+- `ecs_arm_spot_enabled`: create secondary ECS service (arm-spot)
+- `ecs_service_arm_spot_name`: optional exact secondary ECS service name override
 
 ## Outputs
 

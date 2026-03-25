@@ -10,6 +10,25 @@ variable "service_name" {
   type = string
 }
 
+variable "task_family" {
+  type = string
+}
+
+variable "secondary_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "secondary_service_name" {
+  type    = string
+  default = ""
+}
+
+variable "secondary_desired_count" {
+  type    = number
+  default = 1
+}
+
 variable "container_name" {
   type = string
 }

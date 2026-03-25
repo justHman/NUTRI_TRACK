@@ -11,6 +11,16 @@ container_cpu    = 1024
 container_memory = 2048
 desired_count    = 1
 
+# Optional explicit ECS naming (useful when migrating from manually created ECS resources)
+ecs_cluster_name          = null
+ecs_task_family           = null
+ecs_service_name          = null
+
+# Optional secondary service (e.g., ARM Spot)
+ecs_arm_spot_enabled       = false
+ecs_service_arm_spot_name  = null
+ecs_arm_spot_desired_count = 1
+
 # optional - set to null to auto-generate a globally unique bucket name
 s3_bucket_name   = null
 

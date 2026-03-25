@@ -32,7 +32,7 @@ env:
   ECS_SERVICE_ARM: arm-nutritrack-api-service
   ECS_SERVICE_ARM_SPOT: arm-spot-nutritrack-api-service
 
-  IMAGE_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api
+  IMAGE_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api-image
 
 # ============================================================
 # BUILD IMAGE
@@ -187,6 +187,25 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
 
+      - name: Debug deployed revision and service counts
+        run: |
+          echo "Rendered task definition file: ${{ steps.render.outputs.task-definition }}"
+          echo "Deployed task definition ARN: ${{ steps.deploy.outputs.task-definition }}"
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE_ARM_SPOT }} \
+            --query 'services[0].{service:serviceName,taskDefinition:taskDefinition,desired:desiredCount,running:runningCount,pending:pendingCount,status:status,lastEvent:events[0].message}' \
+            --output table
+
+      - name: Debug ECS autoscaling target
+        run: |
+          aws application-autoscaling describe-scalable-targets \
+            --service-namespace ecs \
+            --resource-ids service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+            --scalable-dimension ecs:service:DesiredCount \
+            --query 'ScalableTargets[].{min:MinCapacity,max:MaxCapacity,role:RoleARN}' \
+            --output table
+
 
 # ============================================================
 # DEPLOY ARM (SECONDARY / BACKUP)
@@ -226,9 +245,29 @@ jobs:
           image: ${{ env.IMAGE_REPO }}:arm-${{ github.sha }}
 
       - name: Deploy service
+        id: deploy
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.render.outputs.task-definition }}
           service: ${{ env.ECS_SERVICE_ARM }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+
+      - name: Debug deployed revision and service counts
+        run: |
+          echo "Rendered task definition file: ${{ steps.render.outputs.task-definition }}"
+          echo "Deployed task definition ARN: ${{ steps.deploy.outputs.task-definition }}"
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE_ARM }} \
+            --query 'services[0].{service:serviceName,taskDefinition:taskDefinition,desired:desiredCount,running:runningCount,pending:pendingCount,status:status,lastEvent:events[0].message}' \
+            --output table
+
+      - name: Debug ECS autoscaling target
+        run: |
+          aws application-autoscaling describe-scalable-targets \
+            --service-namespace ecs \
+            --resource-ids service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM }} \
+            --scalable-dimension ecs:service:DesiredCount \
+            --query 'ScalableTargets[].{min:MinCapacity,max:MaxCapacity,role:RoleARN}' \
+            --output table

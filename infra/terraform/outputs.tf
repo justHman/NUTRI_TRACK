@@ -13,6 +13,11 @@ output "ecs_service_name" {
   value       = module.ecs.service_name
 }
 
+output "ecs_service_arm_spot_name" {
+  description = "Secondary ECS arm-spot service name when enabled"
+  value       = module.ecs.secondary_service_name
+}
+
 output "cache_bucket_name" {
   description = "S3 cache bucket name"
   value       = module.storage.bucket_name

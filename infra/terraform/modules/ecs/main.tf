@@ -8,7 +8,7 @@ resource "aws_ecs_cluster" "this" {
 }
 
 resource "aws_ecs_task_definition" "this" {
-  family                   = "${var.name_prefix}-task"
+  family                   = var.task_family
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = tostring(var.cpu)
@@ -65,6 +65,32 @@ resource "aws_ecs_service" "this" {
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = var.desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = var.security_group_ids
+    assign_public_ip = var.assign_public_ip
+  }
+
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn != null ? [1] : []
+    content {
+      target_group_arn = var.target_group_arn
+      container_name   = var.container_name
+      container_port   = var.container_port
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.app]
+}
+
+resource "aws_ecs_service" "secondary" {
+  count           = var.secondary_enabled ? 1 : 0
+  name            = var.secondary_service_name
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.this.arn
+  desired_count   = var.secondary_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {

@@ -87,6 +87,42 @@ variable "container_name" {
   default     = "nutritrack-api-container"
 }
 
+variable "ecs_cluster_name" {
+  description = "Optional ECS cluster name override; if null, uses computed default"
+  type        = string
+  default     = null
+}
+
+variable "ecs_service_name" {
+  description = "Optional ECS service name override for primary service; if null, uses computed default"
+  type        = string
+  default     = null
+}
+
+variable "ecs_task_family" {
+  description = "Optional ECS task definition family override; if null, uses computed default"
+  type        = string
+  default     = null
+}
+
+variable "ecs_arm_spot_enabled" {
+  description = "Create a secondary ECS service (arm-spot) managed by Terraform"
+  type        = bool
+  default     = false
+}
+
+variable "ecs_service_arm_spot_name" {
+  description = "Optional ECS arm-spot service name override; only used when ecs_arm_spot_enabled=true"
+  type        = string
+  default     = null
+}
+
+variable "ecs_arm_spot_desired_count" {
+  description = "Desired count for secondary arm-spot ECS service"
+  type        = number
+  default     = 1
+}
+
 variable "s3_bucket_name" {
   description = "Optional fixed S3 bucket name for cache; if null, name is generated"
   type        = string
