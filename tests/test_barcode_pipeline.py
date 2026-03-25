@@ -77,7 +77,7 @@ EDGE_CASE_QUERIES = [
 
 def _sample_barcode_image() -> str | None:
     candidates = [
-        r"D:/Project/Code/nutritrack-documentation/app/data/images/barcodes/barcode.png"
+        os.path.join(project_root, "..", "data", "images", "barcodes", "barcode.png"),
     ]
     for path in candidates:
         if os.path.exists(path):
