@@ -1,12 +1,5 @@
 {
   "mcpServers": {
-    "fetch": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch"
-      ]
-    },
     "aws-core": {
       "command": "uvx",
       "args": [

@@ -1,13 +1,5 @@
 {
   "servers": {
-    "fetch": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch"
-      ]
-    },
     "aws-core": {
       "type": "stdio",
       "command": "uvx",
@@ -43,9 +35,9 @@
       }
     },
     "code-review-graph": {
-      "type": "stdio",
-      "command": "d:\\Project\\Code\\nutritrack-documentation\\.venv\\Scripts\\code-review-graph.exe",
+      "command": "uvx",
       "args": [
+        "code-review-graph",
         "serve"
       ]
     }
