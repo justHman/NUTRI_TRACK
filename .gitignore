@@ -42,4 +42,6 @@ logs/
 # Docker & Git
 .git
 
+requirements-current.txt
+
  

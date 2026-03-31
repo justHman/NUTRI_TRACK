@@ -52,6 +52,7 @@ apprunner.yaml
 Dockerfile
 fly.toml
 requirements-dev.txt
+requirements-current.txt
 
 # AI
 .claude
