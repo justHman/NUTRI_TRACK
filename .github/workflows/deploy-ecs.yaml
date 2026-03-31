@@ -285,3 +285,175 @@ jobs:
             --scalable-dimension ecs:service:DesiredCount \
             --query 'ScalableTargets[].{min:MinCapacity,max:MaxCapacity,role:RoleARN}' \
             --output table
+
+# ============================================================
+# SYNC CACHE → S3
+# ============================================================
+
+  sync-cache:
+    name: 🗄️ Sync Cache → S3
+    runs-on: ubuntu-latest
+    # Run after at least one deploy succeeds; always attempt even if arm is skipped
+    needs: [deploy-arm-spot, deploy-arm]
+    if: always() && needs.deploy-arm-spot.result != 'skipped'
+
+    env:
+      S3_BUCKET: ${{ secrets.CACHE_S3_BUCKET }}
+      S3_PREFIX: cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── Step 1: Pull remote caches from S3 ──────────────────────────────
+      - name: Pull remote cache from S3
+        run: |
+          mkdir -p .cache-sync/remote
+
+          fetch_remote() {
+            local name="$1"
+            local s3_key="s3://${S3_BUCKET}/${S3_PREFIX}/${name}"
+            local local_path=".cache-sync/remote/${name}"
+
+            if aws s3 cp "$s3_key" "$local_path" 2>/dev/null; then
+              echo "Downloaded remote cache: $s3_key"
+            else
+              echo "::warning::Remote cache not found in S3: $s3_key. Using local seed only."
+            fi
+          }
+
+          fetch_remote usda_cache.json
+          fetch_remote avocavo_cache.json
+          fetch_remote openfoodfacts_cache.json
+
+      # ── Step 2: Merge remote + local with timestamp-based strategy ───────
+      - name: Merge remote + local cache
+        run: |
+          python << 'PY'
+          import json
+          from pathlib import Path
+          from typing import Any, Dict
+
+
+          def load_cache(path: Path) -> Dict[str, Any]:
+              if not path.exists():
+                  return {"foods": {}, "barcodes": {}}
+              try:
+                  with path.open("r", encoding="utf-8") as f:
+                      data = json.load(f)
+                  if not isinstance(data, dict):
+                      return {"foods": {}, "barcodes": {}}
+                  data.setdefault("foods", {})
+                  data.setdefault("barcodes", {})
+                  return data
+              except Exception:
+                  return {"foods": {}, "barcodes": {}}
+
+
+          def get_ts(entry: Any) -> float:
+              if isinstance(entry, dict):
+                  ts = entry.get("_ts", 0)
+                  try:
+                      return float(ts)
+                  except Exception:
+                      return 0.0
+              return 0.0
+
+
+          def merge_bucket(remote_bucket: Dict[str, Any], local_bucket: Dict[str, Any]) -> Dict[str, Any]:
+              merged: Dict[str, Any] = {}
+              keys = set(remote_bucket.keys()) | set(local_bucket.keys())
+              for key in keys:
+                  has_remote = key in remote_bucket
+                  has_local  = key in local_bucket
+                  if has_remote and not has_local:
+                      merged[key] = remote_bucket[key]
+                  elif has_local and not has_remote:
+                      merged[key] = local_bucket[key]
+                  else:
+                      r_val = remote_bucket[key]
+                      l_val = local_bucket[key]
+                      # Keep the fresher entry; tie goes to remote to preserve server state.
+                      merged[key] = r_val if get_ts(r_val) >= get_ts(l_val) else l_val
+              return merged
+
+
+          def merge_cache(remote: Dict[str, Any], local: Dict[str, Any]) -> Dict[str, Any]:
+              merged = dict(remote)
+              merged["foods"]    = merge_bucket(remote.get("foods",    {}), local.get("foods",    {}))
+              merged["barcodes"] = merge_bucket(remote.get("barcodes", {}), local.get("barcodes", {}))
+              return merged
+
+
+          cache_names = [
+              "usda_cache.json",
+              "avocavo_cache.json",
+              "openfoodfacts_cache.json",
+          ]
+
+          for name in cache_names:
+              local_path  = Path("data") / name
+              remote_path = Path(".cache-sync/remote") / name
+              local_cache  = load_cache(local_path)
+              remote_cache = load_cache(remote_path)
+              merged_cache = merge_cache(remote_cache, local_cache)
+              local_path.parent.mkdir(parents=True, exist_ok=True)
+              with local_path.open("w", encoding="utf-8") as f:
+                  json.dump(merged_cache, f, ensure_ascii=False, indent=2)
+              foods_count    = len(merged_cache.get("foods", {}))
+              barcodes_count = len(merged_cache.get("barcodes", {}))
+              print(f"Merged {name}: foods={foods_count}, barcodes={barcodes_count}")
+          PY
+
+      # ── Step 3: Upload merged cache back to S3 (_new → rename) ──────────
+      - name: Upload merged cache to S3
+        run: |
+          upload_with_retry() {
+            local src="$1"
+            local name="$(basename $src)"
+            local s3_dst="s3://${S3_BUCKET}/${S3_PREFIX}/${name}"
+            local s3_dst_new="s3://${S3_BUCKET}/${S3_PREFIX}/${name%.json}_new.json"
+
+            for i in 1 2 3 4 5; do
+              # Upload as _new first
+              if aws s3 cp "$src" "$s3_dst_new"; then
+                # Atomic rename: copy _new → final, then delete _new
+                if aws s3 cp "$s3_dst_new" "$s3_dst" && \
+                   aws s3 rm "$s3_dst_new"; then
+                  echo "✅ Uploaded and renamed: $s3_dst"
+                  return 0
+                else
+                  echo "::warning::Rename failed for $s3_dst_new → $s3_dst. Attempting direct overwrite..."
+                  # Fallback: overwrite directly (already uploaded as _new)
+                  if aws s3 cp "$src" "$s3_dst"; then
+                    aws s3 rm "$s3_dst_new" 2>/dev/null || true
+                    echo "✅ Direct overwrite succeeded: $s3_dst"
+                    return 0
+                  fi
+                fi
+              fi
+
+              echo "Upload failed for $src. Retry $i/5..."
+              aws s3 rm "$s3_dst_new" 2>/dev/null || true
+              sleep 8
+            done
+
+            echo "::error::Failed to upload $src after 5 retries."
+            return 1
+          }
+
+          upload_with_retry data/usda_cache.json
+          upload_with_retry data/avocavo_cache.json
+          upload_with_retry data/openfoodfacts_cache.json
+
+      # ── Step 4: Verify ───────────────────────────────────────────────────
+      - name: Verify S3 cache files
+        run: |
+          aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" --human-readable

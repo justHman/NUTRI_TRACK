@@ -31,8 +31,8 @@ FAST_FOOD_IMG = os.path.join(project_root, "data", "images", "dishes", "fast_foo
 STEAK_IMG = os.path.join(project_root, "data", "images", "dishes", "steak.png")
 
 # Bedrock pricing (approximate — adjust as needed)
-PRICE_PER_1K_INPUT = 0.00053
-PRICE_PER_1K_OUTPUT = 0.00266
+PRICE_PER_1K_INPUT = os.getenv("PRICE_PER_1K_INPUT", 0.00053)
+PRICE_PER_1K_OUTPUT = os.getenv("PRICE_PER_1K_OUTPUT", 0.00266)
 
 
 def _test_pipeline(qwen, client, image_path: str, image_name: str, method: str, expect_dishes: bool = True) -> dict:
@@ -64,7 +64,6 @@ def _test_pipeline(qwen, client, image_path: str, image_name: str, method: str, 
         from scripts.pipeline import analyze_nutrition
 
         cache_before = client.cache_stats()
-        qwen.reset_usage()
 
         start = time.time()
         data = analyze_nutrition(
@@ -82,10 +81,10 @@ def _test_pipeline(qwen, client, image_path: str, image_name: str, method: str, 
 
         # Token usage & pricing
         result["bedrock_calls"] = qwen.bedrock_calls
-        result["token_input"] = qwen.input_tokens
-        result["token_output"] = qwen.output_tokens
-        result["price_input"] = round(qwen.input_tokens / 1000 * PRICE_PER_1K_INPUT, 4)
-        result["price_output"] = round(qwen.output_tokens / 1000 * PRICE_PER_1K_OUTPUT, 4)
+        result["token_input"] = qwen.token_input
+        result["token_output"] = qwen.token_output
+        result["price_input"] = round(qwen.price_input, 4)
+        result["price_output"] = round(qwen.price_output, 4)
 
         # USDA call estimates from cache delta
         l1_delta = cache_after["l1_entries"] - cache_before["l1_entries"]

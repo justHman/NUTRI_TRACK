@@ -25,8 +25,8 @@ with open(os.path.join(_config_dir, "nutrition_tool_config.json"), "r", encoding
 logger.debug("Loaded nutrition_tool_config.json: %d tools", len(NUTRITION_TOOL_CONFIG.get("tools", [])))
 
 
-
-
+PRICE_PER_1K_INPUT: float = float(os.getenv("PRICE_PER_1K_INPUT", 0.00053))
+PRICE_PER_1K_OUTPUT: float = float(os.getenv("PRICE_PER_1K_OUTPUT", 0.00266))
 
 # ─── Qwen3 VL Client ─────────────────────────────────────────────────────────
 
@@ -39,11 +39,11 @@ class Qwen3VL:
     3. analyze_with_tool_calling() — Converse API + toolConfig (function calling loop)
     """
 
-    def __init__(self, region=None, model_id="qwen.qwen3-vl-235b-a22b"):
+    def __init__(self, region=None, model_id=os.getenv("MODEL_ID", "qwen.qwen3-vl-235b-a22b")):
         self.model_id = model_id
         # Ưu tiên lấy từ biến môi trường, nếu không có thì dùng mặc định us-east-1
         self.region = region or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
-        logger.title("Initializing Qwen3VL")
+        logger.title("Initializing " + os.getenv("MODEL_ID", "qwen.qwen3-vl-235b-a22b"))
         logger.info("model=%s, region=%s", model_id, self.region)
 
         # Boto3 sẽ tự động tìm AWS_ACCESS_KEY_ID và AWS_SECRET_ACCESS_KEY 
@@ -55,23 +55,33 @@ class Qwen3VL:
         )
         logger.debug("Bedrock runtime client created for region=%s", self.region)
 
-        self.input_tokens = 0
-        self.output_tokens = 0
+        self.token_input = 0
+        self.price_input = 0.0
+        self.token_output = 0
+        self.price_output = 0.0
         self.bedrock_calls = 0
 
     def reset_usage(self):
         """Reset the token usage counters."""
-        self.input_tokens = 0
-        self.output_tokens = 0
+        self.token_input = 0
+        self.price_input = 0.0
+        self.token_output = 0
+        self.price_output = 0.0
         self.bedrock_calls = 0
 
-        logger.info("Qwen3VL ready! (model=%s, region=%s)", self.model_id, self.region)
+        logger.info("%s ready! (model=%s, region=%s)",os.getenv("MODEL_ID", "qwen.qwen3-vl-235b-a22b"), self.model_id, self.region)
+
+    def _compute_price(self):
+        """Recalculate input/output price from current token counts."""
+        self.price_input = float(self.token_input * PRICE_PER_1K_INPUT / 1000)
+        self.price_output = float(self.token_output * PRICE_PER_1K_OUTPUT / 1000)
 
     # ─── Method 1: Converse API (Manual JSON parsing) ────────────────────
 
     def analyze(self, image_path: Optional[str] = None, prompt: str = "",
                 system_prompt: Optional[str] = None, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> BaseModel:
         """Generic image analysis with structured Pydantic output (Converse API)"""
+        self.reset_usage()
         if image_bytes is None:
             if not image_path or not os.path.exists(image_path):
                 logger.error("Image not found: %s", image_path)
@@ -107,15 +117,16 @@ class Qwen3VL:
         # Add system prompt if provided
         if system_prompt:
             converse_kwargs["system"] = [{"text": system_prompt}]
-
+        
         response = self.client.converse(**converse_kwargs)
         self.bedrock_calls += 1
 
         if "usage" in response:
-            self.input_tokens += response["usage"].get("inputTokens", 0)
-            self.output_tokens += response["usage"].get("outputTokens", 0)
+            self.token_input += response["usage"].get("inputTokens", 0)
+            self.token_output += response["usage"].get("outputTokens", 0)
 
         raw_text = response["output"]["message"]["content"][0]["text"]
+        self._compute_price()
         return raw_text
     # ─── Method 2: Converse API + Tool Calling (Function Calling) ────────
 
@@ -124,6 +135,7 @@ class Qwen3VL:
                                    client=None, system_prompt: Optional[str] = None,
                                    max_tool_rounds: int = 1, image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> str:
         """Image analysis with tool calling (Converse API + toolConfig)"""
+        self.reset_usage()
         if image_bytes is None:
             if not image_path or not os.path.exists(image_path):
                 logger.error("Image not found: %s", image_path)
@@ -168,8 +180,8 @@ class Qwen3VL:
             self.bedrock_calls += 1
 
             if "usage" in response:
-                self.input_tokens += response["usage"].get("inputTokens", 0)
-                self.output_tokens += response["usage"].get("outputTokens", 0)
+                self.token_input += response["usage"].get("inputTokens", 0)
+                self.token_output += response["usage"].get("outputTokens", 0)
 
             stop_reason = response.get("stopReason", "end_turn")
             output_message = response["output"]["message"]
@@ -179,6 +191,7 @@ class Qwen3VL:
             # If model is done (no more tool calls), return the text
             if stop_reason != "tool_use":
                 final_text = "".join(block.get("text", "") for block in output_message.get("content", []) if "text" in block)
+                self._compute_price()
                 logger.info("[ToolCalling] Final response received (%d tokens): %s\n...", count_tokens(str(final_text)), str(final_text)[:500])
                 return final_text
 
@@ -274,12 +287,13 @@ class Qwen3VL:
         response = self.client.converse(**converse_kwargs)
         self.bedrock_calls += 1
         if "usage" in response:
-            self.input_tokens += response["usage"].get("inputTokens", 0)
-            self.output_tokens += response["usage"].get("outputTokens", 0)
+            self.token_input += response["usage"].get("inputTokens", 0)
+            self.token_output += response["usage"].get("outputTokens", 0)
             
         output_message = response["output"]["message"]
         final_text = "".join(block.get("text", "") for block in output_message.get("content", []) if "text" in block)
         
+        self._compute_price()
         logger.info("[ToolCalling] Final attempt received (%d tokens): %s", count_tokens(final_text), str(final_text)[:500])
         return final_text
 

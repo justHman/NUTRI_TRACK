@@ -229,7 +229,7 @@ def scan_barcode_from_image(image_source) -> Optional[str]:
             return None
 
         if not results:
-            logger.warning("No barcode detected in image")
+            logger.warning("No barcode detected in image: ", results)
             return None
 
         code = results[0].text

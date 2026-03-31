@@ -23,6 +23,8 @@ source = "nutritrack_data"
 destination = "/app/data"
 
 [env]
+  PRICE_PER_1K_INPUT = 0.00053
+  PRICE_PER_1K_OUTPUT = 0.00266
   HOST = "0.0.0.0"
   PORT = "8000"
   LOG_LEVEL = "INFO"

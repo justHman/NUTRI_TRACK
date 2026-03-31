@@ -26,8 +26,8 @@ FAST_FOOD_IMG = os.path.join(project_root, "data", "images", "dishes", "fast_foo
 STEAK_IMG = os.path.join(project_root, "data", "images", "dishes", "steak.png")
 
 # Bedrock pricing (approximate — adjust as needed)
-PRICE_PER_1K_INPUT = 0.00053
-PRICE_PER_1K_OUTPUT = 0.00266
+PRICE_PER_1K_INPUT = os.getenv("PRICE_PER_1K_INPUT", 0.00053)
+PRICE_PER_1K_OUTPUT = os.getenv("PRICE_PER_1K_OUTPUT", 0.00266)
 
 
 def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool) -> dict:
@@ -56,8 +56,6 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
     try:
         from scripts.label_analyzer import analyze_label
 
-        qwen.reset_usage()
-
         start = time.time()
         data = analyze_label(image_path=image_path, qwen=qwen)
         elapsed = time.time() - start
@@ -67,10 +65,10 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
 
         # Token usage & pricing
         result["bedrock_calls"] = qwen.bedrock_calls
-        result["token_input"] = qwen.input_tokens
-        result["token_output"] = qwen.output_tokens
-        result["price_input"] = round(qwen.input_tokens / 1000 * PRICE_PER_1K_INPUT, 4)
-        result["price_output"] = round(qwen.output_tokens / 1000 * PRICE_PER_1K_OUTPUT, 4)
+        result["token_input"] = qwen.token_input
+        result["token_output"] = qwen.token_output
+        result["price_input"] = round(qwen.price_input, 4)
+        result["price_output"] = round(qwen.price_output, 4)
 
         # Label analyzer now returns LabelList schema: {"labels": [ ... ]}
         labels = data.get("labels", []) if isinstance(data, dict) else []

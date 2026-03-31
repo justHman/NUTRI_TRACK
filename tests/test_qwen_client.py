@@ -70,8 +70,8 @@ def _test_method1_converse(qwen, image_path: str, image_name: str) -> dict:
         elapsed = time.time() - start
 
         result["time_s"] = round(elapsed, 2)
-        result["token_input"] = qwen.input_tokens
-        result["token_output"] = qwen.output_tokens
+        result["token_input"] = qwen.token_input
+        result["token_output"] = qwen.token_output
         result["bedrock_calls"] = 1
         result["raw_output"] = food_list.model_dump()
 
@@ -120,8 +120,8 @@ def _test_method3_tools(qwen, image_path: str, image_name: str) -> dict:
         cache_after = client.cache_stats()
 
         result["time_s"] = round(elapsed, 2)
-        result["token_input"] = qwen.input_tokens
-        result["token_output"] = qwen.output_tokens
+        result["token_input"] = qwen.token_input
+        result["token_output"] = qwen.token_output
         result["raw_output"] = food_list.model_dump()
 
         # Estimate USDA calls from cache delta
