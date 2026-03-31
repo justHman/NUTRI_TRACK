@@ -1,0 +1,71 @@
+digraph "NutriTrack Secure AWS Architecture" {
+	graph [fontcolor="#2D3436" fontname="Sans-Serif" fontsize=15 label="NutriTrack Secure AWS Architecture" nodesep=0.60 pad=2.0 rankdir=LR ranksep=0.75 splines=ortho]
+	node [fixedsize=true fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13 height=1.4 imagescale=true labelloc=b shape=box style=rounded width=1.4]
+	edge [color="#7B8894"]
+	e20561ac9f4e46f1b499ca29a64c8e9b [label="Client
+Web / Mobile / Postman" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/general\user.png" shape=none]
+	subgraph "cluster_AWS Cloud" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="AWS Cloud" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		ed1f962d1d4944c091157db72c7f06bf [label="AWS WAF" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/security\waf.png" shape=none]
+		aab865f40f1843fab4bd00eaa86e45a2 [label="Amazon API Gateway
+Rate Limit" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/mobile\api-gateway.png" shape=none]
+		subgraph cluster_VPC {
+			graph [bgcolor="#EBF3E7" fontname="Sans-Serif" fontsize=12 label=VPC labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			"727b5a080c9144009b5fdda565901e75" [label="VPC Link" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\endpoint.png" shape=none]
+			subgraph "cluster_Public Subnet" {
+				graph [bgcolor="#ECE8F6" fontname="Sans-Serif" fontsize=12 label="Public Subnet" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+				b84dd87f71f748ddbb259cddd2508458 [label="Application Load Balancer" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\elb-application-load-balancer.png" shape=none]
+				a9b73780d5274bdead66047a74d87f85 [label="NAT Gateway" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\nat-gateway.png" shape=none]
+				e0fbfbc552644f768a984b27f7fdd00c [label="Internet Gateway" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\internet-gateway.png" shape=none]
+			}
+			subgraph "cluster_Private Subnet" {
+				graph [bgcolor="#ECE8F6" fontname="Sans-Serif" fontsize=12 label="Private Subnet" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+				a60bb1f22a8a455f9466d38e54565c18 [label="ECS Fargate Task
+NutriTrack API
+No Public IP" height=2.7 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/compute\fargate.png" shape=none]
+				"2a71b0f79185470cbdd5a119b1aef679" [label="Auto Scaling
+CPU/RAM" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/compute\application-auto-scaling.png" shape=none]
+			}
+			subgraph "cluster_VPC Endpoints" {
+				graph [bgcolor="#ECE8F6" fontname="Sans-Serif" fontsize=12 label="VPC Endpoints" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+				"35c0cc24e8c54aae9e4ff5be648b4dc4" [label="S3 Gateway Endpoint" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\endpoint.png" shape=none]
+				bdc7ead894054000b8db498efd0ac5ed [label="Interface Endpoints
+Bedrock, ECR, CW, Secrets" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\endpoint.png" shape=none]
+			}
+		}
+		subgraph "cluster_AWS Services" {
+			graph [bgcolor="#EBF3E7" fontname="Sans-Serif" fontsize=12 label="AWS Services" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			be81d57f020f4385aef1dc84bf7b7ea0 [label="Amazon Bedrock
+Qwen3-VL-235B" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/ml\bedrock.png" shape=none]
+			"3b348faac594433bbb198fd31ce517b2" [label="Amazon S3
+Cache Results" height=2.3 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/storage\simple-storage-service-s3.png" shape=none]
+			"4317330bdae24a158950f5840509679b" [label="Amazon ECR" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/compute\ec2-container-registry.png" shape=none]
+			"6713432a20904b619d5d93a01e70fc92" [label="Secrets Manager" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/security\secrets-manager.png" shape=none]
+			"1c0993710f4143d2bd8df51bc34764e2" [label="CloudWatch Logs" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/management\cloudwatch-logs.png" shape=none]
+		}
+	}
+	subgraph "cluster_External APIs (third_apis)" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="External APIs (third_apis)" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		ae3b75757acc4b96b59018693a5964f8 [label="USDA API" height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\endpoint.png" shape=none]
+		"4f07d5349764418c9b1dfad49379b103" [label=OpenFoodFacts height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\endpoint.png" shape=none]
+		afd87161c3c14d248cc58ce9ee24cde7 [label=AvocavoNutrition height=1.9 image="C:\Users\Ngô Hoài Nam\AppData\Local\uv\cache\archive-v0\MWyx6o7ajDBhVgnWQy1Ym\Lib\site-packages\resources/aws/network\endpoint.png" shape=none]
+	}
+	e20561ac9f4e46f1b499ca29a64c8e9b -> ed1f962d1d4944c091157db72c7f06bf [label="/analyze" dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	ed1f962d1d4944c091157db72c7f06bf -> aab865f40f1843fab4bd00eaa86e45a2 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	aab865f40f1843fab4bd00eaa86e45a2 -> "727b5a080c9144009b5fdda565901e75" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"727b5a080c9144009b5fdda565901e75" -> b84dd87f71f748ddbb259cddd2508458 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	b84dd87f71f748ddbb259cddd2508458 -> a60bb1f22a8a455f9466d38e54565c18 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"2a71b0f79185470cbdd5a119b1aef679" -> a60bb1f22a8a455f9466d38e54565c18 [label=scales dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13 style=dashed]
+	a60bb1f22a8a455f9466d38e54565c18 -> a9b73780d5274bdead66047a74d87f85 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	a9b73780d5274bdead66047a74d87f85 -> e0fbfbc552644f768a984b27f7fdd00c [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	e0fbfbc552644f768a984b27f7fdd00c -> ae3b75757acc4b96b59018693a5964f8 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	e0fbfbc552644f768a984b27f7fdd00c -> "4f07d5349764418c9b1dfad49379b103" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	e0fbfbc552644f768a984b27f7fdd00c -> afd87161c3c14d248cc58ce9ee24cde7 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	a60bb1f22a8a455f9466d38e54565c18 -> "35c0cc24e8c54aae9e4ff5be648b4dc4" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"35c0cc24e8c54aae9e4ff5be648b4dc4" -> "3b348faac594433bbb198fd31ce517b2" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	a60bb1f22a8a455f9466d38e54565c18 -> bdc7ead894054000b8db498efd0ac5ed [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	bdc7ead894054000b8db498efd0ac5ed -> be81d57f020f4385aef1dc84bf7b7ea0 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	bdc7ead894054000b8db498efd0ac5ed -> "4317330bdae24a158950f5840509679b" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	bdc7ead894054000b8db498efd0ac5ed -> "6713432a20904b619d5d93a01e70fc92" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	bdc7ead894054000b8db498efd0ac5ed -> "1c0993710f4143d2bd8df51bc34764e2" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+}

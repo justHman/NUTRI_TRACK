@@ -17,6 +17,20 @@ on:
         default: false
 
 jobs:
+  scan:
+    name: 🛡️ Scan Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   apply:
     name: Apply (${{ inputs.environment }})
     runs-on: ubuntu-latest

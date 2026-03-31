@@ -10,41 +10,30 @@ import time
 import subprocess
 import requests
 import pytest
-import logging as _stdlib_logging
+from jose import jwt
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.logging_config import get_logger
+from utils.test_helpers import require_api_integration_env, silence_console, restore_console
 
 logger = get_logger(__name__)
 
-
-def _require_api_integration_env() -> None:
-    required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
-    missing = [v for v in required_vars if not os.getenv(v)]
-    if missing:
-        pytest.skip(f"Missing AWS credentials for API integration tests: {', '.join(missing)}")
-
-
-# ── Console-silence helpers ──────────────────────────────────────────────────
-
-def _silence_console():
-    root = _stdlib_logging.getLogger()
-    saved = []
-    for h in root.handlers:
-        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
-            saved.append((h, h.level))
-            h.setLevel(_stdlib_logging.WARNING)
-    return saved
-
-
-def _restore_console(saved):
-    for h, level in saved:
-        h.setLevel(level)
-
 BASE_URL = "http://localhost:8000"
+
+SECRET_KEY = os.getenv("NUTRITRACK_API_KEY", "nutritrack_api_super_secret_key")
+VALID_TOKEN = jwt.encode(
+    {
+        "service": "backend",
+        "exp": int(time.time()) + 3600
+    }, 
+    SECRET_KEY, 
+    algorithm="HS256"
+)
+AUTH_HEADERS = {"Authorization": f"Bearer {VALID_TOKEN}"}
+
 LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "hao_hao.jpg")
 FOOD_IMG = os.path.join(project_root, "data", "images", "dishes", "com_tam.jpg")
 FAST_FOOD_IMG = os.path.join(project_root, "data", "images", "dishes", "fast_food.jpg")
@@ -113,6 +102,7 @@ def _test_analyze_food(image_path: str, image_name: str, method: str = "tools") 
             files = {"file": (os.path.basename(image_path), f, "image/jpeg")}
             resp = requests.post(
                 f"{BASE_URL}/analyze-food",
+                headers=AUTH_HEADERS,
                 files=files,
                 params={"method": method},
                 timeout=180,
@@ -157,6 +147,7 @@ def _test_analyze_food_invalid_method() -> dict:
             files = {"file": (os.path.basename(FOOD_IMG), f, "image/jpeg")}
             resp = requests.post(
                 f"{BASE_URL}/analyze-food",
+                headers=AUTH_HEADERS,
                 files=files,
                 params={"method": "invalid_method"},
                 timeout=10,
@@ -184,7 +175,7 @@ def _test_analyze_food_invalid_file() -> dict:
     }
     try:
         files = {"file": ("test.txt", b"not an image", "text/plain")}
-        resp = requests.post(f"{BASE_URL}/analyze-food", files=files, timeout=10)
+        resp = requests.post(f"{BASE_URL}/analyze-food", headers=AUTH_HEADERS, files=files, timeout=10)
         result["status_code"] = resp.status_code
         if resp.status_code == 400:
             result["success"] = True
@@ -217,7 +208,7 @@ def _test_analyze_label(image_path: str, image_name: str, expect_label: bool) ->
         start = time.time()
         with open(image_path, "rb") as f:
             files = {"file": (os.path.basename(image_path), f, "image/jpeg")}
-            resp = requests.post(f"{BASE_URL}/analyze-label", files=files, timeout=120)
+            resp = requests.post(f"{BASE_URL}/analyze-label", headers=AUTH_HEADERS, files=files, timeout=120)
         elapsed = time.time() - start
 
         result["status_code"] = resp.status_code
@@ -262,7 +253,7 @@ def _test_analyze_label_invalid_file() -> dict:
     }
     try:
         files = {"file": ("test.txt", b"not an image", "text/plain")}
-        resp = requests.post(f"{BASE_URL}/analyze-label", files=files, timeout=10)
+        resp = requests.post(f"{BASE_URL}/analyze-label", headers=AUTH_HEADERS, files=files, timeout=10)
         result["status_code"] = resp.status_code
         if resp.status_code == 400:
             result["success"] = True
@@ -296,7 +287,7 @@ def _test_scan_barcode(image_path: str, image_name: str) -> dict:
         start = time.time()
         with open(image_path, "rb") as f:
             files = {"file": (os.path.basename(image_path), f, "image/png")}
-            resp = requests.post(f"{BASE_URL}/scan-barcode", files=files, timeout=30)
+            resp = requests.post(f"{BASE_URL}/scan-barcode", headers=AUTH_HEADERS, files=files, timeout=30)
         elapsed = time.time() - start
 
         result["status_code"] = resp.status_code
@@ -332,7 +323,7 @@ def _test_scan_barcode_invalid_file() -> dict:
     }
     try:
         files = {"file": ("test.txt", b"not an image", "text/plain")}
-        resp = requests.post(f"{BASE_URL}/scan-barcode", files=files, timeout=10)
+        resp = requests.post(f"{BASE_URL}/scan-barcode", headers=AUTH_HEADERS, files=files, timeout=10)
         result["status_code"] = resp.status_code
         if resp.status_code == 400:
             result["success"] = True
@@ -364,7 +355,7 @@ def _test_scan_barcode_no_barcode() -> dict:
         start = time.time()
         with open(FOOD_IMG, "rb") as f:
             files = {"file": (os.path.basename(FOOD_IMG), f, "image/jpeg")}
-            resp = requests.post(f"{BASE_URL}/scan-barcode", files=files, timeout=30)
+            resp = requests.post(f"{BASE_URL}/scan-barcode", headers=AUTH_HEADERS, files=files, timeout=30)
         elapsed = time.time() - start
 
         result["status_code"] = resp.status_code
@@ -394,7 +385,7 @@ def run_all() -> list:
     Returns:
         List of result dicts
     """
-    _saved = _silence_console()
+    _saved = silence_console()
     try:
         print("\n─── API Endpoint Tests ───────────────────────────────────────────────────")
         all_results = []
@@ -472,7 +463,7 @@ def run_all() -> list:
         print(f"  {passed}/{len(all_results)} passed {icon}\n", flush=True)
         return all_results
     finally:
-        _restore_console(_saved)
+        restore_console(_saved)
 
 
 def _is_server_ready() -> bool:
@@ -527,7 +518,7 @@ def ensure_api_server():
 
 @pytest.mark.integration
 def test_api_endpoints_suite(ensure_api_server):
-    _require_api_integration_env()
+    require_api_integration_env()
     results = run_all()
     failed = [r for r in results if not r.get("success")]
     assert not failed, f"API endpoint suite failed: {failed}"

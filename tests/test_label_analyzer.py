@@ -15,32 +15,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.logging_config import get_logger
+from utils.test_helpers import require_api_integration_env, silence_console, restore_console
 
 logger = get_logger(__name__)
-
-
-def _require_bedrock_env() -> None:
-    required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
-    missing = [v for v in required_vars if not os.getenv(v)]
-    if missing:
-        pytest.skip(f"Missing AWS credentials for Bedrock tests: {', '.join(missing)}")
-
-
-# ── Console-silence helpers ──────────────────────────────────────────────────
-
-def _silence_console():
-    root = _stdlib_logging.getLogger()
-    saved = []
-    for h in root.handlers:
-        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
-            saved.append((h, h.level))
-            h.setLevel(_stdlib_logging.WARNING)
-    return saved
-
-
-def _restore_console(saved):
-    for h, level in saved:
-        h.setLevel(level)
 
 # Test images
 LABEL_IMG = os.path.join(project_root, "data", "images", "labels", "unknow.png")
@@ -174,7 +151,7 @@ def run_all(qwen) -> dict:
     Returns:
         List of result dicts
     """
-    _saved = _silence_console()
+    _saved = silence_console()
     try:
         print("\n─── Label Analyzer Tests ─────────────────────────────────────────────────")
         all_results = []
@@ -213,12 +190,12 @@ def run_all(qwen) -> dict:
         print(f"  {passed}/{len(all_results)} passed {icon}\n", flush=True)
         return all_results
     finally:
-        _restore_console(_saved)
+        restore_console(_saved)
 
 
 @pytest.mark.integration
 def test_label_analyzer_suite():
-    _require_bedrock_env()
+    require_api_integration_env()
 
     from models.QWEN3VL import Qwen3VL
 

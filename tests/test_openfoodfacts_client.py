@@ -15,25 +15,10 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.logging_config import get_logger
+from utils.test_helpers import silence_console, restore_console
 
 logger = get_logger(__name__)
 
-
-# ── Console-silence helpers ──────────────────────────────────────────────────
-
-def _silence_console():
-    root = _stdlib_logging.getLogger()
-    saved = []
-    for h in root.handlers:
-        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
-            saved.append((h, h.level))
-            h.setLevel(_stdlib_logging.WARNING)
-    return saved
-
-
-def _restore_console(saved):
-    for h, level in saved:
-        h.setLevel(level)
 
 
 # ── Test queries ─────────────────────────────────────────────────────────────
@@ -767,7 +752,7 @@ def run_all(client) -> list:
     Returns:
         List of booleans, one per test group (True = all cases in group passed)
     """
-    _saved = _silence_console()
+    _saved = silence_console()
     group_results = []
 
     def _print_group(tag, cases):
@@ -816,7 +801,7 @@ def run_all(client) -> list:
         print(f"  {passed}/{total} groups passed {icon}\n", flush=True)
         return group_results
     finally:
-        _restore_console(_saved)
+        restore_console(_saved)
 
 
 def test_openfoodfacts_client_suite():

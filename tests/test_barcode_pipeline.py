@@ -21,7 +21,7 @@ import os
 import sys
 import re
 import json
-import time
+from dotenv import load_dotenv
 import logging as _stdlib_logging
 from typing import Optional
 
@@ -29,31 +29,12 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from dotenv import load_dotenv
-load_dotenv(os.path.join(project_root, "config", ".env"))
-
 from scripts import scan_barcode as barcode_module
 from config.logging_config import get_logger
+from utils.test_helpers import silence_console, restore_console
 
+load_dotenv(os.path.join(project_root, "config", ".env"))
 logger = get_logger(__name__)
-
-
-# ── Console-silence helpers ──────────────────────────────────────────────────
-
-def _silence_console():
-    root = _stdlib_logging.getLogger()
-    saved = []
-    for h in root.handlers:
-        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
-            saved.append((h, h.level))
-            h.setLevel(_stdlib_logging.WARNING)
-    return saved
-
-
-def _restore_console(saved):
-    for h, level in saved:
-        h.setLevel(level)
-
 
 # ── Test data ─────────────────────────────────────────────────────────────────
 
@@ -580,7 +561,7 @@ def _test_end_to_end_with_bytes_image() -> list:
 def run_all() -> list:
     """Run all barcode pipeline and USDA client tests and return list of group pass/fail booleans."""
 
-    _saved = _silence_console()
+    _saved = silence_console()
     group_results = []
     logger.title("Barcode Pipeline")
 
@@ -623,7 +604,7 @@ def run_all() -> list:
         print(f"  {passed}/{total} groups passed {icon}\n", flush=True)
         return group_results
     finally:
-        _restore_console(_saved)
+        restore_console(_saved)
 
 def test_barcode_pipeline_suite():
     """Test function for pytest discovery."""

@@ -39,7 +39,8 @@
       "args": [
         "code-review-graph",
         "serve"
-      ]
+      ],
+      "type": "stdio"
     }
-  }
+  },
 }

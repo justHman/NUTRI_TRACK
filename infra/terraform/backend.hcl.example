@@ -1,7 +1,0 @@
-# Copy to backend.hcl and fill real values before `terraform init`.
-# terraform init -backend-config=backend.hcl
-bucket         = "nutritrack-tfstate-yourname"
-key            = "nutritrack/dev/terraform.tfstate"
-region         = "us-east-1"
-dynamodb_table = "nutritrack-tf-locks"
-encrypt        = true

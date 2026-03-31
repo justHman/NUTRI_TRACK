@@ -12,41 +12,18 @@ import sys
 import time
 import logging as _stdlib_logging
 import pytest
+from dotenv import load_dotenv
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from dotenv import load_dotenv
-load_dotenv(os.path.join(project_root, "config", ".env"))
 
 from config.logging_config import get_logger
+from utils.test_helpers import silence_console, restore_console, require_api_integration_env
 
 logger = get_logger(__name__)
-
-
-def _require_bedrock_env() -> None:
-    required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
-    missing = [v for v in required_vars if not os.getenv(v)]
-    if missing:
-        pytest.skip(f"Missing AWS credentials for Bedrock tests: {', '.join(missing)}")
-
-
-# ── Console-silence helpers ──────────────────────────────────────────────────
-
-def _silence_console():
-    root = _stdlib_logging.getLogger()
-    saved = []
-    for h in root.handlers:
-        if isinstance(h, _stdlib_logging.StreamHandler) and not isinstance(h, _stdlib_logging.FileHandler):
-            saved.append((h, h.level))
-            h.setLevel(_stdlib_logging.WARNING)
-    return saved
-
-
-def _restore_console(saved):
-    for h, level in saved:
-        h.setLevel(level)
+load_dotenv(os.path.join(project_root, "config", ".env"))
 
 # Test images
 COM_TAM_IMG = os.path.join(project_root, "data", "images", "dishes", "com_tam.jpg")
@@ -180,7 +157,7 @@ def run_all(qwen) -> list:
     Returns:
         List of result dicts (6 tests: 3 methods × 2 images)
     """
-    _saved = _silence_console()
+    _saved = silence_console()
     try:
         print("\n─── Qwen3VL Model Tests ───────────────────────────────────────────────")
         all_results = []
@@ -232,12 +209,12 @@ def run_all(qwen) -> list:
         print(f"  {passed}/{len(all_results)} passed {icon}  (instructor skip is expected)\n", flush=True)
         return all_results
     finally:
-        _restore_console(_saved)
+        restore_console(_saved)
 
 
 @pytest.mark.integration
 def test_qwen_client_suite():
-    _require_bedrock_env()
+    require_api_integration_env()
 
     from models.QWEN3VL import Qwen3VL
 
