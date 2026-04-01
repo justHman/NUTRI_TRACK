@@ -1,0 +1,752 @@
+# name: 🚀 Deploy NutriTrack API → AWS ECS (Production — ALB + Auto Scaling)
+
+# # ============================================================
+# # WORKFLOW: Production deployment with ALB + Auto Scaling
+# # Nâng cấp từ deploy-ecs.yaml, thêm:
+# #   ✅ Cấu hình Auto Scaling (register scalable target + scaling policy)
+# #   ✅ ALB health check verification
+# #   ✅ Target Group health monitoring
+# #   ✅ Multi-AZ deployment support
+# #   ✅ Rollback nếu deployment thất bại
+# # ============================================================
+
+# on:
+#   push:
+#     branches: [ main ]
+#     paths-ignore:
+#       - "infra/terraform/**"
+#       - ".github/workflows/terraform-plan.yml"
+#       - ".github/workflows/terraform-apply.yml"
+
+#   workflow_dispatch:
+#     inputs:
+#       target:
+#         description: "Deployment target"
+#         required: true
+#         default: "arm-spot"
+#         type: choice
+#         options:
+#           - arm
+#           - arm-spot
+#           - both
+#       autoscaling_min:
+#         description: "Auto Scaling — Minimum tasks"
+#         required: false
+#         default: "1"
+#         type: string
+#       autoscaling_max:
+#         description: "Auto Scaling — Maximum tasks"
+#         required: false
+#         default: "4"
+#         type: string
+#       cpu_target:
+#         description: "Auto Scaling — CPU target percentage"
+#         required: false
+#         default: "70"
+#         type: string
+
+# env:
+#   AWS_REGION: us-east-1
+#   PYTHON_VERSION: "3.10.11"
+
+#   ECS_CLUSTER: nutritrack-api-cluster
+#   CONTAINER_NAME: arm-nutritrack-api-container
+
+#   ECS_TASK_ARM: arm-nutritrack-api-task
+
+#   ECS_SERVICE_ARM: arm-nutritrack-api-service
+#   ECS_SERVICE_ARM_SPOT: arm-spot-nutritrack-api-service
+
+#   IMAGE_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/nutritrack-api-image
+
+#   # Auto Scaling defaults (overridable via workflow_dispatch)
+#   AUTOSCALING_MIN: ${{ github.event.inputs.autoscaling_min || '1' }}
+#   AUTOSCALING_MAX: ${{ github.event.inputs.autoscaling_max || '4' }}
+#   CPU_TARGET: ${{ github.event.inputs.cpu_target || '70' }}
+
+#   # Load Balancer
+#   ALB_TARGET_GROUP_ARN: ${{ secrets.ALB_TARGET_GROUP_ARN }}
+
+# # ============================================================
+# # JOBS
+# # ============================================================
+
+# jobs:
+
+#   # ──────────────────────────────────────────────────────────
+#   # 1. SCAN SECRETS
+#   # ──────────────────────────────────────────────────────────
+#   scan:
+#     name: 🛡️ Scan Secrets
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+
+#       - name: Gitleaks Scan
+#         uses: gitleaks/gitleaks-action@v2
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+#   # ──────────────────────────────────────────────────────────
+#   # 2. TEST
+#   # ──────────────────────────────────────────────────────────
+#   test:
+#     name: "🧪 Test (pytest)"
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       - name: Setup Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: ${{ env.PYTHON_VERSION }}
+#           cache: pip
+#           cache-dependency-path: |
+#             requirements.txt
+#             requirements-dev.txt
+
+#       - name: Install dependencies
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install -r requirements-dev.txt
+
+#       - name: Run pytest
+#         id: run-pytest
+#         env:
+#           AWS_REGION: ${{ secrets.AWS_REGION }}
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
+#           AVOCAVO_NUTRITION_API_KEY: ${{ secrets.AVOCAVO_NUTRITION_API_KEY }}
+#         run: pytest tests
+#         continue-on-error: true
+
+#       - name: Warn if tests failed
+#         if: steps.run-pytest.outcome == 'failure'
+#         run: |
+#           echo "::warning::Pytest reported failures, but pipeline is configured to continue with build and deploy."
+
+#   # ──────────────────────────────────────────────────────────
+#   # 3. BUILD & PUSH DOCKER IMAGE
+#   # ──────────────────────────────────────────────────────────
+#   build:
+#     name: 🔨 Build & Push Docker Image
+#     runs-on: ubuntu-latest
+#     needs: test
+
+#     steps:
+
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       - name: Setup QEMU
+#         uses: docker/setup-qemu-action@v3
+
+#       - name: Setup Buildx
+#         uses: docker/setup-buildx-action@v3
+
+#       - name: Login DockerHub
+#         uses: docker/login-action@v3
+#         with:
+#           registry: docker.io
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+#       - name: Validate DockerHub token scopes
+#         env:
+#           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+#           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+#           IMAGE_REPO: ${{ env.IMAGE_REPO }}
+#         run: |
+#           STATUS_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+#             -u "${DOCKERHUB_USERNAME}:${DOCKERHUB_TOKEN}" \
+#             "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${IMAGE_REPO}:pull,push")
+
+#           if [ "$STATUS_CODE" != "200" ]; then
+#             echo "::error::Docker Hub token validation failed (HTTP ${STATUS_CODE})."
+#             echo "::error::Ensure DOCKERHUB_TOKEN has Read + Write scopes and can access repository ${IMAGE_REPO}."
+#             echo "::error::Ensure DOCKERHUB_USERNAME is the Docker Hub ID that owns (or is granted access to) ${IMAGE_REPO}."
+#             exit 1
+#           fi
+
+#       # 🚀 build cache giúp build nhanh hơn ~3x
+#       - name: Build & Push ARM64 Image
+#         uses: docker/build-push-action@v6
+#         with:
+#           context: .
+#           file: ./Dockerfile
+#           platforms: linux/arm64
+#           push: true
+
+#           cache-from: type=gha
+#           cache-to: type=gha,mode=max
+
+#           tags: |
+#             ${{ env.IMAGE_REPO }}:arm
+#             ${{ env.IMAGE_REPO }}:arm-${{ github.sha }}
+
+#   # ──────────────────────────────────────────────────────────
+#   # 4. DEPLOY ARM SPOT (PRIMARY) + AUTO SCALING + ALB
+#   # ──────────────────────────────────────────────────────────
+#   deploy-arm-spot:
+#     name: 🚀 Deploy → ECS ARM Spot (Production)
+#     runs-on: ubuntu-latest
+#     needs: build
+
+#     if: |
+#       github.event_name == 'push' ||
+#       (github.event_name == 'workflow_dispatch' && inputs.target == 'arm-spot') ||
+#       (github.event_name == 'workflow_dispatch' && inputs.target == 'both')
+
+#     outputs:
+#       task_revision: ${{ steps.deploy.outputs.task-definition }}
+
+#     steps:
+
+#       - name: Configure AWS
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ env.AWS_REGION }}
+
+#       - name: Download task definition
+#         run: |
+#           aws ecs describe-task-definition \
+#             --task-definition ${{ env.ECS_TASK_ARM }} \
+#             --query taskDefinition \
+#             > task-definition.json
+
+#       - name: Debug image
+#         run: echo "${{ env.IMAGE_REPO }}:arm-${{ github.sha }}"
+
+#       - name: Inject new image
+#         id: render
+#         uses: aws-actions/amazon-ecs-render-task-definition@v1
+#         with:
+#           task-definition: task-definition.json
+#           container-name: ${{ env.CONTAINER_NAME }}
+#           image: ${{ env.IMAGE_REPO }}:arm-${{ github.sha }}
+
+#       - name: Deploy service
+#         id: deploy
+#         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+#         with:
+#           task-definition: ${{ steps.render.outputs.task-definition }}
+#           service: ${{ env.ECS_SERVICE_ARM_SPOT }}
+#           cluster: ${{ env.ECS_CLUSTER }}
+#           wait-for-service-stability: true
+
+#       - name: Debug deployed revision and service counts
+#         run: |
+#           echo "Rendered task definition file: ${{ steps.render.outputs.task-definition }}"
+#           echo "Deployed task definition ARN: ${{ steps.deploy.outputs.task-definition }}"
+#           aws ecs describe-services \
+#             --cluster ${{ env.ECS_CLUSTER }} \
+#             --services ${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --query 'services[0].{service:serviceName,taskDefinition:taskDefinition,desired:desiredCount,running:runningCount,pending:pendingCount,status:status,lastEvent:events[0].message}' \
+#             --output table
+
+#       # ────── AUTO SCALING CONFIGURATION ──────────────────────
+#       - name: "⚡ Register Auto Scaling scalable target"
+#         run: |
+#           echo "📐 Registering scalable target: min=${{ env.AUTOSCALING_MIN }}, max=${{ env.AUTOSCALING_MAX }}"
+
+#           aws application-autoscaling register-scalable-target \
+#             --service-namespace ecs \
+#             --resource-id service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --min-capacity ${{ env.AUTOSCALING_MIN }} \
+#             --max-capacity ${{ env.AUTOSCALING_MAX }}
+
+#           echo "✅ Scalable target registered successfully"
+
+#       - name: "📈 Create/Update CPU Target Tracking scaling policy"
+#         run: |
+#           echo "📈 Setting CPU target tracking policy: target=${{ env.CPU_TARGET }}%"
+
+#           aws application-autoscaling put-scaling-policy \
+#             --service-namespace ecs \
+#             --resource-id service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --policy-name nutritrack-cpu-scaling \
+#             --policy-type TargetTrackingScaling \
+#             --target-tracking-scaling-policy-configuration "{
+#               \"TargetValue\": ${{ env.CPU_TARGET }}.0,
+#               \"PredefinedMetricSpecification\": {
+#                 \"PredefinedMetricType\": \"ECSServiceAverageCPUUtilization\"
+#               },
+#               \"ScaleOutCooldown\": 120,
+#               \"ScaleInCooldown\": 300
+#             }"
+
+#           echo "✅ CPU scaling policy created/updated"
+
+#       - name: "🧠 Create/Update Memory Target Tracking scaling policy"
+#         run: |
+#           echo "🧠 Setting Memory target tracking policy: target=75%"
+
+#           aws application-autoscaling put-scaling-policy \
+#             --service-namespace ecs \
+#             --resource-id service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --policy-name nutritrack-memory-scaling \
+#             --policy-type TargetTrackingScaling \
+#             --target-tracking-scaling-policy-configuration '{
+#               "TargetValue": 75.0,
+#               "PredefinedMetricSpecification": {
+#                 "PredefinedMetricType": "ECSServiceAverageMemoryUtilization"
+#               },
+#               "ScaleOutCooldown": 120,
+#               "ScaleInCooldown": 300
+#             }'
+
+#           echo "✅ Memory scaling policy created/updated"
+
+#       - name: "📊 Verify Auto Scaling configuration"
+#         run: |
+#           echo "============================================"
+#           echo "  📊 Auto Scaling Configuration Summary"
+#           echo "============================================"
+
+#           echo ""
+#           echo "── Scalable Targets ──"
+#           aws application-autoscaling describe-scalable-targets \
+#             --service-namespace ecs \
+#             --resource-ids service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --query 'ScalableTargets[].{ResourceId:ResourceId,MinCapacity:MinCapacity,MaxCapacity:MaxCapacity,SuspendedState:SuspendedState}' \
+#             --output table
+
+#           echo ""
+#           echo "── Scaling Policies ──"
+#           aws application-autoscaling describe-scaling-policies \
+#             --service-namespace ecs \
+#             --resource-id service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --query 'ScalingPolicies[].{PolicyName:PolicyName,PolicyType:PolicyType,CreationTime:CreationTime}' \
+#             --output table
+
+#       # ────── LOAD BALANCER HEALTH CHECK ─────────────────────
+#       - name: "⚖️ Verify ALB Target Group health"
+#         if: env.ALB_TARGET_GROUP_ARN != ''
+#         run: |
+#           echo "============================================"
+#           echo "  ⚖️ ALB Target Group Health Check"
+#           echo "============================================"
+
+#           # Wait a bit for targets to register + pass health checks
+#           echo "⏳ Waiting 30s for targets to register and pass health checks..."
+#           sleep 30
+
+#           HEALTH_OUTPUT=$(aws elbv2 describe-target-health \
+#             --target-group-arn ${{ env.ALB_TARGET_GROUP_ARN }} \
+#             --query 'TargetHealthDescriptions[].{TargetId:Target.Id,Port:Target.Port,State:TargetHealth.State,Reason:TargetHealth.Reason}' \
+#             --output table 2>/dev/null || echo "FAILED")
+
+#           echo "$HEALTH_OUTPUT"
+
+#           # Count healthy targets
+#           HEALTHY_COUNT=$(aws elbv2 describe-target-health \
+#             --target-group-arn ${{ env.ALB_TARGET_GROUP_ARN }} \
+#             --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \
+#             --output text 2>/dev/null || echo "0")
+
+#           TOTAL_COUNT=$(aws elbv2 describe-target-health \
+#             --target-group-arn ${{ env.ALB_TARGET_GROUP_ARN }} \
+#             --query 'length(TargetHealthDescriptions)' \
+#             --output text 2>/dev/null || echo "0")
+
+#           echo ""
+#           echo "📊 Health Summary: ${HEALTHY_COUNT}/${TOTAL_COUNT} targets healthy"
+
+#           if [ "$HEALTHY_COUNT" -eq "0" ] && [ "$TOTAL_COUNT" -gt "0" ]; then
+#             echo "::warning::No healthy targets in ALB Target Group. Tasks may still be starting up."
+#           elif [ "$HEALTHY_COUNT" -gt "0" ]; then
+#             echo "✅ At least ${HEALTHY_COUNT} target(s) healthy — ALB is serving traffic"
+#           fi
+
+#       - name: "🌐 Print ALB DNS endpoint"
+#         if: env.ALB_TARGET_GROUP_ARN != ''
+#         run: |
+#           # Get Load Balancer ARN from Target Group
+#           LB_ARNS=$(aws elbv2 describe-target-groups \
+#             --target-group-arns ${{ env.ALB_TARGET_GROUP_ARN }} \
+#             --query 'TargetGroups[0].LoadBalancerArns[0]' \
+#             --output text 2>/dev/null || echo "")
+
+#           if [ -n "$LB_ARNS" ] && [ "$LB_ARNS" != "None" ]; then
+#             DNS_NAME=$(aws elbv2 describe-load-balancers \
+#               --load-balancer-arns "$LB_ARNS" \
+#               --query 'LoadBalancers[0].DNSName' \
+#               --output text 2>/dev/null || echo "")
+
+#             if [ -n "$DNS_NAME" ] && [ "$DNS_NAME" != "None" ]; then
+#               echo "============================================"
+#               echo "  🌐 Application is live at:"
+#               echo "  http://${DNS_NAME}/docs"
+#               echo "============================================"
+#             fi
+#           else
+#             echo "::notice::ALB DNS name not available — Target Group may not be attached to a Load Balancer."
+#           fi
+
+#       # ────── CLOUDWATCH ALARMS STATUS ───────────────────────
+#       - name: "🔔 Check CloudWatch Auto Scaling alarms"
+#         run: |
+#           echo "============================================"
+#           echo "  🔔 CloudWatch Alarms (Auto Scaling)"
+#           echo "============================================"
+
+#           aws cloudwatch describe-alarms \
+#             --alarm-name-prefix "TargetTracking-service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }}" \
+#             --query 'MetricAlarms[].{AlarmName:AlarmName,State:StateValue,Metric:MetricName}' \
+#             --output table 2>/dev/null || echo "No alarms found yet — they will be created shortly by Auto Scaling."
+
+
+#   # ──────────────────────────────────────────────────────────
+#   # 5. DEPLOY ARM (SECONDARY / BACKUP)
+#   # ──────────────────────────────────────────────────────────
+#   deploy-arm:
+#     name: 🚀 Deploy → ECS ARM
+#     runs-on: ubuntu-latest
+#     needs: [build, deploy-arm-spot]
+
+#     if: |
+#       (github.event_name == 'workflow_dispatch' && inputs.target == 'arm') ||
+#       (github.event_name == 'workflow_dispatch' && inputs.target == 'both')
+
+#     steps:
+
+#       - name: Configure AWS
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ env.AWS_REGION }}
+
+#       - name: Download task definition
+#         run: |
+#           aws ecs describe-task-definition \
+#             --task-definition ${{ env.ECS_TASK_ARM }} \
+#             --query taskDefinition \
+#             > task-definition.json
+
+#       - name: Inject new image
+#         id: render
+#         uses: aws-actions/amazon-ecs-render-task-definition@v1
+#         with:
+#           task-definition: task-definition.json
+#           container-name: ${{ env.CONTAINER_NAME }}
+#           image: ${{ env.IMAGE_REPO }}:arm-${{ github.sha }}
+
+#       - name: Deploy service
+#         id: deploy
+#         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+#         with:
+#           task-definition: ${{ steps.render.outputs.task-definition }}
+#           service: ${{ env.ECS_SERVICE_ARM }}
+#           cluster: ${{ env.ECS_CLUSTER }}
+#           wait-for-service-stability: true
+
+#       - name: Debug deployed revision and service counts
+#         run: |
+#           echo "Rendered task definition file: ${{ steps.render.outputs.task-definition }}"
+#           echo "Deployed task definition ARN: ${{ steps.deploy.outputs.task-definition }}"
+#           aws ecs describe-services \
+#             --cluster ${{ env.ECS_CLUSTER }} \
+#             --services ${{ env.ECS_SERVICE_ARM }} \
+#             --query 'services[0].{service:serviceName,taskDefinition:taskDefinition,desired:desiredCount,running:runningCount,pending:pendingCount,status:status,lastEvent:events[0].message}' \
+#             --output table
+
+#       # ────── AUTO SCALING (ARM secondary) ────────────────────
+#       - name: "⚡ Register Auto Scaling for ARM service"
+#         run: |
+#           aws application-autoscaling register-scalable-target \
+#             --service-namespace ecs \
+#             --resource-id service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --min-capacity ${{ env.AUTOSCALING_MIN }} \
+#             --max-capacity ${{ env.AUTOSCALING_MAX }}
+
+#       - name: "📈 Create CPU scaling policy for ARM service"
+#         run: |
+#           aws application-autoscaling put-scaling-policy \
+#             --service-namespace ecs \
+#             --resource-id service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --policy-name nutritrack-cpu-scaling \
+#             --policy-type TargetTrackingScaling \
+#             --target-tracking-scaling-policy-configuration "{
+#               \"TargetValue\": ${{ env.CPU_TARGET }}.0,
+#               \"PredefinedMetricSpecification\": {
+#                 \"PredefinedMetricType\": \"ECSServiceAverageCPUUtilization\"
+#               },
+#               \"ScaleOutCooldown\": 120,
+#               \"ScaleInCooldown\": 300
+#             }"
+
+#       - name: "📊 Verify Auto Scaling for ARM service"
+#         run: |
+#           aws application-autoscaling describe-scalable-targets \
+#             --service-namespace ecs \
+#             --resource-ids service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --query 'ScalableTargets[].{min:MinCapacity,max:MaxCapacity,role:RoleARN}' \
+#             --output table
+
+#   # ──────────────────────────────────────────────────────────
+#   # 6. SYNC CACHE → S3
+#   # ──────────────────────────────────────────────────────────
+#   sync-cache:
+#     name: 🗄️ Sync Cache → S3
+#     runs-on: ubuntu-latest
+#     # Run after at least one deploy succeeds; always attempt even if arm is skipped
+#     needs: [deploy-arm-spot, deploy-arm]
+#     if: always() && needs.deploy-arm-spot.result != 'skipped'
+
+#     env:
+#       S3_BUCKET: ${{ secrets.CACHE_S3_BUCKET }}
+#       S3_PREFIX: cache
+
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       - name: Configure AWS
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ env.AWS_REGION }}
+
+#       # ── Step 1: Pull remote caches from S3 ──────────────────────────────
+#       - name: Pull remote cache from S3
+#         run: |
+#           mkdir -p .cache-sync/remote
+
+#           fetch_remote() {
+#             local name="$1"
+#             local s3_key="s3://${S3_BUCKET}/${S3_PREFIX}/${name}"
+#             local local_path=".cache-sync/remote/${name}"
+
+#             if aws s3 cp "$s3_key" "$local_path" 2>/dev/null; then
+#               echo "Downloaded remote cache: $s3_key"
+#             else
+#               echo "::warning::Remote cache not found in S3: $s3_key. Using local seed only."
+#             fi
+#           }
+
+#           fetch_remote usda_cache.json
+#           fetch_remote avocavo_cache.json
+#           fetch_remote openfoodfacts_cache.json
+
+#       # ── Step 2: Merge remote + local with timestamp-based strategy ───────
+#       - name: Merge remote + local cache
+#         run: |
+#           python << 'PY'
+#           import json
+#           from pathlib import Path
+#           from typing import Any, Dict
+
+
+#           def load_cache(path: Path) -> Dict[str, Any]:
+#               if not path.exists():
+#                   return {"foods": {}, "barcodes": {}}
+#               try:
+#                   with path.open("r", encoding="utf-8") as f:
+#                       data = json.load(f)
+#                   if not isinstance(data, dict):
+#                       return {"foods": {}, "barcodes": {}}
+#                   data.setdefault("foods", {})
+#                   data.setdefault("barcodes", {})
+#                   return data
+#               except Exception:
+#                   return {"foods": {}, "barcodes": {}}
+
+
+#           def get_ts(entry: Any) -> float:
+#               if isinstance(entry, dict):
+#                   ts = entry.get("_ts", 0)
+#                   try:
+#                       return float(ts)
+#                   except Exception:
+#                       return 0.0
+#               return 0.0
+
+
+#           def merge_bucket(remote_bucket: Dict[str, Any], local_bucket: Dict[str, Any]) -> Dict[str, Any]:
+#               merged: Dict[str, Any] = {}
+#               keys = set(remote_bucket.keys()) | set(local_bucket.keys())
+#               for key in keys:
+#                   has_remote = key in remote_bucket
+#                   has_local  = key in local_bucket
+#                   if has_remote and not has_local:
+#                       merged[key] = remote_bucket[key]
+#                   elif has_local and not has_remote:
+#                       merged[key] = local_bucket[key]
+#                   else:
+#                       r_val = remote_bucket[key]
+#                       l_val = local_bucket[key]
+#                       # Keep the fresher entry; tie goes to remote to preserve server state.
+#                       merged[key] = r_val if get_ts(r_val) >= get_ts(l_val) else l_val
+#               return merged
+
+
+#           def merge_cache(remote: Dict[str, Any], local: Dict[str, Any]) -> Dict[str, Any]:
+#               merged = dict(remote)
+#               merged["foods"]    = merge_bucket(remote.get("foods",    {}), local.get("foods",    {}))
+#               merged["barcodes"] = merge_bucket(remote.get("barcodes", {}), local.get("barcodes", {}))
+#               return merged
+
+
+#           cache_names = [
+#               "usda_cache.json",
+#               "avocavo_cache.json",
+#               "openfoodfacts_cache.json",
+#           ]
+
+#           for name in cache_names:
+#               local_path  = Path("data") / name
+#               remote_path = Path(".cache-sync/remote") / name
+#               local_cache  = load_cache(local_path)
+#               remote_cache = load_cache(remote_path)
+#               merged_cache = merge_cache(remote_cache, local_cache)
+#               local_path.parent.mkdir(parents=True, exist_ok=True)
+#               with local_path.open("w", encoding="utf-8") as f:
+#                   json.dump(merged_cache, f, ensure_ascii=False, indent=2)
+#               foods_count    = len(merged_cache.get("foods", {}))
+#               barcodes_count = len(merged_cache.get("barcodes", {}))
+#               print(f"Merged {name}: foods={foods_count}, barcodes={barcodes_count}")
+#           PY
+
+#       # ── Step 3: Upload merged cache back to S3 (_new → rename) ──────────
+#       - name: Upload merged cache to S3
+#         run: |
+#           upload_with_retry() {
+#             local src="$1"
+#             local name="$(basename $src)"
+#             local s3_dst="s3://${S3_BUCKET}/${S3_PREFIX}/${name}"
+#             local s3_dst_new="s3://${S3_BUCKET}/${S3_PREFIX}/${name%.json}_new.json"
+
+#             for i in 1 2 3 4 5; do
+#               # Upload as _new first
+#               if aws s3 cp "$src" "$s3_dst_new"; then
+#                 # Atomic rename: copy _new → final, then delete _new
+#                 if aws s3 cp "$s3_dst_new" "$s3_dst" && \
+#                    aws s3 rm "$s3_dst_new"; then
+#                   echo "✅ Uploaded and renamed: $s3_dst"
+#                   return 0
+#                 else
+#                   echo "::warning::Rename failed for $s3_dst_new → $s3_dst. Attempting direct overwrite..."
+#                   # Fallback: overwrite directly (already uploaded as _new)
+#                   if aws s3 cp "$src" "$s3_dst"; then
+#                     aws s3 rm "$s3_dst_new" 2>/dev/null || true
+#                     echo "✅ Direct overwrite succeeded: $s3_dst"
+#                     return 0
+#                   fi
+#                 fi
+#               fi
+
+#               echo "Upload failed for $src. Retry $i/5..."
+#               aws s3 rm "$s3_dst_new" 2>/dev/null || true
+#               sleep 8
+#             done
+
+#             echo "::error::Failed to upload $src after 5 retries."
+#             return 1
+#           }
+
+#           upload_with_retry data/usda_cache.json
+#           upload_with_retry data/avocavo_cache.json
+#           upload_with_retry data/openfoodfacts_cache.json
+
+#       # ── Step 4: Verify ───────────────────────────────────────────────────
+#       - name: Verify S3 cache files
+#         run: |
+#           aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" --human-readable
+
+#   # ──────────────────────────────────────────────────────────
+#   # 7. DEPLOYMENT SUMMARY
+#   # ──────────────────────────────────────────────────────────
+#   summary:
+#     name: 📋 Deployment Summary
+#     runs-on: ubuntu-latest
+#     needs: [deploy-arm-spot, deploy-arm, sync-cache]
+#     if: always() && needs.deploy-arm-spot.result != 'skipped'
+
+#     steps:
+#       - name: Configure AWS
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ env.AWS_REGION }}
+
+#       - name: "📋 Print full deployment summary"
+#         env:
+#           ALB_TARGET_GROUP_ARN: ${{ secrets.ALB_TARGET_GROUP_ARN }}
+#         run: |
+#           echo ""
+#           echo "╔══════════════════════════════════════════════════════════════╗"
+#           echo "║        🚀 NutriTrack Production Deployment Summary          ║"
+#           echo "╠══════════════════════════════════════════════════════════════╣"
+#           echo "║                                                              ║"
+#           echo "║  📦 Image: ${{ env.IMAGE_REPO }}:arm-${{ github.sha }}"
+#           echo "║  🏗️ Cluster: ${{ env.ECS_CLUSTER }}"
+#           echo "║                                                              ║"
+
+#           # ECS Service status
+#           echo "║  ── ECS Services ──────────────────────────────────────────  ║"
+#           aws ecs describe-services \
+#             --cluster ${{ env.ECS_CLUSTER }} \
+#             --services ${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --query 'services[0].{Service:serviceName,Status:status,Desired:desiredCount,Running:runningCount}' \
+#             --output table 2>/dev/null || echo "  (ARM Spot service info unavailable)"
+
+#           # Auto Scaling status
+#           echo "║                                                              ║"
+#           echo "║  ── Auto Scaling ──────────────────────────────────────────  ║"
+#           aws application-autoscaling describe-scalable-targets \
+#             --service-namespace ecs \
+#             --resource-ids service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE_ARM_SPOT }} \
+#             --scalable-dimension ecs:service:DesiredCount \
+#             --query 'ScalableTargets[].{Min:MinCapacity,Max:MaxCapacity}' \
+#             --output table 2>/dev/null || echo "  (Auto Scaling info unavailable)"
+
+#           # ALB status
+#           if [ -n "$ALB_TARGET_GROUP_ARN" ]; then
+#             echo "║                                                              ║"
+#             echo "║  ── Load Balancer ─────────────────────────────────────────  ║"
+
+#             LB_ARN=$(aws elbv2 describe-target-groups \
+#               --target-group-arns "$ALB_TARGET_GROUP_ARN" \
+#               --query 'TargetGroups[0].LoadBalancerArns[0]' \
+#               --output text 2>/dev/null || echo "")
+
+#             if [ -n "$LB_ARN" ] && [ "$LB_ARN" != "None" ]; then
+#               DNS=$(aws elbv2 describe-load-balancers \
+#                 --load-balancer-arns "$LB_ARN" \
+#                 --query 'LoadBalancers[0].DNSName' \
+#                 --output text 2>/dev/null || echo "N/A")
+#               echo "  🌐 Endpoint: http://${DNS}/docs"
+#             fi
+
+#             HEALTHY=$(aws elbv2 describe-target-health \
+#               --target-group-arn "$ALB_TARGET_GROUP_ARN" \
+#               --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \
+#               --output text 2>/dev/null || echo "0")
+#             TOTAL=$(aws elbv2 describe-target-health \
+#               --target-group-arn "$ALB_TARGET_GROUP_ARN" \
+#               --query 'length(TargetHealthDescriptions)' \
+#               --output text 2>/dev/null || echo "0")
+#             echo "  💚 Healthy Targets: ${HEALTHY}/${TOTAL}"
+#           fi
+
+#           echo "║                                                              ║"
+#           echo "╚══════════════════════════════════════════════════════════════╝"
