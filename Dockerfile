@@ -8,15 +8,12 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN python -m venv $VIRTUAL_ENV
 
-# Cài đặt các thư viện hệ thống cần thiết (nếu có)
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# No system dependencies needed for pure Python/FastAPI app
 
 # Copy requirements và cài đặt python dependencies
 COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --retries 3 -r requirements.txt
 
 # Copy toàn bộ mã nguồn vào container
 COPY . .

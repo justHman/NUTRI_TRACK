@@ -111,8 +111,8 @@ def compress_image(image_bytes: bytes, max_pixels: int = 1024, quality: int = 85
     logger.info("Compressing image: %.2f MB (max_pixels=%d, quality=%d)", original_size, max_pixels, quality)
 
     img = Image.open(BytesIO(image_bytes))
-    if img.mode == "RGBA":
-        logger.debug("Converting RGBA → RGB for JPEG compression")
+    if img.mode not in ("RGB", "L"):
+        logger.debug("Converting %s → RGB for JPEG compression", img.mode)
         img = img.convert("RGB")
     img.thumbnail((max_pixels, max_pixels), Image.LANCZOS)
     buf = BytesIO()
