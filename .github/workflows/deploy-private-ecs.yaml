@@ -45,7 +45,7 @@ env:
   # ECS
   ECS_CLUSTER:        nutritrack-api-cluster
   ECS_SERVICE:        spot-arm-nutritrack-api-task-service
-  TASK_DEFINITION:    arm-nutritrack-api-task
+  TASK_DEFINITION:    arm-nutritrack-api-task:LATEST
   CONTAINER_NAME:     arm-nutritrack-api-container
   ECS_CONTAINER_PORT: 8000
 
@@ -117,6 +117,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY:     ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           USDA_API_KEY:              ${{ secrets.USDA_API_KEY }}
           AVOCAVO_NUTRITION_API_KEY: ${{ secrets.AVOCAVO_NUTRITION_API_KEY }}
+          NUTRITRACK_API_KEY:        ${{ secrets.NUTRITRACK_API_KEY }}
         run: |
           echo "──────────────────────────────────────────────"
           echo "🧪 Running pytest on tests/ ..."
@@ -339,8 +340,8 @@ jobs:
               "usda_cache.json",
           ]
 
-          print(f"  {'File':<28}  {'Local':>8}  {'Remote':>8}  {'Merged':>8}  {'New keys':>10}")
-          print(f"  {'-'*28}  {'-'*8}  {'-'*8}  {'-'*8}  {'-'*10}")
+          print(f"  {'File':<26} | {'Local (F / B)':<15} | {'Remote (F / B)':<16} | {'Merged (F / B)':<16} | {'New Keys (F / B)':<18}")
+          print(f"  {'-'*26}-|-{'-'*15}-|-{'-'*16}-|-{'-'*16}-|-{'-'*18}")
 
           for name in CACHE_FILES:
               local_path  = Path("data") / name
@@ -348,19 +349,31 @@ jobs:
               local_cache  = load_cache(local_path)
               remote_cache = load_cache(remote_path)
 
-              local_f  = len(local_cache.get("foods",    {}))
-              remote_f = len(remote_cache.get("foods",   {}))
+              l_f = len(local_cache.get("foods", {}))
+              l_b = len(local_cache.get("barcodes", {}))
+
+              r_f = len(remote_cache.get("foods", {}))
+              r_b = len(remote_cache.get("barcodes", {}))
 
               merged_cache, new_food_keys, new_barcode_keys = merge_cache(remote_cache, local_cache)
-              merged_f = len(merged_cache.get("foods",    {}))
-              new_k    = len(new_food_keys) + len(new_barcode_keys)
+              
+              m_f = len(merged_cache.get("foods", {}))
+              m_b = len(merged_cache.get("barcodes", {}))
+              
+              n_f = len(new_food_keys)
+              n_b = len(new_barcode_keys)
 
               # Write merged file back to data/
               local_path.parent.mkdir(parents=True, exist_ok=True)
               with local_path.open("w", encoding="utf-8") as f:
                   json.dump(merged_cache, f, ensure_ascii=False, indent=2)
 
-              print(f"  {name:<28}  {local_f:>8}  {remote_f:>8}  {merged_f:>8}  {new_k:>10}")
+              l_str = f"{l_f} / {l_b}"
+              r_str = f"{r_f} / {r_b}"
+              m_str = f"{m_f} / {m_b}"
+              n_str = f"{n_f} / {n_b}"
+
+              print(f"  {name:<26} | {l_str:<15} | {r_str:<16} | {m_str:<16} | {n_str:<18}")
 
           print()
           print("  ✅ Merge complete!")
@@ -506,7 +519,9 @@ jobs:
             --cluster "${{ env.ECS_CLUSTER }}" \
             --service "${{ env.ECS_SERVICE }}" \
             --task-definition "${{ env.TASK_DEFINITION }}" \
+            --desired-count 2 \
             --force-new-deployment \
+            --capacity-provider-strategy capacityProvider=FARGATE_SPOT, weight=1 \
             --no-cli-pager
 
           echo "✅ update-service command sent."
@@ -548,6 +563,21 @@ jobs:
               LastEvent:events[0].message
             }' \
             --output table
+          echo "──────────────────────────────────────────────"
+
+      # ── Auto-scaling limits definition ────────────────────
+      - name: 📈 Update Auto-scaling limits (Min=0, Max=10)
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📈 Updating Auto-Scaling Targets (Min=0, Max=10)..."
+          echo "──────────────────────────────────────────────"
+          aws application-autoscaling register-scalable-target \
+            --service-namespace ecs \
+            --scalable-dimension ecs:service:DesiredCount \
+            --resource-id "service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE }}" \
+            --min-capacity 0 \
+            --max-capacity 10
+          echo "✅ Applied Min=0, Max=10"
           echo "──────────────────────────────────────────────"
 
       # ── Auto-scaling table ────────────────────────────────

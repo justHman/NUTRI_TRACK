@@ -2,7 +2,7 @@ name: 🚀 Deploy NutriTrack API → AWS ECS
 
 on:
   push:
-    branches: [ main ]
+    branches: [ dev ]
     paths-ignore:
       - "infra/terraform/**"
       - ".github/workflows/terraform-plan.yml"
