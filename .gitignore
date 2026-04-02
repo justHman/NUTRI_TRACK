@@ -1,6 +1,8 @@
 # Environments & Secrets
 .env
+*.env
 config/.env
+.github/workflows/.env
 
 # Python & Cache
 __pycache__/

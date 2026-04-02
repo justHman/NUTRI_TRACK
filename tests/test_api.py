@@ -18,12 +18,13 @@ if project_root not in sys.path:
 
 from config.logging_config import get_logger
 from utils.test_helpers import require_api_integration_env, silence_console, restore_console
+from utils.getter import get_ip
 
 logger = get_logger(__name__)
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = f"http://{get_ip()}:8000"
 
-SECRET_KEY = os.getenv("NUTRITRACK_API_KEY", "nutritrack_api_super_secret_key")
+SECRET_KEY = os.getenv("NUTRITRACK_API_KEY", "")
 VALID_TOKEN = jwt.encode(
     {
         "service": "backend",

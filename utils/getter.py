@@ -9,7 +9,7 @@ import socket
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "config", ".env"))
 
 
-def get_container_ip() -> str:
+def get_ip() -> str:
     """
     Lấy IP container theo thứ tự ưu tiên:
     1. ECS Task Metadata Endpoint v4 (Fargate awsvpc) — link-local, không cần internet
