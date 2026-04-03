@@ -21,7 +21,7 @@ from utils.cache_utils import get_now_ts, is_expired, load_disk_cache, save_disk
 # ─────────────────────────────────────────────────────────────────────────────
 # Disk Cache Path  (Level 2 — Persistent)
 # Lives at:  app/data/usda_cache.json
-# Swap to S3/DynamoDB later by replacing _load_disk_cache / _save_disk_cache.
+# Swap to S3/DynamoDB later by replacing load_disk_cache / _save_disk_cache.
 # ─────────────────────────────────────────────────────────────────────────────
 _CACHE_DIR  = os.path.join(os.path.dirname(__file__), "..", "data")
 _CACHE_FILE = os.path.join(_CACHE_DIR, "usda_cache.json")
@@ -48,7 +48,7 @@ class USDAClient:
     │ Level 3 │ USDA API │ real network │ only on full miss    │
     └──────────────────────────────────────────────────────────┘
 
-    Swap Level 2 to S3/DynamoDB by replacing _load_disk_cache / _save_disk_cache.
+    Swap Level 2 to S3/DynamoDB by replacing load_disk_cache / _save_disk_cache.
     """
 
     ENERGY_NUMBERS = {"208", "2047", "2048"}  # kcal only

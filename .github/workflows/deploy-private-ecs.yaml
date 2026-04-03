@@ -51,8 +51,6 @@ env:
 
   # S3 cache
   S3_BUCKET:          nutritrack-cache-01apr26
-  S3_PREFIX:          data
-
   # Tag
   IMAGE_TAG:          arm
 
@@ -252,7 +250,7 @@ jobs:
 
           pull_or_skip() {
             local name="$1"
-            local s3_key="s3://${{ env.S3_BUCKET }}/${{ env.S3_PREFIX }}/${name}"
+            local s3_key="s3://${{ env.S3_BUCKET }}/${name}"
             local local_path=".cache-sync/remote/${name}"
 
             if aws s3 cp "$s3_key" "$local_path" 2>/dev/null; then
@@ -393,7 +391,7 @@ jobs:
             local src="$1"
             local name
             name="$(basename "$src")"
-            local s3_dst="s3://${{ env.S3_BUCKET }}/${{ env.S3_PREFIX }}/${name}"
+            local s3_dst="s3://${{ env.S3_BUCKET }}/${name}"
             local size
             size=$(du -sh "$src" | cut -f1)
 
@@ -426,9 +424,9 @@ jobs:
         run: |
           echo "──────────────────────────────────────────────"
           echo "📊 S3 Cache Verification"
-          echo "   Bucket: s3://${{ env.S3_BUCKET }}/${{ env.S3_PREFIX }}/"
+          echo "   Bucket: s3://${{ env.S3_BUCKET }}/"
           echo "──────────────────────────────────────────────"
-          aws s3 ls "s3://${{ env.S3_BUCKET }}/${{ env.S3_PREFIX }}/" --human-readable --summarize || \
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/" --human-readable --summarize || \
             echo "::warning::Could not list S3 bucket contents."
           echo "──────────────────────────────────────────────"
 
