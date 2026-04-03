@@ -1,10 +1,11 @@
 """
 NutriTrack AI Models
 ====================
-    from models import Qwen3VL
+    from models import ANALYSIST, OCRER
 
 Available models:
-    - Qwen3VL: Multimodal Vision-Language (AWS Bedrock)
+    - ANALYSIST: Food visualization and analysis
+    - OCRER: OCR reading of nutrition labels
 
 Pydantic schemas:
     - NutritionInfo: (calories, protein, carbs, fat)
@@ -14,12 +15,14 @@ Pydantic schemas:
 """
 
 from utils.schemas import (
-    NutritionItem,
+    FoodItem,
+    FoodList,
+    Ingredient,
     LabelItem,
     LabelList,
     NutritionInfo,
-    Ingredient,
-    FoodItem,
-    FoodList,
+    NutritionItem,
 )
-from .QWEN3VL import Qwen3VL
+
+from .ANALYSIST import ANALYSIST
+from .OCRER import OCRER

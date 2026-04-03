@@ -1,21 +1,25 @@
-import os
 import json
-import time
-import requests
+import os
 import re
+import time
+import unicodedata
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
-import unicodedata
+import requests
 
 from config.logging_config import get_logger
 from utils.caculator import calculate_ingredient_nutrition
-from utils.transformer import normalize_query, get_mock_nutrition
+from utils.transformer import get_mock_nutrition, normalize_query
 
 logger = get_logger(__name__)
 
-from models.LRUCache import _LRUCache, _MISSING
-from config.client_config import _CACHE_TTL_DAYS, _L1_MAXSIZE, _NEGATIVE_CACHEABLE_SEARCH_STATUSES
+from config.client_config import (
+    CACHE_TTL_DAYS,
+    L1_MAXSIZE,
+    NEGATIVE_CACHEABLE_SEARCH_STATUSES,
+)
+from models.LRUCache import MISSING, LRUCache
 from utils.cache_utils import get_now_ts, is_expired, load_disk_cache, save_disk_cache
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -23,12 +27,12 @@ from utils.cache_utils import get_now_ts, is_expired, load_disk_cache, save_disk
 # Lives at:  app/data/usda_cache.json
 # Swap to S3/DynamoDB later by replacing load_disk_cache / _save_disk_cache.
 # ─────────────────────────────────────────────────────────────────────────────
-_CACHE_DIR  = os.path.join(os.path.dirname(__file__), "..", "data")
+_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 _CACHE_FILE = os.path.join(_CACHE_DIR, "usda_cache.json")
 
 # Module-level L1 caches (shared across all USDAClient instances in one process)
-_l1_foods: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
-_l1_barcodes: _LRUCache = _LRUCache(maxsize=_L1_MAXSIZE)
+_l1_foods: LRUCache = LRUCache(maxsize=L1_MAXSIZE)
+_l1_barcodes: LRUCache = LRUCache(maxsize=L1_MAXSIZE)
 
 # Load once at module import
 _l2: dict = load_disk_cache(_CACHE_FILE, _CACHE_DIR, "usda_cache.json")
@@ -53,9 +57,9 @@ class USDAClient:
 
     ENERGY_NUMBERS = {"208", "2047", "2048"}  # kcal only
     TARGET_NUTRIENTS = {
-        "203": "protein",   # Protein
-        "204": "fat",       # Total lipid (fat)
-        "205": "carbs",     # Carbohydrate, by difference
+        "203": "protein",  # Protein
+        "204": "fat",  # Total lipid (fat)
+        "205": "carbs",  # Carbohydrate, by difference
     }
 
     def __init__(self, api_key: str):
@@ -63,11 +67,18 @@ class USDAClient:
         self.base_url = "https://api.nal.usda.gov/fdc/v1"
         self._last_search_http_status: Optional[int] = None
         self._last_search_empty_result: bool = False
-        logger.info("USDAClient initialized (api_key=%s)", "DEMO_KEY" if api_key == "DEMO_KEY" else "***")
+        logger.info(
+            "USDAClient initialized (api_key=%s)",
+            "DEMO_KEY" if api_key == "DEMO_KEY" else "***",
+        )
         l2_entries = len(_l2["foods"]) + len(_l2["barcodes"])
         l1_entries = len(_l1_foods) + len(_l1_barcodes)
-        logger.debug("L1 cache size: %d / %d   |   L2 disk entries: %d",
-                 l1_entries, _L1_MAXSIZE * 2, l2_entries)
+        logger.debug(
+            "L1 cache size: %d / %d   |   L2 disk entries: %d",
+            l1_entries,
+            L1_MAXSIZE * 2,
+            l2_entries,
+        )
 
     # ─────────────────────────────────────────────────────────────────────
     # Public API
@@ -83,14 +94,18 @@ class USDAClient:
         normalized_query = normalize_query(query)
 
         if not self.api_key or self.api_key == "DEMO_KEY":
-            logger.info("get_nutritions: using mock data (api_key=%s)", self.api_key or "None")
+            logger.info(
+                "get_nutritions: using mock data (api_key=%s)", self.api_key or "None"
+            )
             return get_mock_nutrition(query)
 
         best = self.search_best(normalized_query, pageSize)
         if best:
             return self._parse_100g_nutritions(best)
 
-        logger.warning("get_nutritions: no result for '%s', falling back to mock", normalized_query)
+        logger.warning(
+            "get_nutritions: no result for '%s', falling back to mock", normalized_query
+        )
         return get_mock_nutrition(query)
 
     def get_ingredients(self, query: str, pageSize: int = 5) -> Optional[List[str]]:
@@ -110,11 +125,16 @@ class USDAClient:
             return None
 
         ingredients = self._parse_ingredient_string(best)
-        logger.info("get_ingredients: %d ingredients for '%s'",
-                    len(ingredients) if ingredients else 0, normalized_query)
+        logger.info(
+            "get_ingredients: %d ingredients for '%s'",
+            len(ingredients) if ingredients else 0,
+            normalized_query,
+        )
         return ingredients
 
-    def get_nutritions_and_ingredients(self, query: str, pageSize: int = 5) -> Optional[Dict]:
+    def get_nutritions_and_ingredients(
+        self, query: str, pageSize: int = 5
+    ) -> Optional[Dict]:
         """
         Return both PCF nutrition data and ingredients in one dict.
         Calls search_best() once — cache ensures only 1 API call per unique query.
@@ -127,51 +147,65 @@ class USDAClient:
 
         best = self.search_best(normalized_query, pageSize)
         if not best:
-            logger.warning("get_nutritions_and_ingredients: no USDA result for '%s'", normalized_query)
+            logger.warning(
+                "get_nutritions_and_ingredients: no USDA result for '%s'",
+                normalized_query,
+            )
             return None
 
         description = best.get("description", "N/A").lower()
-        nutritions     = self._parse_100g_nutritions(best)
-        ingredients  = self._parse_ingredient_string(best)
+        nutritions = self._parse_100g_nutritions(best)
+        ingredients = self._parse_ingredient_string(best)
 
         result = {
             "description": description,
             "nutritions": nutritions,
             "ingredients": ingredients,
         }
-        logger.info("get_nutritions_and_ingredients: '%s' → %d ingredients",
-                    normalized_query, len(ingredients) if ingredients else 0)
+        logger.info(
+            "get_nutritions_and_ingredients: '%s' → %d ingredients",
+            normalized_query,
+            len(ingredients) if ingredients else 0,
+        )
         logger.debug("get_nutritions_and_ingredients result: %s", result)
         return result
 
-    def get_nutritions_and_ingredients_by_weight(self, query: str, weight_g: float, pageSize: int = 5) -> Optional[Dict]:
+    def get_nutritions_and_ingredients_by_weight(
+        self, query: str, weight_g: float, pageSize: int = 5
+    ) -> Optional[Dict]:
         """
         Return actual PCF nutrition data calculated by weight and ingredients in one dict.
         Calls get_nutritions_and_ingredients to get 100g reference and calculates actual nutritions.
         """
-        logger.debug("get_nutritions_and_ingredients_by_weight() called with query='%s', weight_g=%.2f", query, weight_g)
-        
+        logger.debug(
+            "get_nutritions_and_ingredients_by_weight() called with query='%s', weight_g=%.2f",
+            query,
+            weight_g,
+        )
+
         result = self.get_nutritions_and_ingredients(query, pageSize)
         if not result:
             return None
-            
+
         nutritions_100g = result["nutritions"]
         actual_nutritions = calculate_ingredient_nutrition(nutritions_100g, weight_g)
-        
+
         result["nutritions"] = actual_nutritions
         result["weight_g"] = weight_g
-        
-        logger.debug("get_nutritions_and_ingredients_by_weight actual result: %s", result)
+
+        logger.debug(
+            "get_nutritions_and_ingredients_by_weight actual result: %s", result
+        )
         return result
 
     def get_batch(self, items: list) -> list:
         """
         - Input: [
-            {"name": "Apple", "weight": 100}, 
+            {"name": "Apple", "weight": 100},
             {"name": "Banana", "weight": 100}
         ]
         - Output: [
-            ["apple", 52.0, 0.26, 13.84, 0.17, ["apple"], 100], 
+            ["apple", 52.0, 0.26, 13.84, 0.17, ["apple"], 100],
             ["banana", 89.0, 1.09, 22.84, 0.33, ["banana"], 100]
         ]
         """
@@ -202,9 +236,11 @@ class USDAClient:
         """Return True when a failed search should be negative-cached."""
         if self._last_search_empty_result:
             return True
-        return self._last_search_http_status in _NEGATIVE_CACHEABLE_SEARCH_STATUSES
+        return self._last_search_http_status in NEGATIVE_CACHEABLE_SEARCH_STATUSES
 
-    def _cache_negative_barcode_result(self, barcode: str, message: str = "product not found") -> Dict:
+    def _cache_negative_barcode_result(
+        self, barcode: str, message: str = "product not found"
+    ) -> Dict:
         """Helper to cache negative barcode results and return formatted response."""
         _l1_barcodes.set(barcode, None)
         _l2["barcodes"][barcode] = {
@@ -217,7 +253,6 @@ class USDAClient:
         entry = _l2["barcodes"][barcode]
         return {k: v for k, v in entry.items() if k != "_ts"}
 
-    
     # ─────────────────────────────────────────────────────────────────────
     # Cache utilities
     # ─────────────────────────────────────────────────────────────────────
@@ -246,21 +281,22 @@ class USDAClient:
     @staticmethod
     def cache_stats() -> dict:
         """Return current cache statistics."""
-        foods    = _l2["foods"]
+        foods = _l2["foods"]
         barcodes = _l2["barcodes"]
-        expired  = sum(1 for e in foods.values()    if is_expired(e)) \
-                 + sum(1 for e in barcodes.values() if is_expired(e))
+        expired = sum(1 for e in foods.values() if is_expired(e)) + sum(
+            1 for e in barcodes.values() if is_expired(e)
+        )
         return {
-            "l1_food_entries":    len(_l1_foods),
+            "l1_food_entries": len(_l1_foods),
             "l1_barcode_entries": len(_l1_barcodes),
-            "l1_entries":         len(_l1_foods) + len(_l1_barcodes),
-            "l1_maxsize":         _L1_MAXSIZE,
-            "l2_food_entries":    len(foods),
+            "l1_entries": len(_l1_foods) + len(_l1_barcodes),
+            "l1_maxsize": L1_MAXSIZE,
+            "l2_food_entries": len(foods),
             "l2_barcode_entries": len(barcodes),
-            "l2_entries":         len(foods) + len(barcodes),
-            "l2_expired":         expired,
-            "l2_file":            _CACHE_FILE,
-            "ttl_days":           _CACHE_TTL_DAYS,
+            "l2_entries": len(foods) + len(barcodes),
+            "l2_expired": expired,
+            "l2_file": _CACHE_FILE,
+            "ttl_days": CACHE_TTL_DAYS,
         }
 
     # ─────────────────────────────────────────────────────────────────────
@@ -288,8 +324,11 @@ class USDAClient:
             self._last_search_http_status = resp.status_code
             resp.raise_for_status()
             data = resp.json()
-            logger.debug("USDA API: status=%d, totalHits=%s",
-                         resp.status_code, data.get("totalHits", "N/A"))
+            logger.debug(
+                "USDA API: status=%d, totalHits=%s",
+                resp.status_code,
+                data.get("totalHits", "N/A"),
+            )
 
             foods = data.get("foods", [])
             if not foods:
@@ -297,16 +336,27 @@ class USDAClient:
                 self._last_search_empty_result = True
                 return None
 
-            logger.info("USDA found %d result(s) for '%s'", len(foods), normalized_query)
+            logger.info(
+                "USDA found %d result(s) for '%s'", len(foods), normalized_query
+            )
             return foods
 
         except requests.exceptions.Timeout:
             logger.error("USDA API timeout for query='%s'", normalized_query)
         except requests.exceptions.HTTPError as e:
-            self._last_search_http_status = e.response.status_code if getattr(e, "response", None) is not None else None
+            self._last_search_http_status = (
+                e.response.status_code
+                if getattr(e, "response", None) is not None
+                else None
+            )
             logger.error("USDA API HTTP error: %s (query='%s')", e, normalized_query)
         except Exception as e:
-            logger.error("USDA API unexpected error: %s (query='%s')", e, normalized_query, exc_info=True)
+            logger.error(
+                "USDA API unexpected error: %s (query='%s')",
+                e,
+                normalized_query,
+                exc_info=True,
+            )
 
         return None
 
@@ -329,10 +379,12 @@ class USDAClient:
         """
         # ── Level 1: RAM LRU ──────────────────────────────────────────────
         l1_hit = _l1_foods.get(normalized_query)
-        if l1_hit is not _MISSING:
-            logger.info("search_best: L1 HIT (RAM) for '%s' → '%s'",
-                        normalized_query,
-                        l1_hit.get("description", "None") if l1_hit else "None")
+        if l1_hit is not MISSING:
+            logger.info(
+                "search_best: L1 HIT (RAM) for '%s' → '%s'",
+                normalized_query,
+                l1_hit.get("description", "None") if l1_hit else "None",
+            )
             return l1_hit
 
         # ── Level 2: Disk JSON ────────────────────────────────────────────
@@ -340,18 +392,25 @@ class USDAClient:
             entry = _l2["foods"][normalized_query]
             if not is_expired(entry):
                 food = entry.get("food")
-                logger.info("search_best: L2 HIT (disk) for '%s' → '%s'",
-                            normalized_query,
-                            food.get("description", "None") if food else "None")
+                logger.info(
+                    "search_best: L2 HIT (disk) for '%s' → '%s'",
+                    normalized_query,
+                    food.get("description", "None") if food else "None",
+                )
                 # Promote to L1
                 _l1_foods.set(normalized_query, food)
                 return food
             else:
-                logger.info("search_best: L2 EXPIRED for '%s' (age > %d days)",
-                            normalized_query, _CACHE_TTL_DAYS)
+                logger.info(
+                    "search_best: L2 EXPIRED for '%s' (age > %d days)",
+                    normalized_query,
+                    CACHE_TTL_DAYS,
+                )
 
         # ── Level 3: USDA API ─────────────────────────────────────────────
-        logger.debug("search_best: Cache MISS for '%s' → calling USDA API", normalized_query)
+        logger.debug(
+            "search_best: Cache MISS for '%s' → calling USDA API", normalized_query
+        )
         foods = self.search(normalized_query, pageSize)
 
         if foods is None:
@@ -371,17 +430,26 @@ class USDAClient:
                     self._last_search_empty_result,
                 )
             else:
-                logger.info("search_best: skip caching for '%s' (last HTTP status=%s)",
-                            normalized_query, self._last_search_http_status)
+                logger.info(
+                    "search_best: skip caching for '%s' (last HTTP status=%s)",
+                    normalized_query,
+                    self._last_search_http_status,
+                )
             return None
 
         if not foods:
-            logger.info("search_best: no foods returned for '%s'; skip negative caching", normalized_query)
+            logger.info(
+                "search_best: no foods returned for '%s'; skip negative caching",
+                normalized_query,
+            )
             return None
 
         best_food = max(foods, key=lambda x: x.get("score", 0))
-        logger.debug("search_best: best='%s' (score=%.1f)",
-                     best_food.get("description", "N/A"), best_food.get("score", 0))
+        logger.debug(
+            "search_best: best='%s' (score=%.1f)",
+            best_food.get("description", "N/A"),
+            best_food.get("score", 0),
+        )
 
         # Save to L1 + L2
         _l1_foods.set(normalized_query, best_food)
@@ -407,7 +475,9 @@ class USDAClient:
         """
         barcode = re.sub(r"\D", "", str(code or "")).strip()
         if not barcode:
-            logger.warning("search_by_barcode: invalid or empty barcode input='%s'", code)
+            logger.warning(
+                "search_by_barcode: invalid or empty barcode input='%s'", code
+            )
             return {
                 "food": None,
                 "found": False,
@@ -416,7 +486,7 @@ class USDAClient:
 
         # Level 1: RAM cache
         l1_hit = _l1_barcodes.get(barcode)
-        if l1_hit is not _MISSING:
+        if l1_hit is not MISSING:
             logger.info("search_by_barcode: L1 HIT (RAM) for code='%s'", barcode)
             if l1_hit is not None:
                 return {
@@ -440,16 +510,25 @@ class USDAClient:
                 logger.info("search_by_barcode: L2 HIT (disk) for code='%s'", barcode)
                 if entry_found:
                     _l1_barcodes.set(barcode, food)
-                    logger.info("search_by_barcode: L2 HIT (disk) for code='%s' → found", barcode)
+                    logger.info(
+                        "search_by_barcode: L2 HIT (disk) for code='%s' → found",
+                        barcode,
+                    )
                 else:
                     _l1_barcodes.set(barcode, None)
-                    logger.info("search_by_barcode: L2 HIT (disk) for code='%s' → not found", barcode)
+                    logger.info(
+                        "search_by_barcode: L2 HIT (disk) for code='%s' → not found",
+                        barcode,
+                    )
 
                 logger.info("search_by_barcode: L2 > L1 for code='%s'", barcode)
                 return {k: v for k, v in entry.items() if k != "_ts"}
             else:
-                logger.info("search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
-                           barcode, _CACHE_TTL_DAYS)
+                logger.info(
+                    "search_by_barcode: L2 EXPIRED for code='%s' (age > %d days)",
+                    barcode,
+                    CACHE_TTL_DAYS,
+                )
 
         # Level 3: API call
         search_url = f"{self.base_url}/foods/search"
@@ -461,13 +540,18 @@ class USDAClient:
         try:
             logger.info("USDA API barcode search: code='%s'", barcode)
             resp = requests.get(search_url, params=params, timeout=20)
-            logger.debug("USDA barcode API: status=%d body=%s",
-                         resp.status_code, resp.text[:120])
+            logger.debug(
+                "USDA barcode API: status=%d body=%s", resp.status_code, resp.text[:120]
+            )
 
             # Handle HTTP errors first (400, 402, 422, etc. should raise exceptions)
             # Only 404/204 are legitimate "not found" responses
-            if resp.status_code in _NEGATIVE_CACHEABLE_SEARCH_STATUSES:
-                logger.info("USDA barcode API: code '%s' not found (status=%d)", barcode, resp.status_code)
+            if resp.status_code in NEGATIVE_CACHEABLE_SEARCH_STATUSES:
+                logger.info(
+                    "USDA barcode API: code '%s' not found (status=%d)",
+                    barcode,
+                    resp.status_code,
+                )
                 return self._cache_negative_barcode_result(barcode)
 
             # Raise for other HTTP errors (400, 402, 422, 500, etc.)
@@ -475,14 +559,20 @@ class USDAClient:
 
             # Parse successful response
             raw_data = resp.json()
-            logger.debug("USDA barcode API: status=%d, totalHits=%s",
-                         resp.status_code, raw_data.get("totalHits", "N/A"))
+            logger.debug(
+                "USDA barcode API: status=%d, totalHits=%s",
+                resp.status_code,
+                raw_data.get("totalHits", "N/A"),
+            )
 
             parsed, entry_found = self._parse_barcode_response(raw_data, barcode)
 
             if not entry_found:
                 # Valid response but no product data found
-                logger.info("USDA barcode API: code '%s' - valid response but no product data", barcode)
+                logger.info(
+                    "USDA barcode API: code '%s' - valid response but no product data",
+                    barcode,
+                )
                 return self._cache_negative_barcode_result(barcode)
 
             # Success - cache positive result
@@ -506,7 +596,12 @@ class USDAClient:
         except requests.exceptions.HTTPError as e:
             logger.error("USDA barcode API HTTP error: %s (code='%s')", e, barcode)
         except Exception as e:
-            logger.error("USDA barcode API unexpected error: %s (code='%s')", e, barcode, exc_info=True)
+            logger.error(
+                "USDA barcode API unexpected error: %s (code='%s')",
+                e,
+                barcode,
+                exc_info=True,
+            )
 
         return {
             "food": None,
@@ -521,8 +616,11 @@ class USDAClient:
     def _parse_barcode_response(self, raw: dict, barcode: str) -> Tuple[dict, bool]:
         """Reduce verbose USDA barcode search payloads to a compact, app-friendly schema."""
         if not isinstance(raw, dict):
-            logger.warning("_parse_barcode_response: invalid payload type for '%s': %s",
-                           barcode, type(raw).__name__)
+            logger.warning(
+                "_parse_barcode_response: invalid payload type for '%s': %s",
+                barcode,
+                type(raw).__name__,
+            )
             return {
                 "barcode": barcode,
                 "found": False,
@@ -544,7 +642,9 @@ class USDAClient:
 
         labels = {
             "data_type": self._normalize_metadata_value(best_food.get("dataType")),
-            "market_country": self._normalize_metadata_value(best_food.get("marketCountry")),
+            "market_country": self._normalize_metadata_value(
+                best_food.get("marketCountry")
+            ),
         }
         labels = {key: value for key, value in labels.items() if value is not None}
 
@@ -562,9 +662,15 @@ class USDAClient:
         }
 
         compact = {key: value for key, value in parsed.items() if value is not None}
-        logger.debug("_parse_barcode_response: compact fields for '%s' -> %s",
-                     barcode, list(compact.keys()))
-        return compact, any(key in compact for key in ("product_name", "nutritions", "ingredients", "ingredients_text"))
+        logger.debug(
+            "_parse_barcode_response: compact fields for '%s' -> %s",
+            barcode,
+            list(compact.keys()),
+        )
+        return compact, any(
+            key in compact
+            for key in ("product_name", "nutritions", "ingredients", "ingredients_text")
+        )
 
     def _normalize_metadata_value(self, value):
         """Normalize optional metadata values, dropping placeholders like 'unknown'."""
@@ -576,10 +682,12 @@ class USDAClient:
         """
         Extract calories, protein, fat, carbs per 100g from a USDA food dict.
         """
-        logger.info("_parse_100g_nutritions: '%s' (fdcId=%s, score=%.1f)",
-                    food.get("description", "N/A"),
-                    food.get("fdcId", "N/A"),
-                    food.get("score", 0))
+        logger.info(
+            "_parse_100g_nutritions: '%s' (fdcId=%s, score=%.1f)",
+            food.get("description", "N/A"),
+            food.get("fdcId", "N/A"),
+            food.get("score", 0),
+        )
 
         result = {
             "calories": 0.0,
@@ -590,7 +698,7 @@ class USDAClient:
 
         for n in food.get("foodNutrients", []):
             nutrient_number = str(n.get("nutrientNumber", "")).strip()
-            unit  = str(n.get("unitName", "")).upper()
+            unit = str(n.get("unitName", "")).upper()
             value = n.get("value")
 
             if value is None:
@@ -615,8 +723,11 @@ class USDAClient:
         """
         raw_ingredients = food.get("ingredients", "")
         if not raw_ingredients:
-            logger.info("_parse_ingredient_string: no 'ingredients' for '%s' (fdcId=%s)",
-                        food.get("description", "N/A"), food.get("fdcId", "N/A"))
+            logger.info(
+                "_parse_ingredient_string: no 'ingredients' for '%s' (fdcId=%s)",
+                food.get("description", "N/A"),
+                food.get("fdcId", "N/A"),
+            )
             return None
 
         tokens = []
@@ -655,5 +766,3 @@ class USDAClient:
     # ─────────────────────────────────────────────────────────────────────
     # Helpers
     # ─────────────────────────────────────────────────────────────────────
-
-

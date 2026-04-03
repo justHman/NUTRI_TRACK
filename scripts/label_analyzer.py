@@ -1,18 +1,19 @@
 """
 NutriTrack Label Analyzer Script
 =================================
-Analyze nutrition labels on product packaging using Qwen3VL OCR.
+Analyze nutrition labels on product packaging using OCRER.
 
-Pipeline: Image → Qwen3VL (analyze_label) → LabelList JSON
+Pipeline: Image → OCRER (analyze_label) → LabelList JSON
 
 Usage:
     python -m app.scripts.label_analyzer <image_path>
 """
 
+import json
 import os
 import sys
 import time
-import json
+
 from dotenv import load_dotenv
 
 # project_root = app/ directory
@@ -22,36 +23,42 @@ if project_root not in sys.path:
 
 load_dotenv(os.path.join(project_root, "config", ".env"))
 
-from config.logging_config import get_logger
 from typing import Optional
-from models.QWEN3VL import Qwen3VL
+
+from config.logging_config import get_logger
+from models.OCRER import OCRER
 from utils.schemas import LabelList
 
 logger = get_logger(__name__)
 
 
-def analyze_label(image_path: Optional[str] = None, qwen: Optional[Qwen3VL] = None,
-                  image_bytes: Optional[bytes] = None, filename: Optional[str] = None) -> dict:
+def analyze_label(
+    image_path: Optional[str] = None,
+    ocrer: Optional[OCRER] = None,
+    image_bytes: Optional[bytes] = None,
+    filename: Optional[str] = None,
+) -> dict:
     """
     Analyze a nutrition label image and return structured LabelList data.
     """
     logger.title("Label Analysis Pipeline")
     logger.info("Image: %s", image_path or filename)
 
-    if qwen is None:
-        logger.info("Initializing Qwen3VL client...")
-        qwen = Qwen3VL()
+    if ocrer is None:
+        logger.info("Initializing OCRER client...")
+        ocrer = OCRER()
     else:
-        logger.debug("Using pre-initialized Qwen3VL client")
+        logger.debug("Using pre-initialized OCRER client")
 
     step_start = time.time()
-    label_result: LabelList = qwen.analyze_label(
-        image_path=image_path,
-        image_bytes=image_bytes,
-        filename=filename
+    label_result: LabelList = ocrer.analyze_label(
+        image_path=image_path, image_bytes=image_bytes, filename=filename
     )
-    logger.info("Label analysis complete %s product in %.1fs",
-                len(label_result.labels), time.time() - step_start)
+    logger.info(
+        "Label analysis complete %s product in %.1fs",
+        len(label_result.labels),
+        time.time() - step_start,
+    )
 
     return label_result.model_dump()
 
@@ -63,9 +70,9 @@ def print_label_report(results: dict):
     ingredients = results.get("ingredients", [])
     allergens = results.get("allergens", [])
 
-    print(f"\n{'='*95}")
+    print(f"\n{'=' * 95}")
     print(f"🏷️  BÁO CÁO PHÂN TÍCH NHÃN DINH DƯỠNG")
-    print(f"{'='*95}\n")
+    print(f"{'=' * 95}\n")
 
     if not product:
         print("⚠️  Không phát hiện thông tin sản phẩm.")
@@ -74,9 +81,9 @@ def print_label_report(results: dict):
     name = product.get("name", "Unknown")
     brand = product.get("brand", "")
     pid = product.get("product_id", "")
-    
+
     print(f"📦 SẢN PHẨM: {name} ({brand}) | ID: {pid}")
-    
+
     print(f"   Khẩu phần: {product.get('serving_value')} {product.get('serving_unit')}")
     print(f"   Đóng gói:  {product.get('package_value')} {product.get('package_unit')}")
 

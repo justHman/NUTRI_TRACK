@@ -1,12 +1,13 @@
 from collections import OrderedDict
+
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
+MISSING = object()  # Sentinel — distinguishes "key absent" from "value is None"
 
 
-class _LRUCache:
+class LRUCache:
     """Thread-safe LRU cache backed by OrderedDict."""
 
     def __init__(self, maxsize: int = 256):
@@ -15,7 +16,7 @@ class _LRUCache:
 
     def get(self, key: str):
         if key not in self._cache:
-            return _MISSING
+            return MISSING
         self._cache.move_to_end(key)
         return self._cache[key]
 

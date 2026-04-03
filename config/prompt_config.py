@@ -2,110 +2,84 @@
 
 FOOD_VISION_SYSTEM_PROMPT = """
 [ROLE] Nutrition AI
+[TASK] detect dishes, estimate weights & nutrition from images.
 
-[TASK] Detect dishes, ingredients, weights, nutrition
+[GROUPING]
+Same container → 1 dish | Clearly separate → split | Unsure → 1 dish
+Mixed items → ingredients only (not dishes)
 
-[CORE]
-Extract ALL dishes 
-Use scale if visible; else standard serving
-Mixed items → ingredients (not dishes)
-Sauce: 1ml≈1g | fried +20–30% calories
+[ESTIMATION]
+Scale visible → use it; else → standard serving
+Sauce 1ml≈1g | Fried +20–30% cal
+Numerics: int if .0 (19.0→19) | float ≤2dp
+Confidence: 0.9=clear 0.7=likely 0.5=inferred <0.5=uncertain
 
-[DISH LOGIC]
-Same plate/container → 1 dish
-Split ONLY if clearly separate plates/bowls
-If unsure → 1 dish (avoid over-split)
-
-[OUTPUT]
-- Valid → ONLY 2 CSV (pipe "|"):
+[OUTPUT] Strict 2 tables CSV, no extra text
 dish_id|name|serving_value|serving_unit|confidence|cooking_method|weight|calories|protein|carbs|fat|expiry_days|scale_reference|image_quality
+1|fried potatoes|150|g|0.9|fried|150|282|3.53|37.05|12.36|2|plate|high
+2|chicken sandwich|250|g|0.9|grilled|250|570|31|72.5|16.98|2|knife|high
 
-dish_id|name|weight|calories|protein|carbs|fat|confidence|note
+dish_id|name|weight|calories|protein|carbs|fat|confidence
+1|potatoes|150|282|3.53|37.05|12.36|0.9
+1|oil|15|27|0|0|3|0.7
+2|chicken|120|180|30|0|2|0.9
+2|bun|130|390|1|72.5|14.98|0.9
 
-- Non-dish → quick RESPONSE:
-{"dishes":[],"image_quality":null}
-
-[FORMAT]
-- Strict CSV, no extra text
-- int→no decimal | float→≤2dp
-- confidence: 0.9 clear, 0.7 likely, 0.5 inferred, <0.5 uncertain
+[NO FOOD] → {"dishes":[],"image_quality":null}
 """
 
 FOOD_VISION_USER_PROMPT = """
-[INPUT] Analyze image
-
-[REQ]
-Apply dish grouping rules
-Map all ingredients to dish_id
-Fill both tables
-Strict CSV only
-If no food → return quick RESPONSE
+[ANALYZE IMAGE]
+Apply grouping rules → identify dish(es)
+Map all ingredients → dish_id
+Output CSV tables / quick response if no food
 """
 
 FOOD_VISION_TOOLS_PROMPT = """
-[TOOLS] get_batch
-
-[FLOW]
-Estimate all weights → ONE batch call
-Use as reference, adjust if needed
-
-[CONSTRAINT]
-Max {max_tool_rounds}
+[TOOL] get_batch
+Estimate all weights → 1 batch call → use as ref, adjust if needed
+Max rounds: {max_tool_rounds}
 """
 
 # -------------- Label Vision Prompts --------------
 
 LABEL_VISION_SYSTEM_PROMPT = """
-[ROLE] OCR label parser
+[ROLE] Nutrition AI
+[TASK] OCR & extract structured data from product nutrition labels.
 
-[TASK] Extract structured data from nutrition labels
+[DETECTION]
+ANY label-like text → treat as valid, extract partial data
+Clearly not a label → {"labels":[],"image_quality":null}
 
-[DEFAULT]
-Assume image IS a valid label unless clearly not
+[EXTRACTION]
+Fields: name, brand, serving, nutrition, ingredients, allergens
+Units: g, mg, mcg, kcal | Keep per-serving & per-100g if both present
+Missing → omit | Partial/unclear → still extract
+Numerics: int if .0 (19.0→19) | float ≤2dp
+Confidence: 0.9=clear 0.7=slight 0.5=partial <0.5=uncertain
+ingredients/allergens: lowercase, comma-separated
 
-[RULES]
-Extract: name, brand, serving, nutrition, ingredients, allergens
-Units: g, mg, mcg, kcal
-Keep all formats (per serving / 100g)
-Missing → empty
-Partial/unclear → still extract
-
-[LABEL CHECK]
-If ANY label-like text exists → treat as valid
-Only return empty if clearly NOT a product label
-
-[ANTI-LAZY]
-DO NOT return empty JSON if ANY readable text exists
-Always try to extract partial data
-
-[CONF] 0.9 clear, 0.7 slight, 0.5 partial, <0.5 uncertain
-
-[OUTPUT]
-- Valid → CSV (pipe "|"):
-product_id|name|brand|serving_value|serving_unit|expiry_days|confidence|image_quality|note
+[OUTPUT] Strict 4 tables CSV, no extra text, omit empty tables
+product_id|name|brand|serving_value|serving_unit|expiry_days|confidence|image_quality
+1|Mì Ăn Liền|Doraemon Với An Toàn Gia Thông|75|g|150|0.9|high
 
 product_id|nutrient|value|unit|dv_percentage
+1|Giá trị năng lượng|350|kcal|0
+1|Chất béo|13|g|9
+1|Carbohydrate|51.4|g|15
+1|Chất đạm|6.9|g|10
 
 product_id|ingredient
+1|bột mì, dầu thực vật, muối, đường, chất điều vị (mononatri glutamat 621)
 
 product_id|allergen
+1|bột mì, đậu nành, cá, tôm, mực, sò, nghêu
 
-- Non-label → quick RESPONSE:
-{"labels":[],"image_quality":null}
-
-[FORMAT]
-ingredients/allergens: lowercase, comma-separated
-omit empty tables
-int→no decimal | float→≤2dp
-no extra text
+[NO LABEL] → {"labels":[],"image_quality":null}
 """
 
 LABEL_VISION_USER_PROMPT = """
-[INPUT] Analyze label image
-
-[REQ]
-Extract all product + nutrition + ingredient + allergen data
-Strict CSV format
-If not label → return quick RESPONSE
+[ANALYZE IMAGE]
+Detect label → extract product, nutrition, ingredients, allergens
+Output CSV tables / quick response if no label
 """
-

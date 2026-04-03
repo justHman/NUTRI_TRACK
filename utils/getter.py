@@ -1,10 +1,12 @@
-from jose import jwt
-from dotenv import load_dotenv
+import json
 import os
+import socket
 import time
 import urllib.request
-import json
-import socket
+
+import pyperclip
+from dotenv import load_dotenv
+from jose import jwt
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "config", ".env"))
 
@@ -42,13 +44,12 @@ def get_ip() -> str:
     except Exception:
         return "unknown"
 
+
 if __name__ == "__main__":
     token = jwt.encode(
-        {
-            'service': 'backend',
-            'exp': int(time.time()) + 24 * 3600
-        },
-        os.getenv('NUTRITRACK_API_KEY'),
-        algorithm='HS256'
+        {"service": "backend", "exp": int(time.time()) + 3600},
+        os.getenv("NUTRITRACK_API_KEY"),
+        algorithm="HS256",
     )
+    pyperclip.copy(token)
     print(token)

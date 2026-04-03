@@ -1,11 +1,11 @@
-import re
-import unicodedata
-from typing import Dict
-import sys
-import os
 import csv
 import io
 import json
+import os
+import re
+import sys
+import unicodedata
+from typing import Dict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,19 +13,21 @@ from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 def clean_csv_raw_text(raw_text: str) -> str:
     text = raw_text.strip()
     text = re.sub(r"```(?:csv)?\s*([\s\S]*?)```", r"\1", text, flags=re.IGNORECASE)
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
-    text = re.sub(r'\s*,\s*', ',', text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"\s*,\s*", ",", text)
     text = "\n".join(line.strip() for line in text.split("\n"))
-    text = re.sub(r'\n{2,}', '\n\n', text)
+    text = re.sub(r"\n{2,}", "\n\n", text)
     parts = [p.strip() for p in text.split("\n\n") if p.strip()]
     if len(parts) >= 2:
         cleaned_text = "\n\n".join(parts)
     elif parts:
         cleaned_text = parts[0]
     return cleaned_text
+
 
 def safe_float(value, default=0.0):
     """Safely convert value to float, handling None, empty strings, and strings."""
@@ -35,6 +37,7 @@ def safe_float(value, default=0.0):
         return float(value)
     except (ValueError, TypeError):
         return default
+
 
 def normalize_query(query: str) -> str:
     """
@@ -56,15 +59,17 @@ def normalize_query(query: str) -> str:
     # Remove common trademark symbols before normalization so they don't expand to letters like 'TM'
     query = re.sub(r"[\u2122\u00ae\u00a9]", "", query)
 
-    query = unicodedata.normalize('NFKD', query)
-    query = ''.join([c for c in query if not unicodedata.combining(c)])
+    query = unicodedata.normalize("NFKD", query)
+    query = "".join([c for c in query if not unicodedata.combining(c)])
 
     match = re.match(r"^(.*?)\s*\(.*?\)", query)
     if match:
         prefix = match.group(1).strip()
         if len(prefix) >= 2:
             query = prefix
-            logger.debug("normalize_query: extracted prefix '%s' from '%s'", prefix, original)
+            logger.debug(
+                "normalize_query: extracted prefix '%s' from '%s'", prefix, original
+            )
 
     query = re.sub(r"[-_]", " ", query)
     query = re.sub(r"[()]", "", query)
@@ -73,6 +78,7 @@ def normalize_query(query: str) -> str:
 
     logger.debug("normalize_query: '%s' → '%s'", original, query)
     return query
+
 
 def get_mock_nutrition(query: str) -> Dict[str, float]:
     """Safe mock fallback when no API key or no result."""
@@ -84,10 +90,11 @@ def get_mock_nutrition(query: str) -> Dict[str, float]:
         "carbs": 15.0,
     }
 
+
 def batch_to_csv(batch):
     """
     Input:[
-            ["apple", 52.0, 0.26, 13.84, 0.17, ["apple"], 100], 
+            ["apple", 52.0, 0.26, 13.84, 0.17, ["apple"], 100],
             ["banana", 89.0, 1.09, 22.84, 0.33, ["banana"], 100]
         ]
     Output:
@@ -96,7 +103,7 @@ def batch_to_csv(batch):
         banana|100|1.09|27|0.33|banana|100;
     """
     lines = ["name|calories|protein|carbs|fat|ingredients|weight"]
-    
+
     def _opt(x):
         return int(x) if isinstance(x, float) and x.is_integer() else x
 
@@ -112,6 +119,7 @@ def batch_to_csv(batch):
 
     return ";".join(lines)
 
+
 def normalize_number(x):
     """Convert number: 19.0 -> 19"""
     try:
@@ -119,6 +127,7 @@ def normalize_number(x):
         return int(x) if x.is_integer() else round(x, 2)
     except:
         return x
+
 
 def parse_table_block(block_text, delimiter=None):
     """Parse a table block into list[dict] with configurable/auto delimiter."""
@@ -142,6 +151,7 @@ def parse_table_block(block_text, delimiter=None):
             normalized_row[nk] = nv
         parsed_rows.append(normalized_row)
     return parsed_rows
+
 
 def parse_list_field_with_nesting(field_str):
     """Extract list items, preserving commas inside paired (), [] or {}."""
@@ -187,6 +197,7 @@ def parse_list_field_with_nesting(field_str):
 
     return items
 
+
 def parse_key_value_section(section_text, value_parser=None):
     """Parse lines in format key|value with only first pipe as splitter."""
     parser = value_parser or (lambda x: x)
@@ -203,6 +214,7 @@ def parse_key_value_section(section_text, value_parser=None):
             result[key] = parser(value)
     return result
 
+
 def convert_food_csv_to_json(text):
     """
     Input: raw text chứa 2 bảng CSV (có thể dính nhau hoặc cách nhau bởi dòng trống)
@@ -211,10 +223,7 @@ def convert_food_csv_to_json(text):
     text = (text or "").strip()
 
     if not text:
-        return {
-            "dishes": [],
-            "image_quality": None
-        }
+        return {"dishes": [], "image_quality": None}
 
     # Non-food / no-dish shortcut contract:
     # {
@@ -228,17 +237,13 @@ def convert_food_csv_to_json(text):
                 dishes = payload.get("dishes") or []
                 if len(dishes) == 0:
                     logger.info("Detected non-food JSON payload with empty dishes")
-                    return {
-                        "dishes": [],
-                        "image_quality": None
-                    }
+                    return {"dishes": [], "image_quality": None}
                 # Keep compatibility if upstream starts returning non-empty dishes as JSON.
-                return {
-                    "dishes": dishes,
-                    "image_quality": payload.get("image_quality")
-                }
+                return {"dishes": dishes, "image_quality": payload.get("image_quality")}
         except json.JSONDecodeError:
-            logger.debug("Input starts with '{' but is not valid JSON, fallback to CSV parsing")
+            logger.debug(
+                "Input starts with '{' but is not valid JSON, fallback to CSV parsing"
+            )
 
     # Find the second table start. Both table headers start with dish_id
     # and can be either pipe-delimited or comma-delimited.
@@ -253,8 +258,8 @@ def convert_food_csv_to_json(text):
         ingredient_csv = parts[1]
     else:
         # Bảng 2 bắt đầu tại matches[1].start()
-        dish_csv = text[:matches[1].start()].strip()
-        ingredient_csv = text[matches[1].start():].strip()
+        dish_csv = text[: matches[1].start()].strip()
+        ingredient_csv = text[matches[1].start() :].strip()
 
     dishes_raw = parse_table_block(dish_csv)
     ingredients_raw = parse_table_block(ingredient_csv)
@@ -264,7 +269,9 @@ def convert_food_csv_to_json(text):
     for ing in ingredients_raw:
         dish_id = (ing.get("dish_id") or "").strip()
         if not dish_id:
-            logger.debug("convert_food_csv_to_json: skip ingredient row without dish_id: %s", ing)
+            logger.debug(
+                "convert_food_csv_to_json: skip ingredient row without dish_id: %s", ing
+            )
             continue
         ingredient_map.setdefault(dish_id, []).append(ing)
 
@@ -289,41 +296,46 @@ def convert_food_csv_to_json(text):
     for d in dishes_raw:
         dish_id = (d.get("dish_id") or "").strip()
         if not dish_id:
-            logger.debug("convert_food_csv_to_json: skip dish row without dish_id: %s", d)
+            logger.debug(
+                "convert_food_csv_to_json: skip dish row without dish_id: %s", d
+            )
             continue
 
         ingredients = []
         for ing in ingredient_map.get(dish_id, []):
-            ingredients.append({
-                "name": ing.get("name", ""),
-                "weight": normalize_number(ing.get("weight", 0)),
-                "nutritions": {
-                    "calories": normalize_number(ing.get("calories", 0)),
-                    "protein": normalize_number(ing.get("protein", 0)),
-                    "carbs": normalize_number(ing.get("carbs", 0)),
-                    "fat": normalize_number(ing.get("fat", 0)),
-                },
-                "confidence": safe_float(ing.get("confidence"), 0.9),
-                "note": ing.get("note", "")
-            })
+            ingredients.append(
+                {
+                    "name": ing.get("name", ""),
+                    "weight": normalize_number(ing.get("weight", 0)),
+                    "nutritions": {
+                        "calories": normalize_number(ing.get("calories", 0)),
+                        "protein": normalize_number(ing.get("protein", 0)),
+                        "carbs": normalize_number(ing.get("carbs", 0)),
+                        "fat": normalize_number(ing.get("fat", 0)),
+                    },
+                    "confidence": safe_float(ing.get("confidence"), 0.9),
+                }
+            )
 
-        dishes.append({
-            "name": d.get("name", ""),
-            "serving_value": normalize_number(d.get("serving_value", 0)),
-            "serving_unit": d.get("serving_unit", ""),
-            "confidence": safe_float(d.get("confidence"), 0.9),
-            "cooking_method": d.get("cooking_method", ""),
-            "ingredients": ingredients,
-            "weight": normalize_number(d.get("weight", 0)),
-            "nutritions": {
-                "calories": normalize_number(d.get("calories", 0)),
-                "protein": normalize_number(d.get("protein", 0)),
-                "carbs": normalize_number(d.get("carbs", 0)),
-                "fat": normalize_number(d.get("fat", 0)),
-            },
-            "expiry_days": parse_optional_int(d.get("expiry_days")),
-            "scale_reference": d.get("scale_reference", "")
-        })
+        dishes.append(
+            {
+                "name": d.get("name", ""),
+                "serving_value": normalize_number(d.get("serving_value", 0)),
+                "serving_unit": d.get("serving_unit", ""),
+                "confidence": safe_float(d.get("confidence"), 0.9),
+                "cooking_method": d.get("cooking_method", ""),
+                "ingredients": ingredients,
+                "weight": normalize_number(d.get("weight", 0)),
+                "nutritions": {
+                    "calories": normalize_number(d.get("calories", 0)),
+                    "protein": normalize_number(d.get("protein", 0)),
+                    "carbs": normalize_number(d.get("carbs", 0)),
+                    "fat": normalize_number(d.get("fat", 0)),
+                },
+                "expiry_days": parse_optional_int(d.get("expiry_days")),
+                "scale_reference": d.get("scale_reference", ""),
+            }
+        )
 
         # Backward/forward compatibility for merged column naming.
         merged_scale_quality = d.get("scale_reference/image_quality", "")
@@ -333,17 +345,15 @@ def convert_food_csv_to_json(text):
         if d.get("image_quality") and image_quality == "unknown":
             image_quality = d.get("image_quality")
 
-    return {
-        "dishes": dishes,
-        "image_quality": image_quality
-    }
+    return {"dishes": dishes, "image_quality": image_quality}
+
 
 def convert_label_csv_to_json(text: str):
     """
     Convert multi-section CSV format to JSON.
 
     Input: raw text with 4 CSV sections separated by blank lines (pipe-delimited):
-        1. Product info (product_id|name|brand|serving_value|serving_unit|confidence|note)
+        1. Product info (product_id|name|brand|serving_value|serving_unit|confidence)
         2. Nutrition facts (product_id|nutrient|value|unit|dv_percentage)
         3. Ingredients (product_id|ingredients) - ingredients is comma-separated list "item1,item2,..."
         4. Allergens (product_id|allergens) - allergens is comma-separated list "item1,item2,..."
@@ -361,8 +371,7 @@ def convert_label_csv_to_json(text: str):
                     "ingredients": [str, ...],
                     "allergens": [str, ...],
                     "expiry_days": Optional[int],
-                    "confidence": float,
-                    "note": str
+                    "confidence": float
                 },
                 "image_quality": str
             ]
@@ -372,7 +381,7 @@ def convert_label_csv_to_json(text: str):
 
     if not text:
         return {"labels": []}
-    
+
     if text.startswith("{"):
         try:
             payload = json.loads(text)
@@ -385,7 +394,9 @@ def convert_label_csv_to_json(text: str):
                 # If upstream returns non-empty labels as JSON, keep compatibility.
                 return {"labels": labels, "image_quality": image_quality}
         except json.JSONDecodeError:
-            logger.debug("Input starts with '{' but is not valid JSON, fallback to CSV parsing")
+            logger.debug(
+                "Input starts with '{' but is not valid JSON, fallback to CSV parsing"
+            )
 
     # Split into sections by double newline
     sections = [s.strip() for s in text.split("\n\n") if s.strip()]
@@ -398,7 +409,9 @@ def convert_label_csv_to_json(text: str):
     products_data = parse_table_block(sections[0], delimiter="|")
     nutrition_data = parse_table_block(sections[1], delimiter="|")
 
-    logger.debug(f"Parsed {len(products_data)} products, {len(nutrition_data)} nutrition rows")
+    logger.debug(
+        f"Parsed {len(products_data)} products, {len(nutrition_data)} nutrition rows"
+    )
 
     # Group nutrition by product_id
     nutrition_map = {}
@@ -409,26 +422,40 @@ def convert_label_csv_to_json(text: str):
         nutrition_map.setdefault(product_id, []).append(row)
 
     # Group ingredients/allergens by product_id (optional sections)
-    ingredients_map = parse_key_value_section(sections[2], value_parser=parse_list_field_with_nesting) if len(sections) >= 3 else {}
-    allergens_map = parse_key_value_section(sections[3], value_parser=parse_list_field_with_nesting) if len(sections) >= 4 else {}
+    ingredients_map = (
+        parse_key_value_section(sections[2], value_parser=parse_list_field_with_nesting)
+        if len(sections) >= 3
+        else {}
+    )
+    allergens_map = (
+        parse_key_value_section(sections[3], value_parser=parse_list_field_with_nesting)
+        if len(sections) >= 4
+        else {}
+    )
 
     # Build output
     labels = []
     print(products_data)
     for product in products_data:
-        product_id = (product.get("product_id") or "").strip() if isinstance(product.get("product_id"), str) else product.get("product_id")
+        product_id = (
+            (product.get("product_id") or "").strip()
+            if isinstance(product.get("product_id"), str)
+            else product.get("product_id")
+        )
         if not product_id:
             continue
 
         # Build nutrition array
         nutrition = []
         for n in nutrition_map.get(product_id, []):
-            nutrition.append({
-                "nutrient": n.get("nutrient", ""),
-                "value": safe_float(n.get("value")),
-                "unit": n.get("unit", ""),
-                "dv_percentage": safe_float(n.get("dv_percentage"))
-            })
+            nutrition.append(
+                {
+                    "nutrient": n.get("nutrient", ""),
+                    "value": safe_float(n.get("value")),
+                    "unit": n.get("unit", ""),
+                    "dv_percentage": safe_float(n.get("dv_percentage")),
+                }
+            )
 
         label = {
             "product_id": int(product_id) if product_id.isdigit() else product_id,
@@ -439,20 +466,22 @@ def convert_label_csv_to_json(text: str):
             "nutrition": nutrition,
             "ingredients": ingredients_map.get(product_id, []),
             "allergens": allergens_map.get(product_id, []),
-            "expiry_days": int(product.get("expiry_days")) if str(product.get("expiry_days", "")).isdigit() else None,
+            "expiry_days": int(product.get("expiry_days"))
+            if str(product.get("expiry_days", "")).isdigit()
+            else None,
             "confidence": safe_float(product.get("confidence")),
-            "note": product.get("note", "")
         }
 
         labels.append(label)
 
     logger.info(f"Successfully converted {len(labels)} labels to JSON")
     return {"labels": labels}
-    
+
+
 if __name__ == "__main__":
     raw = """
-product_id|name|brand|serving_value|serving_unit|expiry_days|confidence|image_quality|note
-1|||30|g||0.9|high|
+product_id|name|brand|serving_value|serving_unit|expiry_days|confidence|image_quality
+1|||30|g||0.9|high
 
 product_id|nutrient|value|unit|dv_percentage
 1|Calories|150|kcal|0

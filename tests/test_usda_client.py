@@ -13,7 +13,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.logging_config import get_logger
-from utils.test_helpers import silence_console, restore_console
+from utils.test_helpers import restore_console, silence_console
 
 logger = get_logger(__name__)
 
@@ -30,6 +30,7 @@ QUERIES = [
 # ── Individual test functions ─────────────────────────────────────────────────
 # Each returns list of (ok: bool|None, label: str, detail: str) — one tuple per case.
 
+
 def _test_get_nutritions(usda_client) -> list:
     """Tests all QUERIES. Returns list of (ok, label, detail) per query."""
     results = []
@@ -41,10 +42,17 @@ def _test_get_nutritions(usda_client) -> list:
             for key in ("calories", "protein", "fat", "carbs"):
                 assert key in r and isinstance(r[key], (int, float))
             if expect_gt > 0:
-                assert r["calories"] > expect_gt, f"cal={r['calories']:.1f} ≤ {expect_gt}"
-            results.append((True, f"'{query}'",
-                            f"cal={r['calories']:.1f}  pro={r['protein']:.1f}"
-                            f"  fat={r['fat']:.1f}  carb={r['carbs']:.1f}"))
+                assert r["calories"] > expect_gt, (
+                    f"cal={r['calories']:.1f} ≤ {expect_gt}"
+                )
+            results.append(
+                (
+                    True,
+                    f"'{query}'",
+                    f"cal={r['calories']:.1f}  pro={r['protein']:.1f}"
+                    f"  fat={r['fat']:.1f}  carb={r['carbs']:.1f}",
+                )
+            )
         except Exception as e:
             results.append((False, f"'{query}'", str(e)))
     return results
@@ -72,8 +80,13 @@ def _test_nutritions_and_ingredients(usda_client) -> list:
         nut = r["nutritions"]
         for key in ("calories", "protein", "fat", "carbs"):
             assert key in nut
-        return [(True, f"'{query}'",
-                 f"desc='{r['description']}'  cal={nut['calories']:.1f}")]
+        return [
+            (
+                True,
+                f"'{query}'",
+                f"desc='{r['description']}'  cal={nut['calories']:.1f}",
+            )
+        ]
     except Exception as e:
         return [(False, f"'{query}'", str(e))]
 
@@ -87,9 +100,14 @@ def _test_nutritions_by_weight(usda_client) -> list:
         assert isinstance(r, dict) and "nutritions" in r and "weight_g" in r
         assert r["weight_g"] == weight_g
         nut = r["nutritions"]
-        return [(True, f"'{query}' {weight_g:.0f}g",
-                 f"cal={nut['calories']:.1f}  pro={nut['protein']:.1f}"
-                 f"  fat={nut['fat']:.1f}  carb={nut['carbs']:.1f}")]
+        return [
+            (
+                True,
+                f"'{query}' {weight_g:.0f}g",
+                f"cal={nut['calories']:.1f}  pro={nut['protein']:.1f}"
+                f"  fat={nut['fat']:.1f}  carb={nut['carbs']:.1f}",
+            )
+        ]
     except Exception as e:
         return [(False, f"'{query}' {weight_g:.0f}g", str(e))]
 
@@ -109,15 +127,18 @@ def _test_cache_l1_hit(usda_client) -> list:
 
 def _test_cache_l2_hit(usda_client) -> list:
     try:
-        from third_apis.USDA import _l2, _l1_foods, get_now_ts, _MISSING, USDAClient
+        from third_apis.USDA import MISSING, USDAClient, _l1_foods, _l2, get_now_ts
+
         query = "__l2test_chicken__"
         fake_food = {
-            "fdcId": 999999, "description": "Test Chicken L2", "score": 100.0,
+            "fdcId": 999999,
+            "description": "Test Chicken L2",
+            "score": 100.0,
             "foodNutrients": [
                 {"nutrientNumber": "208", "unitName": "KCAL", "value": 165.0},
-                {"nutrientNumber": "203", "unitName": "G",    "value": 31.0},
-                {"nutrientNumber": "204", "unitName": "G",    "value": 3.6},
-                {"nutrientNumber": "205", "unitName": "G",    "value": 0.0},
+                {"nutrientNumber": "203", "unitName": "G", "value": 31.0},
+                {"nutrientNumber": "204", "unitName": "G", "value": 3.6},
+                {"nutrientNumber": "205", "unitName": "G", "value": 0.0},
             ],
         }
         _l2["foods"][query] = {
@@ -127,18 +148,19 @@ def _test_cache_l2_hit(usda_client) -> list:
             "_ts": get_now_ts(),
         }
         USDAClient.clear_l1_cache()
-        assert _l1_foods.get(query) is _MISSING
+        assert _l1_foods.get(query) is MISSING
         start = time.time()
         r = usda_client.search_best(query)
         elapsed = time.time() - start
         assert r is not None and r.get("description") == "Test Chicken L2"
         l1_val = _l1_foods.get(query)
-        assert l1_val is not _MISSING and l1_val.get("description") == "Test Chicken L2"
+        assert l1_val is not MISSING and l1_val.get("description") == "Test Chicken L2"
         return [(True, "synthetic inject+promote", f"{elapsed:.4f}s  L1 promoted ✓")]
     except Exception as e:
         return [(False, "synthetic inject+promote", str(e))]
     finally:
-        from third_apis.USDA import _l2, USDAClient
+        from third_apis.USDA import USDAClient, _l2
+
         _l2["foods"].pop("__l2test_chicken__", None)
         USDAClient.clear_l1_cache()
 
@@ -146,6 +168,7 @@ def _test_cache_l2_hit(usda_client) -> list:
 def _test_mock_data() -> list:
     """Tests 3 queries against DEMO_KEY client — each should return mock fallback data."""
     from third_apis.USDA import USDAClient
+
     mock_client = USDAClient(api_key="DEMO_KEY")
     EXPECTED = {"calories": 100.0, "protein": 5.0, "fat": 3.0, "carbs": 15.0}
     results = []
@@ -165,10 +188,22 @@ def _test_cache_stats(usda_client) -> list:
     try:
         s = usda_client.cache_stats()
         assert isinstance(s, dict)
-        for key in ("l1_entries", "l1_maxsize", "l2_entries", "l2_expired", "l2_file", "ttl_days"):
+        for key in (
+            "l1_entries",
+            "l1_maxsize",
+            "l2_entries",
+            "l2_expired",
+            "l2_file",
+            "ttl_days",
+        ):
             assert key in s
-        return [(True, "cache_stats()",
-                 f"L1={s['l1_entries']}/{s['l1_maxsize']}  L2={s['l2_entries']} (expired={s['l2_expired']})")]
+        return [
+            (
+                True,
+                "cache_stats()",
+                f"L1={s['l1_entries']}/{s['l1_maxsize']}  L2={s['l2_entries']} (expired={s['l2_expired']})",
+            )
+        ]
     except Exception as e:
         return [(False, "cache_stats()", str(e))]
 
@@ -176,14 +211,15 @@ def _test_cache_stats(usda_client) -> list:
 def _test_normalize_query(usda_client) -> list:
     """Tests all normalization cases. Returns one (ok, label, detail) per case."""
     from utils.transformer import normalize_query
+
     cases = [
         ("Chicken Breast", "chicken breast"),
         ("  white rice  ", "white rice"),
-        ("cơm tấm",        "com tam"),
-        ("phở bò",         "pho bo"),
-        ("egg (fried)",    "egg"),
-        ("fish-sauce",     "fish sauce"),
-        ("",               ""),
+        ("cơm tấm", "com tam"),
+        ("phở bò", "pho bo"),
+        ("egg (fried)", "egg"),
+        ("fish-sauce", "fish sauce"),
+        ("", ""),
     ]
     results = []
     for raw, expected in cases:
@@ -203,10 +239,10 @@ def _test_search_by_barcode(usda_client) -> list:
     """Test search_by_barcode() returns streamlined response format."""
     cases = [
         ("8934563138165", "found=False"),  # numeric barcode not in USDA
-        ("abc",           "invalid"),      # non-numeric -> validation error
-        ("",              "invalid"),      # empty -> validation error
+        ("abc", "invalid"),  # non-numeric -> validation error
+        ("", "invalid"),  # empty -> validation error
         ("  123456789  ", "found=False"),  # numeric barcode not in USDA
-        ("000000000000", "found=False")    # numeric barcode not in USDA
+        ("000000000000", "found=False"),  # numeric barcode not in USDA
     ]
     results = []
 
@@ -215,7 +251,9 @@ def _test_search_by_barcode(usda_client) -> list:
             result = usda_client.search_by_barcode(code)
 
             # All responses should be dict with consistent format
-            assert isinstance(result, dict), f"expected dict, got {type(result).__name__}"
+            assert isinstance(result, dict), (
+                f"expected dict, got {type(result).__name__}"
+            )
             assert "food" in result
             assert "found" in result and isinstance(result["found"], bool)
             assert "message" in result
@@ -235,14 +273,23 @@ def _test_search_by_barcode(usda_client) -> list:
                 assert isinstance(result["food"], dict)
                 # Should have product info specific to USDA
                 expected_fields = ["barcode", "description", "nutritions", "fdcId"]
-                found_fields = [field for field in expected_fields if field in result["food"]]
-                assert len(found_fields) > 0, f"Expected at least one of {expected_fields}"
-                results.append((True, f"'{code}'", f"found=True, food has {found_fields}"))
+                found_fields = [
+                    field for field in expected_fields if field in result["food"]
+                ]
+                assert len(found_fields) > 0, (
+                    f"Expected at least one of {expected_fields}"
+                )
+                results.append(
+                    (True, f"'{code}'", f"found=True, food has {found_fields}")
+                )
             else:
                 assert result["food"] is None or isinstance(result["food"], dict)
                 if isinstance(result["food"], dict):
                     assert result["food"].get("barcode") == code
-                assert "not found" in result["message"].lower() or "0 results" in result["message"].lower()
+                assert (
+                    "not found" in result["message"].lower()
+                    or "0 results" in result["message"].lower()
+                )
                 results.append((True, f"'{code}'", "found=False (no USDA data)"))
 
         except Exception as e:
@@ -255,7 +302,7 @@ def _test_barcode_cache(usda_client) -> list:
     """Test L2->L1 promotion and L1 hit behavior for search_by_barcode()."""
     results = []
     from third_apis import USDA as usda_module
-    from third_apis.USDA import _l1_barcodes, _l2, get_now_ts, _MISSING, USDAClient
+    from third_apis.USDA import MISSING, USDAClient, _l1_barcodes, _l2, get_now_ts
 
     barcode = "8934563138166"
 
@@ -265,7 +312,12 @@ def _test_barcode_cache(usda_client) -> list:
             "barcode": barcode,
             "description": "Barcode L2 USDA Test Food",
             "fdcId": 789012,
-            "nutritions": {"calories": 165.0, "protein": 31.0, "fat": 3.6, "carbs": 0.0},
+            "nutritions": {
+                "calories": 165.0,
+                "protein": 31.0,
+                "fat": 3.6,
+                "carbs": 0.0,
+            },
         }
         _l2["barcodes"][barcode] = {
             "food": fake_l2_food,
@@ -274,7 +326,7 @@ def _test_barcode_cache(usda_client) -> list:
             "_ts": get_now_ts(),
         }
         USDAClient.clear_l1_cache()
-        assert _l1_barcodes.get(barcode) is _MISSING
+        assert _l1_barcodes.get(barcode) is MISSING
 
         # Test L2 -> L1 promotion
         got_l2 = usda_client.search_by_barcode(barcode)
@@ -285,16 +337,23 @@ def _test_barcode_cache(usda_client) -> list:
 
         # Verify L1 promotion
         promoted = _l1_barcodes.get(barcode)
-        assert promoted is not _MISSING
+        assert promoted is not MISSING
         assert promoted == fake_l2_food
-        results.append((True, "L2->L1 promotion", "barcode cache promoted successfully"))
+        results.append(
+            (True, "L2->L1 promotion", "barcode cache promoted successfully")
+        )
 
         # L1 hit should not call network
         fake_l1_food = {
             "barcode": barcode,
             "description": "Barcode L1 USDA Test Food",
             "fdcId": 789013,
-            "nutritions": {"calories": 165.0, "protein": 31.0, "fat": 3.6, "carbs": 0.0},
+            "nutritions": {
+                "calories": 165.0,
+                "protein": 31.0,
+                "fat": 3.6,
+                "carbs": 0.0,
+            },
         }
         _l1_barcodes.set(barcode, fake_l1_food)
         original_get = usda_module.requests.get
@@ -324,6 +383,7 @@ def _test_barcode_cache(usda_client) -> list:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
 def run_all(usda_client) -> list:
     """Run all USDA client tests.
 
@@ -349,23 +409,49 @@ def run_all(usda_client) -> list:
         return passed == total
 
     try:
-        print("\n─── USDA Client Tests ─────────────────────────────────────────────────", flush=True)
-        group_results.append(_print_group("NUTRITION TESTS",  _test_get_nutritions(usda_client)))
-        group_results.append(_print_group("INGREDIENTS TEST", _test_get_ingredients(usda_client)))
-        group_results.append(_print_group("NUTR+ING TEST",    _test_nutritions_and_ingredients(usda_client)))
-        group_results.append(_print_group("BY WEIGHT TEST",   _test_nutritions_by_weight(usda_client)))
-        group_results.append(_print_group("CACHE L1 TEST",    _test_cache_l1_hit(usda_client)))
-        group_results.append(_print_group("CACHE STATS TEST", _test_cache_stats(usda_client)))
-        group_results.append(_print_group("NORMALIZE TESTS",  _test_normalize_query(usda_client)))
-        group_results.append(_print_group("BARCODE TEST",     _test_search_by_barcode(usda_client)))
-        group_results.append(_print_group("BARCODE CACHE TEST", _test_barcode_cache(usda_client)))
-        group_results.append(_print_group("CACHE L2 TEST",    _test_cache_l2_hit(usda_client)))
-        group_results.append(_print_group("MOCK TEST",        _test_mock_data()))
+        print(
+            "\n─── USDA Client Tests ─────────────────────────────────────────────────",
+            flush=True,
+        )
+        group_results.append(
+            _print_group("NUTRITION TESTS", _test_get_nutritions(usda_client))
+        )
+        group_results.append(
+            _print_group("INGREDIENTS TEST", _test_get_ingredients(usda_client))
+        )
+        group_results.append(
+            _print_group("NUTR+ING TEST", _test_nutritions_and_ingredients(usda_client))
+        )
+        group_results.append(
+            _print_group("BY WEIGHT TEST", _test_nutritions_by_weight(usda_client))
+        )
+        group_results.append(
+            _print_group("CACHE L1 TEST", _test_cache_l1_hit(usda_client))
+        )
+        group_results.append(
+            _print_group("CACHE STATS TEST", _test_cache_stats(usda_client))
+        )
+        group_results.append(
+            _print_group("NORMALIZE TESTS", _test_normalize_query(usda_client))
+        )
+        group_results.append(
+            _print_group("BARCODE TEST", _test_search_by_barcode(usda_client))
+        )
+        group_results.append(
+            _print_group("BARCODE CACHE TEST", _test_barcode_cache(usda_client))
+        )
+        group_results.append(
+            _print_group("CACHE L2 TEST", _test_cache_l2_hit(usda_client))
+        )
+        group_results.append(_print_group("MOCK TEST", _test_mock_data()))
 
         passed = sum(group_results)
         total = len(group_results)
         icon = "✅" if passed == total else "❌"
-        print(f"\n───────────────────────────────────────────────────────────────────────", flush=True)
+        print(
+            f"\n───────────────────────────────────────────────────────────────────────",
+            flush=True,
+        )
         print(f"  {passed}/{total} groups passed {icon}\n", flush=True)
         return group_results
     finally:

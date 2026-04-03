@@ -15,34 +15,34 @@ Endpoints:
 """
 
 import os
+import socket
 import sys
 import time
-import socket
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.openapi.utils import get_openapi
-from fastapi.security import HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
-from jose import ExpiredSignatureError, JWTError, jwt
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.security import HTTPBearer
+from jose import ExpiredSignatureError, JWTError, jwt
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from config.logging_config import get_logger
-from models.QWEN3VL import Qwen3VL
+from config.logging_config import NutriLogger, get_logger
+from models.ANALYSIST import ANALYSIST
+from models.OCRER import OCRER
+from scripts.food_analyzer import analyze_food_nutrition
 from scripts.label_analyzer import analyze_label
-from scripts.pipeline import analyze_nutrition
 from scripts.scan_barcode import barcode_pipeline
 from third_apis.AvocavoNutrition import AvocavoNutritionClient
 from third_apis.OpenFoodFacts import OpenFoodFactsClient
 from third_apis.USDA import USDAClient
 from utils.getter import get_ip
-from config.logging_config import NutriLogger
 
 load_dotenv(os.path.join(project_root, "config", ".env"))
 logger: NutriLogger = get_logger(__name__)
@@ -51,7 +51,8 @@ FAVICON_PATH: str = os.path.join(os.path.dirname(__file__), "favicon.ico")
 
 # ─── App Lifespan ────────────────────────────────────────────────────────────
 
-qwen_client: Optional[Qwen3VL] = None
+analysist_client: Optional[ANALYSIST] = None
+ocrer_client: Optional[OCRER] = None
 usda_client: Optional[USDAClient] = None
 avocavo_client: Optional[AvocavoNutritionClient] = None
 openfoodfacts_client: Optional[OpenFoodFactsClient] = None
@@ -60,11 +61,29 @@ openfoodfacts_client: Optional[OpenFoodFactsClient] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize models on startup, cleanup on shutdown"""
-    global qwen_client, usda_client, avocavo_client, openfoodfacts_client
+    global \
+        analysist_client, \
+        ocrer_client, \
+        usda_client, \
+        avocavo_client, \
+        openfoodfacts_client
     logger.title("Starting NutriTrack API Server")
 
-    logger.info(f"Loading {os.getenv('MODEL_ID', 'qwen.qwen3-vl-235b-a22b')} model...")
-    qwen_client = Qwen3VL()
+    logger.info(
+        f"Loading analysist {os.getenv('ANALYSIST_MODEL_ID', 'qwen.qwen3-vl-235b-a22b')} model..."
+    )
+    analysist_client = ANALYSIST(
+        region=os.getenv("AWS_REGION", "ap-southeast-2"),
+        model_id=os.getenv("ANALYSIST_MODEL_ID", "qwen.qwen3-vl-235b-a22b"),
+    )
+
+    logger.info(
+        f"Loading ocrer {os.getenv('OCRER_MODEL_ID', 'qwen.qwen3-vl-235b-a22b')} model..."
+    )
+    ocrer_client = OCRER(
+        region=os.getenv("AWS_REGION", "ap-southeast-2"),
+        model_id=os.getenv("OCRER_MODEL_ID", "qwen.qwen3-vl-235b-a22b"),
+    )
 
     logger.info("Initializing USDA client...")
     usda_client = USDAClient(api_key=os.getenv("USDA_API_KEY", "DEMO_KEY"))
@@ -93,6 +112,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # ─── Swagger UI Security Scheme ───────────────────────────────────────────────
 # Thêm nút "Authorize 🔒" vào Swagger UI để có thể test các endpoint từ /docs
 def custom_openapi():
@@ -119,6 +139,7 @@ def custom_openapi():
     app.openapi_schema = schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
 
 # Dùng để inject vào Swagger UI — không thực sự validate ở đây (middleware đảm nhiệm)
@@ -137,8 +158,17 @@ ALGORITHM = "HS256"
 
 
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next) -> JSONResponse :
-    excluded_paths: list[str] = ["/", "/health", "/docs", "/redoc", "/favicon.ico", "/openapi.json", "/fly", "/docs/oauth2-redirect"]
+async def auth_middleware(request: Request, call_next) -> JSONResponse:
+    excluded_paths: list[str] = [
+        "/",
+        "/health",
+        "/docs",
+        "/redoc",
+        "/favicon.ico",
+        "/openapi.json",
+        "/fly",
+        "/docs/oauth2-redirect",
+    ]
     if request.url.path in excluded_paths or request.url.path.startswith("/fly/logs/"):
         return await call_next(request)
 
@@ -153,7 +183,8 @@ async def auth_middleware(request: Request, call_next) -> JSONResponse :
     try:
         if not SECRET_KEY:
             return JSONResponse(
-                status_code=500, content={"detail": "Server hasn't configured the API secret key yet!"}
+                status_code=500,
+                content={"detail": "Server hasn't configured the API secret key yet!"},
             )
 
         payload: dict[str, any] = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -169,6 +200,7 @@ async def auth_middleware(request: Request, call_next) -> JSONResponse :
 
     return await call_next(request)
 
+
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 
@@ -177,6 +209,7 @@ async def favicon() -> FileResponse:
     if os.path.isfile(FAVICON_PATH):
         return FileResponse(FAVICON_PATH, media_type="image/x-icon")
     from fastapi.responses import Response
+
     return Response(status_code=204)
 
 
@@ -186,18 +219,20 @@ async def root():
     hostname: str = socket.gethostname()
     ip_addr: str = get_ip()
 
-    return {
+    result = {
         "status": "ok",
         "server_info": {
             "hostname": hostname,
             "ip": ip_addr,
-            "container": os.getenv("HOSTNAME", hostname)
+            "container": os.getenv("HOSTNAME", hostname),
         },
-        "qwen_model": qwen_client.model_id if qwen_client else None,
+        "analysist_model": analysist_client.model_id if analysist_client else None,
+        "ocrer_model": ocrer_client.model_id if ocrer_client else None,
         "usda_ready": usda_client is not None,
         "avocavo_ready": avocavo_client is not None,
         "openfoodfacts_ready": openfoodfacts_client is not None,
     }
+    return result
 
 
 @app.get("/health")
@@ -206,18 +241,20 @@ async def health_check():
     hostname: str = socket.gethostname()
     ip_addr: str = get_ip()
 
-    return {
+    result = {
         "status": "ok",
         "server_info": {
             "hostname": hostname,
             "ip": ip_addr,
-            "container": os.getenv("HOSTNAME", hostname)
+            "container": os.getenv("HOSTNAME", hostname),
         },
-        "qwen_model": qwen_client.model_id if qwen_client else None,
+        "analysist_model": analysist_client.model_id if analysist_client else None,
+        "ocrer_model": ocrer_client.model_id if ocrer_client else None,
         "usda_ready": usda_client is not None,
         "avocavo_ready": avocavo_client is not None,
         "openfoodfacts_ready": openfoodfacts_client is not None,
     }
+    return result
 
 
 @app.get("/fly/logs/{app_name}")
@@ -276,14 +313,14 @@ async def analyze_food_image(
         len(image_bytes) / 1024 / 1024,
     )
 
-    if qwen_client is None:
-        raise HTTPException(status_code=503, detail="Qwen model not initialized")
+    if analysist_client is None:
+        raise HTTPException(status_code=503, detail="ANALYSIST model not initialized")
 
     try:
         start = time.time()
         logger.info("Starting analysis pipeline (method=%s)...", method)
-        results = analyze_nutrition(
-            qwen=qwen_client,
+        results = analyze_food_nutrition(
+            analysist=analysist_client,
             client=usda_client,
             method=method,
             image_bytes=image_bytes,
@@ -296,17 +333,20 @@ async def analyze_food_image(
             "Analysis complete: %d dish(es) detected in %.1fs", num_dishes, elapsed
         )
 
-        bedrock_usage: dict[str, int | float]= {
-            "token_input": qwen_client.token_input,
-            "price_input": round(qwen_client.price_input, 8),
-            "token_output": qwen_client.token_output,
-            "price_output": round(qwen_client.price_output, 8),
-            "total_tokens": qwen_client.token_input + qwen_client.token_output,
-            "total_price": round(qwen_client.price_input + qwen_client.price_output, 8),
-            "bedrock_calls": qwen_client.bedrock_calls,
+        bedrock_usage: dict[str, int | float] = {
+            "token_input": analysist_client.token_input,
+            "price_input": round(analysist_client.price_input, 8),
+            "token_output": analysist_client.token_output,
+            "price_output": round(analysist_client.price_output, 8),
+            "total_tokens": analysist_client.token_input
+            + analysist_client.token_output,
+            "total_price": round(
+                analysist_client.price_input + analysist_client.price_output, 8
+            ),
+            "bedrock_calls": analysist_client.bedrock_calls,
         }
 
-        return {
+        result = {
             "success": True,
             "method": "POST",
             "endpoint": "/analyze-food",
@@ -318,6 +358,8 @@ async def analyze_food_image(
             "bedrock_usage": bedrock_usage,
             "time_s": round(elapsed, 2),
         }
+        return result
+
     except Exception as e:
         logger.error(
             "Analysis failed for file '%s': %s", file.filename, str(e), exc_info=True
@@ -352,14 +394,14 @@ async def analyze_label_image(
         len(image_bytes) / 1024 / 1024,
     )
 
-    if qwen_client is None:
-        raise HTTPException(status_code=503, detail="Qwen model not initialized")
+    if ocrer_client is None:
+        raise HTTPException(status_code=503, detail="OCRER model not initialized")
 
     try:
         start = time.time()
         logger.info("Starting label analysis pipeline...")
         results = analyze_label(
-            qwen=qwen_client, image_bytes=image_bytes, filename=filename
+            ocrer=ocrer_client, image_bytes=image_bytes, filename=filename
         )
         elapsed = time.time() - start
 
@@ -379,16 +421,18 @@ async def analyze_label_image(
             logger.info("Label analysis complete: no label detected in %.1fs", elapsed)
 
         bedrock_usage: dict[str, int | float] = {
-            "token_input": qwen_client.token_input,
-            "price_input": round(qwen_client.price_input, 8),
-            "token_output": qwen_client.token_output,
-            "price_output": round(qwen_client.price_output, 8),
-            "total_tokens": qwen_client.token_input + qwen_client.token_output,
-            "total_price": round(qwen_client.price_input + qwen_client.price_output, 8),
-            "bedrock_calls": qwen_client.bedrock_calls,
+            "token_input": ocrer_client.token_input,
+            "price_input": round(ocrer_client.price_input, 8),
+            "token_output": ocrer_client.token_output,
+            "price_output": round(ocrer_client.price_output, 8),
+            "total_tokens": ocrer_client.token_input + ocrer_client.token_output,
+            "total_price": round(
+                ocrer_client.price_input + ocrer_client.price_output, 8
+            ),
+            "bedrock_calls": ocrer_client.bedrock_calls,
         }
 
-        return {
+        result = {
             "success": True,
             "method": "POST",
             "endpoint": "/analyze-label",
@@ -400,6 +444,8 @@ async def analyze_label_image(
             "time_s": round(elapsed, 2),
             "label_detected": has_label,
         }
+        return result
+
     except Exception as e:
         logger.error(
             "Label analysis failed for file '%s': %s",
@@ -472,7 +518,7 @@ async def scan_barcode_image(
             message = "No barcode detected in image."
             logger.info("Barcode scan complete: no barcode detected (%.2fs)", elapsed)
 
-        return {
+        result = {
             "success": True,
             "method": "POST",
             "endpoint": "/scan-barcode",
@@ -482,6 +528,8 @@ async def scan_barcode_image(
             "message": message,
             "time_s": round(elapsed, 2),
         }
+
+        return result
 
     except Exception as e:
         logger.error(
@@ -495,5 +543,6 @@ async def scan_barcode_image(
 
 if __name__ == "__main__":
     import uvicorn
+
     logger.info("Starting uvicorn server...")
     uvicorn.run("templates.api:app", host="0.0.0.0", port=8000, reload=True)

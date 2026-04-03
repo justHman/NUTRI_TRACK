@@ -7,7 +7,6 @@ Tests the label analysis pipeline with label and non-label images.
 import os
 import sys
 import time
-import logging as _stdlib_logging
 import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,7 +29,7 @@ PRICE_PER_1K_INPUT = os.getenv("PRICE_PER_1K_INPUT", 0.00053)
 PRICE_PER_1K_OUTPUT = os.getenv("PRICE_PER_1K_OUTPUT", 0.00266)
 
 
-def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool) -> dict:
+def _test_label_image(ocrer, image_path: str, image_name: str, expect_label: bool) -> dict:
     """Run a single label analysis test"""
     result = {
         "method": "label_ocr",
@@ -57,18 +56,18 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
         from scripts.label_analyzer import analyze_label
 
         start = time.time()
-        data = analyze_label(image_path=image_path, qwen=qwen)
+        data = analyze_label(image_path=image_path, ocrer=ocrer)
         elapsed = time.time() - start
 
         result["time_s"] = round(elapsed, 2)
         result["raw_output"] = data
 
         # Token usage & pricing
-        result["bedrock_calls"] = qwen.bedrock_calls
-        result["token_input"] = qwen.token_input
-        result["token_output"] = qwen.token_output
-        result["price_input"] = round(qwen.price_input, 4)
-        result["price_output"] = round(qwen.price_output, 4)
+        result["bedrock_calls"] = ocrer.bedrock_calls
+        result["token_input"] = ocrer.token_input
+        result["token_output"] = ocrer.token_output
+        result["price_input"] = round(ocrer.price_input, 4)
+        result["price_output"] = round(ocrer.price_output, 4)
 
         # Label analyzer now returns LabelList schema: {"labels": [ ... ]}
         labels = data.get("labels", []) if isinstance(data, dict) else []
@@ -140,11 +139,11 @@ def _test_label_image(qwen, image_path: str, image_name: str, expect_label: bool
     return result
 
 
-def run_all(qwen) -> dict:
+def run_all(ocrer) -> dict:
     """Run all label analyzer tests.
 
     Args:
-        qwen: Pre-initialized Qwen3VL instance
+        ocrer: Pre-initialized OCRER instance
 
     Returns:
         List of result dicts
@@ -173,7 +172,7 @@ def run_all(qwen) -> dict:
             print(f"    {passed}/{total} passed {s_icon}", flush=True)
 
         for img_path, img_name, expect_label in TEST_CASES:
-            r = _test_label_image(qwen, img_path, img_name, expect_label)
+            r = _test_label_image(ocrer, img_path, img_name, expect_label)
             all_results.append(r)
             detail = r.get("notes", "")
             if r.get("time_s"):
@@ -195,14 +194,15 @@ def run_all(qwen) -> dict:
 def test_label_analyzer_suite():
     require_api_integration_env()
 
-    from models.QWEN3VL import Qwen3VL
+    from models.OCRER import OCRER
 
-    qwen = Qwen3VL()
-    results = run_all(qwen)
+    ocrer = OCRER()
+    results = run_all(ocrer)
     failed = [r for r in results if not r.get("success")]
     assert not failed, f"Label analyzer suite failed: {failed}"
 
 if __name__ == "__main__":
-    from models.QWEN3VL import Qwen3VL
-    qwen = Qwen3VL()
-    run_all(qwen)
+    from models.OCRER import OCRER
+    ocrer = OCRER()
+    run_all(ocrer)
+

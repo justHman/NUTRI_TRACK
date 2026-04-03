@@ -6,12 +6,9 @@ from typing import Any, List, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from utils.processor import prepare_image_for_bedrock
-from utils.transformer import batch_to_csv, convert_food_csv_to_json, clean_csv_raw_text, convert_label_csv_to_json
+from utils.transformer import batch_to_csv
 from utils.counter import count_tokens
 from config.logging_config import get_logger
-from config.prompt_config import (FOOD_VISION_SYSTEM_PROMPT, FOOD_VISION_USER_PROMPT, FOOD_VISION_TOOLS_PROMPT,
-                                  LABEL_VISION_SYSTEM_PROMPT, LABEL_VISION_USER_PROMPT)
-from utils.schemas import LabelList, FoodList
 
 logger = get_logger(__name__)
 
@@ -28,20 +25,19 @@ logger.debug("Loaded nutrition_tool_config.json: %d tools", len(NUTRITION_TOOL_C
 PRICE_PER_1K_INPUT: float = float(os.getenv("PRICE_PER_1K_INPUT", 0.00053))
 PRICE_PER_1K_OUTPUT: float = float(os.getenv("PRICE_PER_1K_OUTPUT", 0.00266))
 
-# ─── Qwen3 VL Client ─────────────────────────────────────────────────────────
 
-class MODEL:
+class BedrockModel:
     """Model via AWS Bedrock
     
     Supports 3 methods for structured output:
     1. analyze() — Raw Converse API + JSON prompt + manual Pydantic validation
-    2. analyze_with_instructor() — instructor[bedrock] + chat.completions + auto Pydantic validation
-    3. analyze_with_tool_calling() — Converse API + toolConfig (function calling loop)
+    2. analyze_with_tool_calling() — Converse API + toolConfig (function calling loop)
     """
 
-    def __init__(self, region=None, model_id=None)):
+    def __init__(self, model_id=None, region=None):
         if model_id is None:
             logger.info("Set your MODEL ID")
+            raise ValueError("MODEL ID is required")
         self.model_id = model_id
         # Ưu tiên lấy từ biến môi trường, nếu không có thì dùng mặc định us-east-1
         self.region = region or os.getenv("AWS_REGION") or "ap-southeast-2"
