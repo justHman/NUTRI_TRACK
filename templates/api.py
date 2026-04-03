@@ -9,25 +9,29 @@ Usage (from app/ directory):
 Endpoints:
     GET  /          - Root health check
     GET  /health    - Health check
-    POST /analyze-food   - Upload food image → nutrition analysis JSON
-    POST /analyze-label  - Upload label image → nutrition label OCR JSON
-    POST /scan-barcode   - Upload barcode image → scan & lookup in L1/L2/L3
+    GET  /jobs/{id} - Get background job status
+    POST /analyze-food   - Upload food image → background analysis
+    POST /analyze-label  - Upload label image → background OCR
+    POST /scan-barcode   - Upload barcode image → background scan
 """
 
 import os
-import socket
 import sys
 import time
+import socket
+import uuid
+from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, BackgroundTasks
+from fastapi.concurrency import run_in_threadpool
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBearer
+from fastapi.middleware.cors import CORSMiddleware
 from jose import ExpiredSignatureError, JWTError, jwt
+from fastapi.responses import FileResponse, JSONResponse
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -57,16 +61,20 @@ usda_client: Optional[USDAClient] = None
 avocavo_client: Optional[AvocavoNutritionClient] = None
 openfoodfacts_client: Optional[OpenFoodFactsClient] = None
 
+# In-memory dictionary to store async job status
+job_store: dict[str, dict] = {}
+
+def cleanup_old_jobs():
+    """Keep memory footprint small by removing old jobs"""
+    if len(job_store) > 1000:
+        keys_to_delete = list(job_store.keys())[:200]
+        for k in keys_to_delete:
+            del job_store[k]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize models on startup, cleanup on shutdown"""
-    global \
-        analysist_client, \
-        ocrer_client, \
-        usda_client, \
-        avocavo_client, \
-        openfoodfacts_client
+    global analysist_client, ocrer_client, usda_client, avocavo_client, openfoodfacts_client
     logger.title("Starting NutriTrack API Server")
 
     logger.info(
@@ -112,9 +120,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-
 # ─── Swagger UI Security Scheme ───────────────────────────────────────────────
-# Thêm nút "Authorize 🔒" vào Swagger UI để có thể test các endpoint từ /docs
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -132,17 +138,14 @@ def custom_openapi():
             "description": "Nhập JWT token (không cần prefix 'Bearer '). Token phải có claim: service=backend",
         }
     }
-    # Áp dụng security cho tất cả endpoint (trừ các public path đã excluded trong middleware)
     for path in schema.get("paths", {}).values():
         for operation in path.values():
             operation["security"] = [{"BearerAuth": []}]
     app.openapi_schema = schema
     return app.openapi_schema
 
-
 app.openapi = custom_openapi
 
-# Dùng để inject vào Swagger UI — không thực sự validate ở đây (middleware đảm nhiệm)
 bear_scheme = HTTPBearer(auto_error=False)
 
 app.add_middleware(
@@ -156,19 +159,11 @@ app.add_middleware(
 SECRET_KEY: str = os.getenv("NUTRITRACK_API_KEY", "")
 ALGORITHM = "HS256"
 
-
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next) -> JSONResponse:
-    excluded_paths: list[str] = [
-        "/",
-        "/health",
-        "/docs",
-        "/redoc",
-        "/favicon.ico",
-        "/openapi.json",
-        "/fly",
-        "/docs/oauth2-redirect",
-    ]
+    # Adding /jobs to exclusion or requiring auth. Here we assume /jobs requires auth unless we exclude it.
+    # Exclude typical public endpoints, we will NOT exclude /jobs to protect data
+    excluded_paths: list[str] = ["/", "/health", "/docs", "/redoc", "/favicon.ico", "/openapi.json", "/fly", "/docs/oauth2-redirect"]
     if request.url.path in excluded_paths or request.url.path.startswith("/fly/logs/"):
         return await call_next(request)
 
@@ -183,8 +178,7 @@ async def auth_middleware(request: Request, call_next) -> JSONResponse:
     try:
         if not SECRET_KEY:
             return JSONResponse(
-                status_code=500,
-                content={"detail": "Server hasn't configured the API secret key yet!"},
+                status_code=500, content={"detail": "Server hasn't configured the API secret key yet!"}
             )
 
         payload: dict[str, any] = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -200,153 +194,37 @@ async def auth_middleware(request: Request, call_next) -> JSONResponse:
 
     return await call_next(request)
 
+# ─── Async Workers ───────────────────────────────────────────────────────────
 
-# ─── Endpoints ───────────────────────────────────────────────────────────────
-
-
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon() -> FileResponse:
-    if os.path.isfile(FAVICON_PATH):
-        return FileResponse(FAVICON_PATH, media_type="image/x-icon")
-    from fastapi.responses import Response
-
-    return Response(status_code=204)
-
-
-@app.get("/")
-async def root():
-    logger.debug("Health check requested")
-    hostname: str = socket.gethostname()
-    ip_addr: str = get_ip()
-
-    result = {
-        "status": "ok",
-        "server_info": {
-            "hostname": hostname,
-            "ip": ip_addr,
-            "container": os.getenv("HOSTNAME", hostname),
-        },
-        "analysist_model": analysist_client.model_id if analysist_client else None,
-        "ocrer_model": ocrer_client.model_id if ocrer_client else None,
-        "usda_ready": usda_client is not None,
-        "avocavo_ready": avocavo_client is not None,
-        "openfoodfacts_ready": openfoodfacts_client is not None,
-    }
-    return result
-
-
-@app.get("/health")
-async def health_check():
-    logger.debug("Health check requested")
-    hostname: str = socket.gethostname()
-    ip_addr: str = get_ip()
-
-    result = {
-        "status": "ok",
-        "server_info": {
-            "hostname": hostname,
-            "ip": ip_addr,
-            "container": os.getenv("HOSTNAME", hostname),
-        },
-        "analysist_model": analysist_client.model_id if analysist_client else None,
-        "ocrer_model": ocrer_client.model_id if ocrer_client else None,
-        "usda_ready": usda_client is not None,
-        "avocavo_ready": avocavo_client is not None,
-        "openfoodfacts_ready": openfoodfacts_client is not None,
-    }
-    return result
-
-
-@app.get("/fly/logs/{app_name}")
-def get_fly_logs(app_name: str):
-    url: str = f"https://fly.io/apps/{app_name}/monitoring"
-    if os.getenv("FLY_APP_NAME"):
-        # Thay vì RedirectResponse, trả về JSON để Frontend tự window.open()
-        return {
-            "status": "success",
-            "fly_monitoring_url": url,
-            "message": "You are running on Fly.io.",
-        }
-
-    return {
-        "status": "Local",
-        "fly_monitoring_url": url,
-        "message": f"You are running on Localhost. Please check your terminal/console for logs. Maybe it is running on Fly.io, check {url}",
-    }
-
-
-@app.post("/analyze-food")
-async def analyze_food_image(
-    file: UploadFile = File(...),
-    method: str = Query(
-        default="manual",
-        description="Analysis method: 'tools' (model-driven) or 'manual' (2-step)",
-    ),
-):
-    """Upload a food image → full nutrition analysis JSON.
-
-    Query params:
-        method: 'tools' (default) — model calls USDA tools directly
-                'manual' — traditional Qwen → USDA per ingredient
-    """
-    logger.info(
-        "Received /analyze-food request: filename=%s, content_type=%s, method=%s",
-        file.filename,
-        file.content_type,
-        method,
-    )
-
-    if method not in ("tools", "manual"):
-        raise HTTPException(
-            status_code=400, detail="method must be 'tools' or 'manual'"
-        )
-
-    if not file.content_type or not file.content_type.startswith("image/"):
-        logger.warning("Rejected upload: invalid content type '%s'", file.content_type)
-        raise HTTPException(status_code=400, detail="File must be an image")
-
-    image_bytes = await file.read()
-    filename = file.filename or "upload.jpg"
-    logger.debug(
-        "Read uploaded file into memory: %s (%.2f MB)",
-        filename,
-        len(image_bytes) / 1024 / 1024,
-    )
-
-    if analysist_client is None:
-        raise HTTPException(status_code=503, detail="ANALYSIST model not initialized")
-
+async def background_analyze_food_nutrition(job_id: str, method: str, image_bytes: bytes, filename: str):
     try:
         start = time.time()
-        logger.info("Starting analysis pipeline (method=%s)...", method)
-        results = analyze_food_nutrition(
-            analysist=analysist_client,
-            client=usda_client,
-            method=method,
-            image_bytes=image_bytes,
-            filename=filename,
+        logger.info("Background Job %s (analyze-food) started for %s", job_id, filename)
+        
+        # Heavy sync function in threadpool
+        results = await run_in_threadpool(
+            analyze_food_nutrition, 
+            analysist=analysist_client, 
+            client=usda_client, 
+            method=method, 
+            image_bytes=image_bytes, 
+            filename=filename
         )
         elapsed = time.time() - start
-
+        
         num_dishes = len(results.get("dishes", []))
-        logger.info(
-            "Analysis complete: %d dish(es) detected in %.1fs", num_dishes, elapsed
-        )
-
-        bedrock_usage: dict[str, int | float] = {
+        
+        bedrock_usage = {
             "token_input": analysist_client.token_input,
             "price_input": round(analysist_client.price_input, 8),
             "token_output": analysist_client.token_output,
             "price_output": round(analysist_client.price_output, 8),
-            "total_tokens": analysist_client.token_input
-            + analysist_client.token_output,
-            "total_price": round(
-                analysist_client.price_input + analysist_client.price_output, 8
-            ),
+            "total_tokens": analysist_client.token_input + analysist_client.token_output,
+            "total_price": round(analysist_client.price_input + analysist_client.price_output, 8),
             "bedrock_calls": analysist_client.bedrock_calls,
         }
-
-        result = {
+        
+        payload = {
             "success": True,
             "method": "POST",
             "endpoint": "/analyze-food",
@@ -358,49 +236,21 @@ async def analyze_food_image(
             "bedrock_usage": bedrock_usage,
             "time_s": round(elapsed, 2),
         }
-        return result
-
+        
+        job_store[job_id]["status"] = "completed"
+        job_store[job_id]["result"] = payload
+        logger.info("Background Job %s completed in %.1fs", job_id, elapsed)
     except Exception as e:
-        logger.error(
-            "Analysis failed for file '%s': %s", file.filename, str(e), exc_info=True
-        )
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        logger.error("Background Job %s failed: %s", job_id, str(e), exc_info=True)
+        job_store[job_id]["status"] = "failed"
+        job_store[job_id]["error"] = f"Analysis failed: {str(e)}"
 
-
-@app.post("/analyze-label")
-async def analyze_label_image(
-    file: UploadFile = File(...),
-):
-    """Upload a product image → nutrition label OCR → structured JSON.
-
-    If no nutrition label is detected in the image, returns success=True
-    with label_detected=False and an empty dishes array.
-    """
-    logger.info(
-        "Received /analyze-label request: filename=%s, content_type=%s",
-        file.filename,
-        file.content_type,
-    )
-
-    if not file.content_type or not file.content_type.startswith("image/"):
-        logger.warning("Rejected upload: invalid content type '%s'", file.content_type)
-        raise HTTPException(status_code=400, detail="File must be an image")
-
-    image_bytes = await file.read()
-    filename = file.filename or "upload.jpg"
-    logger.debug(
-        "Read uploaded file into memory: %s (%.2f MB)",
-        filename,
-        len(image_bytes) / 1024 / 1024,
-    )
-
-    if ocrer_client is None:
-        raise HTTPException(status_code=503, detail="OCRER model not initialized")
-
+async def background_analyze_label(job_id: str, image_bytes: bytes, filename: str):
     try:
         start = time.time()
-        logger.info("Starting label analysis pipeline...")
-        results = analyze_label(
+        logger.info("Background Job %s (analyze-label) started", job_id)
+        results = await run_in_threadpool(
+            analyze_label,
             ocrer=ocrer_client, image_bytes=image_bytes, filename=filename
         )
         elapsed = time.time() - start
@@ -411,28 +261,20 @@ async def analyze_label_image(
 
         if has_label:
             message = f"Detected {num_dishes} product(s) with nutrition label."
-            logger.info(
-                "Label analysis complete: %d product(s) detected in %.1fs",
-                num_dishes,
-                elapsed,
-            )
         else:
             message = "No nutrition label detected in the image."
-            logger.info("Label analysis complete: no label detected in %.1fs", elapsed)
 
-        bedrock_usage: dict[str, int | float] = {
+        bedrock_usage = {
             "token_input": ocrer_client.token_input,
             "price_input": round(ocrer_client.price_input, 8),
             "token_output": ocrer_client.token_output,
             "price_output": round(ocrer_client.price_output, 8),
             "total_tokens": ocrer_client.token_input + ocrer_client.token_output,
-            "total_price": round(
-                ocrer_client.price_input + ocrer_client.price_output, 8
-            ),
+            "total_price": round(ocrer_client.price_input + ocrer_client.price_output, 8),
             "bedrock_calls": ocrer_client.bedrock_calls,
         }
 
-        result = {
+        payload = {
             "success": True,
             "method": "POST",
             "endpoint": "/analyze-label",
@@ -444,57 +286,23 @@ async def analyze_label_image(
             "time_s": round(elapsed, 2),
             "label_detected": has_label,
         }
-        return result
-
+        job_store[job_id]["status"] = "completed"
+        job_store[job_id]["result"] = payload
     except Exception as e:
-        logger.error(
-            "Label analysis failed for file '%s': %s",
-            file.filename,
-            str(e),
-            exc_info=True,
-        )
-        raise HTTPException(status_code=500, detail=f"Label analysis failed: {str(e)}")
+        logger.error("Background Job %s failed: %s", job_id, str(e), exc_info=True)
+        job_store[job_id]["status"] = "failed"
+        job_store[job_id]["error"] = f"Label analysis failed: {str(e)}"
 
-
-@app.post("/scan-barcode")
-async def scan_barcode_image(
-    file: UploadFile = File(...),
-):
-    """Upload a barcode image → scan barcode → lookup product in caches → API search fallback.
-
-    The client reads the image file and sends the raw bytes.
-    The pipeline decodes the barcode using pyrxing, then searches
-    L1 (RAM) → L2 (disk JSON) caches across OpenFoodFacts, Avocavo, and USDA.
-    On full cache miss, falls back to API calls in order:
-    Avocavo → OpenFoodFacts → USDA.
-    """
-    logger.info(
-        "Received /scan-barcode request: filename=%s, content_type=%s",
-        file.filename,
-        file.content_type,
-    )
-
-    if not file.content_type or not file.content_type.startswith("image/"):
-        logger.warning("Rejected upload: invalid content type '%s'", file.content_type)
-        raise HTTPException(status_code=400, detail="File must be an image")
-
-    image_bytes = await file.read()
-    filename = file.filename or "upload.png"
-    logger.debug(
-        "Read uploaded file into memory: %s (%.2f KB)",
-        filename,
-        len(image_bytes) / 1024,
-    )
-
+async def background_scan_barcode(job_id: str, image_bytes: bytes, filename: str):
     try:
         start = time.time()
-        logger.info("Starting barcode pipeline...")
+        logger.info("Background Job %s (scan-barcode) started", job_id)
         clients = {
             "avocavo": avocavo_client,
             "openfoodfacts": openfoodfacts_client,
             "usda": usda_client,
         }
-        result = barcode_pipeline(image_bytes, clients=clients)
+        result = await run_in_threadpool(barcode_pipeline, image_bytes, clients=clients)
         elapsed = time.time() - start
 
         found = result.get("found", False)
@@ -503,22 +311,12 @@ async def scan_barcode_image(
 
         if found:
             message = f"Barcode {barcode} found (source={result.get('source')})."
-            logger.info(
-                "Barcode scan complete: %s found in %s (%.2fs)",
-                barcode,
-                result.get("source"),
-                elapsed,
-            )
         elif barcode:
             message = f"Barcode {barcode} decoded but not found in any cache."
-            logger.info(
-                "Barcode scan complete: %s not in cache (%.2fs)", barcode, elapsed
-            )
         else:
             message = "No barcode detected in image."
-            logger.info("Barcode scan complete: no barcode detected (%.2fs)", elapsed)
 
-        result = {
+        payload = {
             "success": True,
             "method": "POST",
             "endpoint": "/scan-barcode",
@@ -528,21 +326,167 @@ async def scan_barcode_image(
             "message": message,
             "time_s": round(elapsed, 2),
         }
-
-        return result
-
+        job_store[job_id]["status"] = "completed"
+        job_store[job_id]["result"] = payload
     except Exception as e:
-        logger.error(
-            "Barcode scan failed for file '%s': %s",
-            file.filename,
-            str(e),
-            exc_info=True,
-        )
-        raise HTTPException(status_code=500, detail=f"Barcode scan failed: {str(e)}")
+        logger.error("Background Job %s failed: %s", job_id, str(e), exc_info=True)
+        job_store[job_id]["status"] = "failed"
+        job_store[job_id]["error"] = f"Barcode scan failed: {str(e)}"
 
+# ─── Endpoints ───────────────────────────────────────────────────────────────
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    if os.path.isfile(FAVICON_PATH):
+        return FileResponse(FAVICON_PATH, media_type="image/x-icon")
+    from fastapi.responses import Response
+    return Response(status_code=204)
+
+@app.get("/")
+async def root():
+    hostname: str = socket.gethostname()
+    return {
+        "status": "ok",
+        "server_info": {"hostname": hostname, "ip": get_ip(), "container": os.getenv("HOSTNAME", hostname)},
+        "analysist_model": analysist_client.model_id if analysist_client else None,
+        "ocrer_model": ocrer_client.model_id if ocrer_client else None,
+        "usda_ready": usda_client is not None,
+        "avocavo_ready": avocavo_client is not None,
+        "openfoodfacts_ready": openfoodfacts_client is not None
+    }
+
+@app.get("/health")
+async def health_check():
+    hostname: str = socket.gethostname()
+    return {
+        "status": "ok",
+        "server_info": {"hostname": hostname, "ip": get_ip(), "container": os.getenv("HOSTNAME", hostname)},
+        "analysist_model": analysist_client.model_id if analysist_client else None,
+        "ocrer_model": ocrer_client.model_id if ocrer_client else None,
+        "usda_ready": usda_client is not None,
+        "avocavo_ready": avocavo_client is not None,
+        "openfoodfacts_ready": openfoodfacts_client is not None
+    }
+
+@app.get("/fly/logs/{app_name}")
+def get_fly_logs(app_name: str):
+    url: str = f"https://fly.io/apps/{app_name}/monitoring"
+    return {"status": "success", "fly_monitoring_url": url, "message": "Check monitoring"}
+
+@app.get("/jobs/{job_id}", summary="Check Job Status")
+async def get_job_status(job_id: str):
+    """
+    Client calls this endpoint periodically to check if their async background job is complete.
+    Returns: { "job_id": "...", "status": "processing" } OR the final JSON result.
+    """
+    job = job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or expired")
+    
+    return job
+
+@app.post("/analyze-food", status_code=202)
+async def analyze_food_image(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    method: str = Query(
+        default="manual",
+        description="Analysis method: 'tools' (model-driven) or 'manual' (2-step)",
+    ),
+):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    image_bytes = await file.read()
+    filename = file.filename or "upload.jpg"
+
+    if analysist_client is None:
+        raise HTTPException(status_code=503, detail="ANALYSIST model not initialized")
+
+    job_id = str(uuid.uuid4())
+    job_store[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "task_type": "analyze_food_nutrition",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    cleanup_old_jobs()
+
+    # Pass the heavy async function to background threadpool safely
+    background_tasks.add_task(background_analyze_food_nutrition, job_id, method, image_bytes, filename)
+
+    return {
+        "success": True,
+        "message": "Job accepted and is processing in background.",
+        "job_id": job_id,
+        "status": "processing",
+        "check_url": f"/jobs/{job_id}"
+    }
+
+@app.post("/analyze-label", status_code=202)
+async def analyze_label_image(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    image_bytes = await file.read()
+    filename = file.filename or "upload.jpg"
+
+    if ocrer_client is None:
+        raise HTTPException(status_code=503, detail="OCRER model not initialized")
+
+    job_id = str(uuid.uuid4())
+    job_store[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "task_type": "analyze_label",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    cleanup_old_jobs()
+
+    background_tasks.add_task(background_analyze_label, job_id, image_bytes, filename)
+
+    return {
+        "success": True,
+        "message": "Job accepted and is processing in background.",
+        "job_id": job_id,
+        "status": "processing",
+        "check_url": f"/jobs/{job_id}"
+    }
+
+@app.post("/scan-barcode", status_code=202)
+async def scan_barcode_image(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    image_bytes = await file.read()
+    filename = file.filename or "upload.png"
+
+    job_id = str(uuid.uuid4())
+    job_store[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "task_type": "scan_barcode",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    cleanup_old_jobs()
+
+    background_tasks.add_task(background_scan_barcode, job_id, image_bytes, filename)
+
+    return {
+        "success": True,
+        "message": "Job accepted and is processing in background.",
+        "job_id": job_id,
+        "status": "processing",
+        "check_url": f"/jobs/{job_id}"
+    }
 
 if __name__ == "__main__":
     import uvicorn
-
     logger.info("Starting uvicorn server...")
     uvicorn.run("templates.api:app", host="0.0.0.0", port=8000, reload=True)
