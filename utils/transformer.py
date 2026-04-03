@@ -126,7 +126,7 @@ def normalize_number(x):
         x = float(x)
         return int(x) if x.is_integer() else round(x, 2)
     except:
-        return x
+        return 0.0
 
 
 def parse_table_block(block_text, delimiter=None):

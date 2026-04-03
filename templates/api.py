@@ -279,7 +279,7 @@ def get_fly_logs(app_name: str):
 async def analyze_food_image(
     file: UploadFile = File(...),
     method: str = Query(
-        default="tools",
+        default="manual",
         description="Analysis method: 'tools' (model-driven) or 'manual' (2-step)",
     ),
 ):
