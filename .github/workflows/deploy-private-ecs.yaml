@@ -54,7 +54,7 @@ env:
   S3_PREFIX:          cache
 
   # Tag
-  IMAGE_TAG:          arm
+  IMAGE_TAG:          arm-${{ github.sha }}
 
 # ============================================================
 # JOBS
@@ -515,7 +515,7 @@ jobs:
             --task-definition "${{ env.TASK_DEFINITION }}" \
             --desired-count 2 \
             --force-new-deployment \
-            --capacity-provider-strategy capacityProvider=FARGATE_SPOT,weight=1 \
+            --capacity-provider-strategy capacityProvider=FARGATE_SPOT, weight=1 \
             --no-cli-pager
 
           echo "✅ update-service command sent."
@@ -694,6 +694,7 @@ jobs:
           echo "  │ 🚀  Deploy       │ ${{ needs.deploy.result }}   │"
           echo "  └──────────────────┴────────────────┘"
           echo ""
+          echo "  🏷️  Commit SHA : ${{ github.sha }}"
           echo "  🌿 Branch     : ${{ github.ref_name }}"
           echo "  👤 Actor      : ${{ github.actor }}"
           echo "  🕐 Run ID     : ${{ github.run_id }}"
@@ -703,7 +704,7 @@ jobs:
           echo "  • Cluster    : nutritrack-api-cluster"
           echo "  • Service    : spot-arm-nutritrack-api-task-service"
           echo "  • Task Def   : arm-nutritrack-api-task (Latest)"
-          echo "  • ECR Image  : ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:arm"
+          echo "  • ECR Image  : ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:arm-${{ github.sha }}"
           echo "  • S3 Cache   : s3://${{ env.S3_BUCKET }}/cache/"
           echo ""
           echo "  🌐 Networking:"
