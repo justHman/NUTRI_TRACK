@@ -78,14 +78,20 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          for i in 1 2 3 4 5; do
+          AWAKE=0
+          for i in 1 2 3 4 5 6 7 8 9 10; do
             if curl -fsS "https://$APP_NAME.fly.dev/health" > /dev/null; then
-              echo "App is awake attempt $i/5."
+              echo "App is awake attempt $i/10."
+              AWAKE=1
               break
             fi
-            echo "Waiting for app to start... attempt $i/5"
-            sleep 8
+            echo "Waiting for app to start... attempt $i/10"
+            sleep 10
           done
+          if [ "$AWAKE" -eq 0 ]; then
+            echo "App failed to wake after multiple attempts."
+            exit 1
+          fi
 
       - name: Upload cache files to Fly volume
         env:
@@ -98,6 +104,7 @@ jobs:
             local name="$1"
             local remote="/app/data/$name"
             local local_path=".cache-sync/remote/$name"
+            curl -fsS "https://$APP_NAME.fly.dev/health" > /dev/null 2>&1 || true
             if flyctl ssh console -a "$APP_NAME" -C "test -f '$remote'" >/dev/null 2>&1; then
               if flyctl ssh sftp get "$remote" "$local_path" -a "$APP_NAME"; then
                 echo "Downloaded remote cache: $remote"
@@ -195,6 +202,7 @@ jobs:
             local dst_new
             dst_new="${dst%.json}_new.json"
             for i in 1 2 3 4 5; do
+              curl -fsS "https://$APP_NAME.fly.dev/health" > /dev/null 2>&1 || true
               if flyctl ssh sftp put "$src" "$dst_new" -a "$APP_NAME"; then
                 if flyctl ssh console -a "$APP_NAME" -C "mv -f '$dst_new' '$dst'"; then
                   echo "Uploaded $dst_new and replaced $dst"

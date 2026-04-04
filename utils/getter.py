@@ -4,7 +4,6 @@ import socket
 import time
 import urllib.request
 from typing import Dict, List
-import pyperclip
 from dotenv import load_dotenv
 from jose import jwt
 import os, sys
@@ -118,6 +117,7 @@ def get_mock_barcode(barcode: str = "") -> dict:
 
 
 if __name__ == "__main__":
+    import pyperclip
     token = jwt.encode(
         {"service": "backend", "exp": int(time.time()) + 3600},
         os.getenv("NUTRITRACK_API_KEY"),
