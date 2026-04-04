@@ -557,18 +557,18 @@ jobs:
           echo "──────────────────────────────────────────────"
 
       # ── Auto-scaling limits definition ────────────────────
-      - name: 📈 Update Auto-scaling limits (Min=0, Max=10)
+      - name: 📈 Update Auto-scaling limits
         run: |
           echo "──────────────────────────────────────────────"
-          echo "📈 Updating Auto-Scaling Targets (Min=0, Max=10)..."
+          echo "📈 Updating Auto-Scaling Targets..."
           echo "──────────────────────────────────────────────"
           aws application-autoscaling register-scalable-target \
             --service-namespace ecs \
             --scalable-dimension ecs:service:DesiredCount \
             --resource-id "service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE }}" \
-            --min-capacity 0 \
+            --min-capacity 1 \
             --max-capacity 10
-          echo "✅ Applied Min=0, Max=10"
+          echo "✅ Applied Min=1, Max=10"
           echo "──────────────────────────────────────────────"
 
       # ── Auto-scaling table ────────────────────────────────
