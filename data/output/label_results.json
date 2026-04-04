@@ -1,0 +1,58 @@
+{
+  "labels": [
+    {
+      "product_id": 1,
+      "name": "Mì Ăn Liền",
+      "brand": "Doraemon Với An Toàn Gia Thông",
+      "serving_value": 75.0,
+      "serving_unit": "g",
+      "nutrition": [
+        {
+          "nutrient": "Giá trị năng lượng",
+          "value": 350.0,
+          "unit": "kcal",
+          "dv_percentage": 0.0
+        },
+        {
+          "nutrient": "Chất béo",
+          "value": 13.0,
+          "unit": "g",
+          "dv_percentage": 9.0
+        },
+        {
+          "nutrient": "Carbohydrate",
+          "value": 51.4,
+          "unit": "g",
+          "dv_percentage": 15.0
+        },
+        {
+          "nutrient": "Chất đạm",
+          "value": 6.9,
+          "unit": "g",
+          "dv_percentage": 10.0
+        }
+      ],
+      "ingredients": [
+        "bột mì",
+        "dầu thực vật",
+        "muối",
+        "đường",
+        "chất điều vị (mononatri glutamat 621)",
+        "chất ổn định (pentanatri triphosphat (451(i)),kali carbonat (501(i)),chất tạo màu (natri carbonat (500(i))),bột nghệ,chất tạo màu tự nhiên (curcumin (1000(i))),chất tạo ngọt tổng hợp (aspartam (951))"
+      ],
+      "allergens": [
+        "bột mì",
+        "đậu nành",
+        "cá",
+        "tôm",
+        "mực",
+        "sò",
+        "nghêu"
+      ],
+      "expiry_days": 150,
+      "confidence": 0.9,
+      "note": null
+    }
+  ],
+  "image_quality": null
+}

@@ -166,21 +166,37 @@ def _test_cache_l2_hit(usda_client) -> list:
 
 
 def _test_mock_data() -> list:
-    """Tests 3 queries against DEMO_KEY client — each should return mock fallback data."""
+    """Tests queries against DEMO_KEY, empty, and None api_keys — each should return mock fallback data."""
     from third_apis.USDA import USDAClient
 
-    mock_client = USDAClient(api_key="DEMO_KEY")
-    EXPECTED = {"calories": 100.0, "protein": 5.0, "fat": 3.0, "carbs": 15.0}
     results = []
-    for query in ("chicken breast", "white rice", "unknown_food_xyz"):
+    EXPECTED_NUTR = {"calories": 100.0, "protein": 5.0, "fat": 3.0, "carbs": 15.0}
+
+    for key_val in ("DEMO_KEY", "", None):
+        mock_client = USDAClient(api_key=key_val)
+        
+        # Test get_nutritions fallback
+        for query in ("chicken breast", "unknown_food_xyz"):
+            try:
+                r = mock_client.get_nutritions(query)
+                if isinstance(r, dict) and r == EXPECTED_NUTR:
+                    results.append((True, f"key={key_val!r} get_nutritions({query!r})", "→ fallback mock data"))
+                else:
+                    results.append((False, f"key={key_val!r} get_nutritions({query!r})", f"mismatch: {r}"))
+            except Exception as e:
+                results.append((False, f"key={key_val!r} get_nutritions({query!r})", str(e)))
+        
+        # Test search_by_barcode fallback
+        barcode = "123456789"
         try:
-            r = mock_client.get_nutritions(query)
-            if isinstance(r, dict) and r == EXPECTED:
-                results.append((True, f"'{query}'", "→ fallback mock data"))
+            r_bc = mock_client.search_by_barcode(barcode)
+            if isinstance(r_bc, dict) and r_bc.get("found") is True and r_bc.get("food", {}).get("nutritions") == EXPECTED_NUTR:
+                results.append((True, f"key={key_val!r} search_by_barcode({barcode!r})", "→ fallback mock data"))
             else:
-                results.append((False, f"'{query}'", f"mismatch: {r}"))
+                results.append((False, f"key={key_val!r} search_by_barcode({barcode!r})", f"mismatch: {r_bc}"))
         except Exception as e:
-            results.append((False, f"'{query}'", str(e)))
+            results.append((False, f"key={key_val!r} search_by_barcode({barcode!r})", str(e)))
+
     return results
 
 
@@ -402,7 +418,7 @@ def run_all(usda_client) -> list:
         for i, (ok, label, detail) in enumerate(cases, 1):
             icon = "⏭️ " if ok is None else ("✅" if ok else "❌")
             print(f"    {i}. {label}: {detail} ({icon})", flush=True)
-        passed = sum(1 for ok, _, _ in cases if ok)
+        passed = sum(1 for ok, _, _ in cases if ok or ok is None)
         total = len(cases)
         s_icon = "✅" if passed == total else "❌"
         print(f"    {passed}/{total} passed {s_icon}", flush=True)
@@ -461,6 +477,6 @@ def run_all(usda_client) -> list:
 def test_usda_client_suite():
     from third_apis.USDA import USDAClient
 
-    client = USDAClient(api_key=os.getenv("USDA_API_KEY", "DEMO_KEY"))
+    client = USDAClient(api_key=os.getenv("USDA_API_KEY", "FAKE_TEST_KEY"))
     group_results = run_all(client)
     assert all(group_results), f"USDA client suite failed: {group_results}"

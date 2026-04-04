@@ -226,6 +226,7 @@ def setup_logging() -> None:
     # Suppress noisy third-party loggers
     for noisy_logger in (
         "urllib3", "httpcore", "httpx",
+        "python_multipart", "python_multipart.multipart", "multipart",
         # botocore — suppress both the top-level and its most verbose sub-loggers
         "botocore", "botocore.hooks", "botocore.loaders",
         "botocore.utils", "botocore.configprovider",

@@ -229,8 +229,9 @@ def scan_barcode_from_image(image_source) -> Optional[str]:
             return None
 
         if not results:
-            logger.warning("No barcode detected in image: ", results)
+            logger.warning("No barcode detected in image: %s", results)
             return None
+        logger.info("Raw results: %s", results)
 
         code = results[0].text
         logger.info("Barcode decoded: %s (format=%s)", code, getattr(results[0], 'format', 'unknown'))
@@ -330,7 +331,7 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
 
     if not code:
         result["food"] = None
-        result["found"] = False
+        result["found"] = {"barcode": code}
         result["message"] = "No barcode detected in image"
         result["scan_time_s"] = round(elapsed_scan, 3)
         result["total_time_s"] = round(time.time() - start, 3)
@@ -352,11 +353,18 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
             logger.info("Promoted barcode '%s' from L3 to L1 (source=%s)",
                         barcode, lookup_result.get("source"))
 
+    logger.debug("result: %s", result)
+    logger.debug("lookup_result: %s", lookup_result)
+    lookup_result["food"] = {"barcode": code}
+    logger.debug("lookup_result: %s", lookup_result)
+
     elapsed_total = time.time() - start
 
     result.update(lookup_result)
     result["scan_time_s"] = round(elapsed_scan, 3)
     result["total_time_s"] = round(elapsed_total, 3)
+
+    logger.debug("result: %s", result)
 
     if result.get("found"):
         logger.info("Pipeline complete: barcode=%s found=%s source=%s level=%s (%.3fs)",

@@ -3,10 +3,19 @@ import os
 import socket
 import time
 import urllib.request
-
+from typing import Dict, List
 import pyperclip
 from dotenv import load_dotenv
 from jose import jwt
+import os, sys
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "config", ".env"))
 
@@ -43,6 +52,69 @@ def get_ip() -> str:
         return socket.gethostbyname(socket.gethostname())
     except Exception:
         return "unknown"
+
+
+def get_mock_nutrition(query: str = "") -> Dict[str, float]:
+    """Safe mock fallback when no API key or no result."""
+    logger.warning("Using MOCK nutrition for query='%s'", query)
+    return {
+        "calories": 100.0,
+        "protein": 5.0,
+        "fat": 3.0,
+        "carbs": 15.0,
+    }
+
+def get_mock_ingredients(query: str = "") -> List[str]:
+    """Safe mock fallback for ingredients."""
+    logger.warning("Using MOCK ingredients for query='%s'", query)
+    return [""]
+
+def get_mock_nutritions_and_ingredients(query: str = "") -> dict:
+    """Safe mock fallback for nutritions and ingredients."""
+    logger.warning("Using MOCK nutritions and ingredients for query='%s'", query)
+    return {
+        "description": "",
+        "nutritions": get_mock_nutrition(query),
+        "ingredients": get_mock_ingredients(query),
+    }
+
+def get_mock_barcode(barcode: str = "") -> dict:
+    """Safe mock fallback for barcode search."""
+    logger.warning("Using MOCK barcode for code='%s'", barcode)
+    return {
+        "found": True,
+        "message": "product found",
+        "food": {
+            "barcode": barcode,
+            "product_name": "",
+            "brands": "",
+            "quantity": "",
+            "category": "",
+            "ingredients_text": "",
+            "ingredients": get_mock_ingredients(barcode),
+            "allergens": [""],
+            "nutritions": get_mock_nutrition(barcode),
+            "labels": {
+                 "vegan": "",
+                 "vegetarian": "",
+                 "gluten_free": "",
+                 "organic": "",
+                 "additives": "",
+                 "packaging": "",
+                 "ecoscore": "",
+                 "nutriscore": "",
+                 "nova_group": "",
+                 "origin": "",
+                 "processing_type": "",
+                 "market_country": ""
+            },
+            "images": {
+                 "front": "",
+                 "ingredients": "",
+                 "nutrition": ""
+            }
+        }
+    }
 
 
 if __name__ == "__main__":

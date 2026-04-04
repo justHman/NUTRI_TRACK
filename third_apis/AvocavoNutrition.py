@@ -13,7 +13,8 @@ from config.logging_config import get_logger
 from models.LRUCache import MISSING, LRUCache
 from utils.cache_utils import get_now_ts, is_expired, load_disk_cache, save_disk_cache
 from utils.caculator import calculate_ingredient_nutrition
-from utils.transformer import get_mock_nutrition, normalize_query, safe_float
+from utils.transformer import normalize_query, safe_float
+from utils.getter import get_mock_nutrition, get_mock_ingredients, get_mock_nutritions_and_ingredients, get_mock_barcode
 
 logger = get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,11 +106,11 @@ class AvocavoNutritionClient:
         logger.debug("get_ingredients() called with query='%s'", query)
         normalized_query = normalize_query(query)
 
-        best = (
-            self.search_best(normalized_query)
-            if (self.api_key and self.api_key != "DEMO_KEY")
-            else None
-        )
+        if not self.api_key or self.api_key == "DEMO_KEY":
+            logger.info("get_ingredients: using mock data (api_key=%s)", self.api_key or "None")
+            return get_mock_ingredients(query)
+
+        best = self.search_best(normalized_query)
         if best:
             return self._parse_ingredient_string(best)
 
@@ -143,11 +144,7 @@ class AvocavoNutritionClient:
                 "get_nutritions_and_ingredients: using mock data (api_key=%s)",
                 self.api_key or "None",
             )
-            return {
-                "description": normalized_query,
-                "nutritions": get_mock_nutrition(query),
-                "ingredients": None,
-            }
+            return get_mock_nutritions_and_ingredients(query)
 
         best = self.search_best(normalized_query)
         if not best:
@@ -504,6 +501,11 @@ class AvocavoNutritionClient:
             Parsed product dict from Avocavo API, or None on error/invalid input.
         """
         barcode = re.sub(r"\D", "", str(code or "")).strip()
+
+        if not self.api_key or self.api_key == "DEMO_KEY":
+            logger.info("search_by_barcode: using mock data (api_key=%s)", self.api_key or "None")
+            return get_mock_barcode(barcode)
+
         if not barcode:
             logger.warning(
                 "search_by_barcode: invalid or empty barcode input='%s'", code

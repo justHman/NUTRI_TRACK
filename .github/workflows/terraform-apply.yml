@@ -1,84 +1,39 @@
-name: Terraform Apply
+name: "Terraform Apply"
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/terraform/**'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
-      auto_approve:
-        description: "Skip interactive approval"
-        required: true
-        type: boolean
-        default: false
 
 jobs:
-  scan:
-    name: 🛡️ Scan Secrets
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Gitleaks Scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   apply:
-    name: Apply (${{ inputs.environment }})
+    name: "Terraform Apply"
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-
     defaults:
       run:
         working-directory: infra/terraform
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ap-southeast-2
 
-      - name: Terraform Init (Remote Backend)
-        run: |
-          terraform init -input=false \
-            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="key=nutritrack/${{ inputs.environment }}/terraform.tfstate" \
-            -backend-config="region=${{ secrets.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}" \
-            -backend-config="encrypt=true"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Validate
-        run: terraform validate
+      - name: Terraform Init
+        id: init
+        run: terraform init
 
-      - name: Terraform Plan
-        run: |
-          terraform plan \
-            -input=false \
-            -var-file=environments/${{ inputs.environment }}.tfvars \
-            -var="usda_api_key=${{ secrets.USDA_API_KEY }}" \
-            -var="avocavo_api_key=${{ secrets.AVOCAVO_API_KEY }}" \
-            -out=tfplan-${{ inputs.environment }}
-
-      - name: Terraform Apply (Auto Approve)
-        if: ${{ inputs.auto_approve }}
-        run: terraform apply -input=false -auto-approve tfplan-${{ inputs.environment }}
-
-      - name: Terraform Apply (Manual Confirm)
-        if: ${{ !inputs.auto_approve }}
-        run: terraform apply -input=false tfplan-${{ inputs.environment }}
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve -input=false

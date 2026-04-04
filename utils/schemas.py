@@ -30,9 +30,6 @@ class LabelItem(BaseModel):
         default=None,
         description="Confidence score 0.0 - 1.0 for the overall label analysis",
     )
-    note: Optional[str] = Field(
-        default=None, description="Optional note, e.g., 'inferred from similar product'"
-    )
 
 
 class LabelList(BaseModel):

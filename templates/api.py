@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
+import anyio
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, BackgroundTasks
@@ -73,7 +74,10 @@ def cleanup_old_jobs():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize models on startup, cleanup on shutdown"""
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    limiter.total_tokens = 100  # Nâng số lượng luồng chạy nền lên 100
+    logger.info(f"Đã nâng giới hạn AnyIO Threadpool lên {limiter.total_tokens} luồng.")
+
     global analysist_client, ocrer_client, usda_client, avocavo_client, openfoodfacts_client
     logger.title("Starting NutriTrack API Server")
 
@@ -163,8 +167,11 @@ ALGORITHM = "HS256"
 async def auth_middleware(request: Request, call_next) -> JSONResponse:
     # Adding /jobs to exclusion or requiring auth. Here we assume /jobs requires auth unless we exclude it.
     # Exclude typical public endpoints, we will NOT exclude /jobs to protect data
-    excluded_paths: list[str] = ["/", "/health", "/docs", "/redoc", "/favicon.ico", "/openapi.json", "/fly", "/docs/oauth2-redirect"]
-    if request.url.path in excluded_paths or request.url.path.startswith("/fly/logs/"):
+    # Check if path starts with any of the protected prefixes
+    protected_prefixes = ("/analyze-food", "/analyze-label", "/scan-barcode", "/jobs/", "/fly/logs/")
+    is_protected = any(request.url.path.startswith(p) for p in protected_prefixes)
+    
+    if not is_protected:
         return await call_next(request)
 
     auth_header: str = request.headers.get("Authorization")
@@ -394,6 +401,9 @@ async def analyze_food_image(
         description="Analysis method: 'tools' (model-driven) or 'manual' (2-step)",
     ),
 ):
+    if method not in ["tools", "manual"]:
+        raise HTTPException(status_code=400, detail="Invalid method. Use 'tools' or 'manual'")
+
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 

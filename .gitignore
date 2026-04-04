@@ -45,5 +45,10 @@ logs/
 .git
 
 requirements-current.txt
+*.txt
 
+# File
+tests/test_barcode_pipeline.py
+tests/test_food_analyzer.py
+tests/test_label_analyzer.py
  

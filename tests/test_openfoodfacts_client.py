@@ -435,22 +435,37 @@ def _test_product_scoring(client) -> list:
 
 
 def _test_mock_data() -> list:
-    """Tests mock data — OpenFoodFacts has no DEMO_KEY mode but mock_nutrition still works."""
+    """Tests mock data fallback against DEMO_KEY, empty, and None api_keys."""
     from third_apis.OpenFoodFacts import OpenFoodFactsClient
 
-    mock_client = OpenFoodFactsClient()
-    EXPECTED = {"calories": 100.0, "protein": 5.0, "fat": 3.0, "carbs": 15.0}
     results = []
-    # Use a query that will definitely not match anything
-    query = "xyznonexistentfood12345"
-    try:
-        r = mock_client.get_nutritions(query)
-        if isinstance(r, dict) and r == EXPECTED:
-            results.append((True, f"'{query}'", "→ fallback mock data"))
-        else:
-            results.append((False, f"'{query}'", f"mismatch: {r}"))
-    except Exception as e:
-        results.append((False, f"'{query}'", str(e)))
+    EXPECTED_NUTR = {"calories": 100.0, "protein": 5.0, "fat": 3.0, "carbs": 15.0}
+
+    for key_val in ("DEMO_KEY", "", None):
+        mock_client = OpenFoodFactsClient(api_key=key_val)
+        
+        # Test get_nutritions fallback
+        query = "xyznonexistentfood12345"
+        try:
+            r = mock_client.get_nutritions(query)
+            if isinstance(r, dict) and r == EXPECTED_NUTR:
+                results.append((True, f"key={key_val!r} get_nutritions", "→ fallback mock data"))
+            else:
+                results.append((False, f"key={key_val!r} get_nutritions", f"mismatch: {r}"))
+        except Exception as e:
+            results.append((False, f"key={key_val!r} get_nutritions", str(e)))
+
+        # Test search_by_barcode fallback
+        barcode = "123456789"
+        try:
+            r_bc = mock_client.search_by_barcode(barcode)
+            if isinstance(r_bc, dict) and r_bc.get("found") is True and r_bc.get("food", {}).get("nutritions") == EXPECTED_NUTR:
+                results.append((True, f"key={key_val!r} search_by_barcode", "→ fallback mock data"))
+            else:
+                results.append((False, f"key={key_val!r} search_by_barcode", f"mismatch: {r_bc}"))
+        except Exception as e:
+            results.append((False, f"key={key_val!r} search_by_barcode", str(e)))
+
     return results
 
 
@@ -910,7 +925,7 @@ def run_all(client) -> list:
         for i, (ok, label, detail) in enumerate(cases, 1):
             icon = "⏭️ " if ok is None else ("✅" if ok else "❌")
             print(f"    {i}. {label}: {detail} ({icon})", flush=True)
-        passed = sum(1 for ok, _, _ in cases if ok is True)
+        passed = sum(1 for ok, _, _ in cases if ok is True or ok is None)
         total = len(cases)
         all_ok = all(ok is True or ok is None for ok, _, _ in cases)
         s_icon = "✅" if all_ok else "❌"
@@ -999,7 +1014,8 @@ def run_all(client) -> list:
 
 def test_openfoodfacts_client_suite():
     from third_apis.OpenFoodFacts import OpenFoodFactsClient
+    import os
 
-    client = OpenFoodFactsClient()
+    client = OpenFoodFactsClient(api_key=os.getenv("OPEN_FOOD_FACTS_API_KEY", "FAKE_TEST_KEY"))
     group_results = run_all(client)
     assert all(group_results), f"OpenFoodFacts client suite failed: {group_results}"

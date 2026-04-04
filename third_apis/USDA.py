@@ -1,16 +1,13 @@
-import json
 import os
 import re
-import time
-import unicodedata
-from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
 import requests
 
 from config.logging_config import get_logger
 from utils.caculator import calculate_ingredient_nutrition
-from utils.transformer import get_mock_nutrition, normalize_query
+from utils.transformer import normalize_query
+from utils.getter import get_mock_nutrition, get_mock_ingredients, get_mock_nutritions_and_ingredients, get_mock_barcode
 
 logger = get_logger(__name__)
 
@@ -119,6 +116,10 @@ class USDAClient:
             logger.warning("get_ingredients: empty query")
             return None
 
+        if not self.api_key or self.api_key == "DEMO_KEY":
+            logger.info("get_ingredients: using mock data (api_key=%s)", self.api_key or "None")
+            return get_mock_ingredients(query)
+
         best = self.search_best(normalized_query, pageSize)
         if not best:
             logger.warning("get_ingredients: no USDA result for '%s'", normalized_query)
@@ -144,6 +145,10 @@ class USDAClient:
         if not normalized_query:
             logger.warning("get_nutritions_and_ingredients: empty query")
             return None
+
+        if not self.api_key or self.api_key == "DEMO_KEY":
+            logger.info("get_nutritions_and_ingredients: using mock data (api_key=%s)", self.api_key or "None")
+            return get_mock_nutritions_and_ingredients(query)
 
         best = self.search_best(normalized_query, pageSize)
         if not best:
@@ -474,6 +479,11 @@ class USDAClient:
             Parsed product dict from USDA API, or None on error/invalid input.
         """
         barcode = re.sub(r"\D", "", str(code or "")).strip()
+
+        if not self.api_key or self.api_key == "DEMO_KEY":
+            logger.info("search_by_barcode: using mock data (api_key=%s)", self.api_key or "None")
+            return get_mock_barcode(barcode)
+
         if not barcode:
             logger.warning(
                 "search_by_barcode: invalid or empty barcode input='%s'", code

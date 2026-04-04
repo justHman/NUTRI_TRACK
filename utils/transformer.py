@@ -80,17 +80,6 @@ def normalize_query(query: str) -> str:
     return query
 
 
-def get_mock_nutrition(query: str) -> Dict[str, float]:
-    """Safe mock fallback when no API key or no result."""
-    logger.warning("Using MOCK nutrition for query='%s'", query)
-    return {
-        "calories": 100.0,
-        "protein": 5.0,
-        "fat": 3.0,
-        "carbs": 15.0,
-    }
-
-
 def batch_to_csv(batch):
     """
     Input:[
@@ -435,7 +424,6 @@ def convert_label_csv_to_json(text: str):
 
     # Build output
     labels = []
-    print(products_data)
     for product in products_data:
         product_id = (
             (product.get("product_id") or "").strip()
