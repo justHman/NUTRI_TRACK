@@ -36,7 +36,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s | %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
-LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").strip().lower() in ("1", "true", "yes", "on")
+LOG_TO_FILE = os.getenv("LOG_TO_FILE", "false").strip().lower() in ("1", "true", "yes", "on")
 
 TITLE_MIN_INNER    = 44    # Minimum inner width
 TITLE_TOTAL_WIDTH  = 100   # Total width of the terminal line for centering

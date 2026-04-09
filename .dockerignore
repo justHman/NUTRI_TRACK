@@ -40,8 +40,9 @@ Thumbs.db
 *.ipynb
 *.md
 
-# CI
+# Agents
 .github/
+.agent/
 
 # Docker & Git
 .git

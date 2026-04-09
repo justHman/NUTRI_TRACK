@@ -225,4 +225,5 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
+          curl -fsS "https://$APP_NAME.fly.dev/health" > /dev/null 2>&1 || true
           flyctl ssh console -a "$APP_NAME" -C "sh -c 'ls /app/data/*.json'" 
