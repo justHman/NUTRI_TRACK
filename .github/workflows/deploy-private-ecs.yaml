@@ -5,7 +5,7 @@ name: 🚀 Deploy NutriTrack API → Private ECS (ECR + Spot)
 # ============================================================
 on:
   push:
-    branches: [ main ]
+    branches: [ dev ]
     paths-ignore:
       - "infra/terraform/**"
       - ".github/workflows/terraform-plan.yml"
