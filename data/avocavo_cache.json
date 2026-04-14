@@ -63600,6 +63600,65 @@
       "found": true,
       "message": "product found",
       "_ts": 1773788437.4191182
+    },
+    "7048840000548": {
+      "food": {
+        "barcode": "7048840000548",
+        "product_name": "Lettmelk 1% 1,75l Q",
+        "brands": "Q-meieriene as",
+        "quantity": "1750 ml",
+        "category": "milks",
+        "ingredients_text": "Lettmelk (1,0 % fett).homogenisert og pasteurisert",
+        "ingredients": [
+          "lettmelk homogenisert og pasteurisert"
+        ],
+        "nutritions": {
+          "calories": 42.0,
+          "protein": 3.7,
+          "fat": 1.0,
+          "carbs": 4.5,
+          "fiber": 0.0,
+          "sodium": 0.0395,
+          "sugar": 4.5
+        },
+        "labels": {
+          "source": "open_food_facts",
+          "coverage": "comprehensive"
+        }
+      },
+      "found": true,
+      "message": "product found",
+      "_ts": 1776153100.148914
+    },
+    "716270001660": {
+      "food": {
+        "barcode": "716270001660",
+        "product_name": "Ginger Crystallized In Dark Chocolate",
+        "brands": "Creative Natural Products, Inc.",
+        "quantity": "3.2 g",
+        "category": "fruits and vegetables based foods",
+        "ingredients_text": "dark chocolate (cocoa liquor*, sugar, cocoa butter*, soy lecithin, vanilla), crystallized ginger (ginger, sugar)",
+        "ingredients": [
+          "dark chocolate",
+          "crystallized ginger"
+        ],
+        "nutritions": {
+          "calories": 500.0,
+          "protein": 6.67,
+          "fat": 33.33,
+          "carbs": 53.33,
+          "fiber": 10.0,
+          "sodium": 0.0,
+          "sugar": 40.0
+        },
+        "labels": {
+          "source": "open_food_facts",
+          "coverage": "comprehensive"
+        }
+      },
+      "found": true,
+      "message": "product found",
+      "_ts": 1776153957.2919567
     }
   }
 }

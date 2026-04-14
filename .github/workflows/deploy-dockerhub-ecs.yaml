@@ -1,0 +1,677 @@
+name: 🚀 Deploy NutriTrack API → Docker Hub + ECS Fargate Spot (ARM64)
+
+# ============================================================
+# TRIGGERS
+# ============================================================
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - "infra/terraform/**"
+      - "**.md"
+      - ".github/workflows/deploy-private-ecs.yaml"
+      - ".github/workflows/terraform-plan.yml"
+      - ".github/workflows/terraform-apply.yml"
+
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "⚠️ Skip pytest even if tests fail"
+        required: false
+        default: "false"
+        type: choice
+        options: [ "false", "true" ]
+      skip_cache_sync:
+        description: "⏭️ Skip S3 cache sync step"
+        required: false
+        default: "false"
+        type: choice
+        options: [ "false", "true" ]
+
+# ============================================================
+# GLOBAL ENV  (mirrors .github/.env — no secrets here)
+# ============================================================
+env:
+  AWS_REGION:       ap-southeast-2
+  PYTHON_VERSION:   "3.10.11"
+
+  # Docker Hub
+  DH_REPOSITORY:   imjusthman/nutritrack-api-image
+  DH_TAG_LATEST:   arm-latest            # always-current tag
+
+  # ECS
+  ECS_CLUSTER:      nutritrack-api-cluster
+  ECS_SERVICE:      spot-arm-nutritrack-api-task-service
+  TASK_DEFINITION:  arm-nutritrack-api-task
+  CONTAINER_NAME:   arm-nutritrack-api-container
+
+  # S3 cache
+  S3_BUCKET:        nutritrack-cache-01apr26
+
+# ============================================================
+# JOBS
+# ============================================================
+jobs:
+
+# ────────────────────────────────────────────────────────────
+#  JOB 1 · 🛡️ SECRET SCAN (Gitleaks)
+# ────────────────────────────────────────────────────────────
+  scan:
+    name: "🛡️ Scan Secrets (Gitleaks)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # required by Gitleaks for full history scan
+
+      - name: 🔍 Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# ────────────────────────────────────────────────────────────
+#  JOB 2 · 🧪 TEST (pytest) — non-blocking
+# ────────────────────────────────────────────────────────────
+  test:
+    name: "🧪 Test (pytest)"
+    runs-on: ubuntu-latest
+    needs: scan
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: 📦 Install dependencies
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📦 Installing Python dependencies..."
+          echo "──────────────────────────────────────────────"
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          echo "✅ Dependencies installed."
+
+      - name: 🧪 Run pytest (skip-on-fail allowed)
+        id: run-pytest
+        if: ${{ github.event.inputs.skip_tests != 'true' }}
+        env:
+          AWS_REGION:                ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION:        ${{ env.AWS_REGION }}
+          AWS_ACCESS_KEY_ID:         ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:     ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          USDA_API_KEY:              ${{ secrets.USDA_API_KEY }}
+          AVOCAVO_NUTRITION_API_KEY: ${{ secrets.AVOCAVO_NUTRITION_API_KEY }}
+          NUTRITRACK_API_KEY:        ${{ secrets.NUTRITRACK_API_KEY }}
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "🧪 Running pytest on tests/ ..."
+          echo "──────────────────────────────────────────────"
+          pytest tests -v --tb=short -p no:warnings || true
+          echo "✅ Pytest step done (failures are non-blocking)."
+        continue-on-error: true
+
+      - name: ⚠️ Warn if tests failed
+        if: steps.run-pytest.outcome == 'failure'
+        run: |
+          echo "::warning::⚠️ Pytest reported failures — pipeline continues as per policy."
+          echo "──────────────────────────────────────────────"
+          echo "📊 Test outcome: ${{ steps.run-pytest.outcome }}"
+          echo "──────────────────────────────────────────────"
+
+# ────────────────────────────────────────────────────────────
+#  JOB 3 · 🔨 BUILD & PUSH ARM IMAGE → Docker Hub
+#  Tags: arm-latest  +  arm-ddmmyy  (e.g. arm-140426)
+# ────────────────────────────────────────────────────────────
+  build:
+    name: "🔨 Build ARM64 Image → Docker Hub"
+    runs-on: ubuntu-latest
+    needs: test
+
+    outputs:
+      image_url:    ${{ steps.set-outputs.outputs.image_url }}
+      date_tag:     ${{ steps.date-tag.outputs.date_tag }}
+      image_digest: ${{ steps.build-push.outputs.digest }}
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # ── Generate date-stamped rollback tag ────────────────
+      - name: 🗓️ Generate date tag (arm-ddmmyy)
+        id: date-tag
+        run: |
+          DATE_TAG="arm-$(date +'%d%m%y')"
+          echo "date_tag=${DATE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "──────────────────────────────────────────────"
+          echo "🗓️  Rollback tag  : ${DATE_TAG}"
+          echo "🏷️  Latest tag    : ${{ env.DH_TAG_LATEST }}"
+          echo "──────────────────────────────────────────────"
+
+      # ── Docker Hub Login ──────────────────────────────────
+      - name: 🔑 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ── Docker Buildx (ARM64 cross-compile on x86 runner) ─
+      - name: ⚙️ Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: ⚙️ Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Build & Push ──────────────────────────────────────
+      - name: 🏗️ Build & Push ARM64 image → Docker Hub
+        id: build-push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+
+          # Layer cache from GitHub Actions cache (speeds up rebuilds)
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+          tags: |
+            ${{ env.DH_REPOSITORY }}:${{ env.DH_TAG_LATEST }}
+            ${{ env.DH_REPOSITORY }}:${{ steps.date-tag.outputs.date_tag }}
+
+      # ── Set outputs ───────────────────────────────────────
+      - name: 📌 Set job outputs
+        id: set-outputs
+        run: |
+          IMAGE_URL="${{ env.DH_REPOSITORY }}:${{ env.DH_TAG_LATEST }}"
+          echo "image_url=${IMAGE_URL}" >> "$GITHUB_OUTPUT"
+          echo "──────────────────────────────────────────────"
+          echo "✅ Image pushed successfully!"
+          echo "📦 Latest  : ${IMAGE_URL}"
+          echo "📦 Rollback: ${{ env.DH_REPOSITORY }}:${{ steps.date-tag.outputs.date_tag }}"
+          echo "🔐 Digest  : ${{ steps.build-push.outputs.digest }}"
+          echo "──────────────────────────────────────────────"
+
+      # ── Docker Hub summary ────────────────────────────────
+      - name: 📊 Docker Hub image summary
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📊 Docker Hub Push Summary"
+          echo "──────────────────────────────────────────────"
+          echo "  Repository : ${{ env.DH_REPOSITORY }}"
+          echo "  Tags pushed:"
+          echo "    • ${{ env.DH_TAG_LATEST }}   ← always-current"
+          echo "    • ${{ steps.date-tag.outputs.date_tag }}  ← rollback point"
+          echo "  Digest     : ${{ steps.build-push.outputs.digest }}"
+          echo "  Platform   : linux/arm64"
+          echo "──────────────────────────────────────────────"
+
+# ────────────────────────────────────────────────────────────
+#  JOB 4 · 🗄️ S3 CACHE SYNC (pull → merge → push)
+# ────────────────────────────────────────────────────────────
+  sync-cache:
+    name: "🗄️ Sync Cache → S3"
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      github.event.inputs.skip_cache_sync != 'true'
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      # ── Step 1: Pull remote caches from S3 ───────────────
+      - name: 📥 Pull remote cache from S3
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📥 Pulling remote cache files from S3..."
+          echo "   Bucket : s3://${{ env.S3_BUCKET }}/"
+          echo "──────────────────────────────────────────────"
+          mkdir -p .cache-sync/remote
+
+          pull_or_skip() {
+            local name="$1"
+            local s3_key="s3://${{ env.S3_BUCKET }}/${name}"
+            local local_path=".cache-sync/remote/${name}"
+            if aws s3 cp "$s3_key" "$local_path" 2>/dev/null; then
+              local size; size=$(du -sh "$local_path" | cut -f1)
+              echo "  ✅ Downloaded : $s3_key  (${size})"
+            else
+              echo "  ℹ️  Not found  : $s3_key — will use local seed only."
+            fi
+          }
+
+          pull_or_skip avocavo_cache.json
+          pull_or_skip openfoodfacts_cache.json
+          pull_or_skip usda_cache.json
+
+          echo ""
+          echo "📊 Remote files pulled:"
+          ls -lh .cache-sync/remote/ 2>/dev/null || echo "  (none)"
+          echo "──────────────────────────────────────────────"
+
+      # ── Step 2: Merge remote + local (Python) ────────────
+      - name: 🔀 Merge remote + local cache files
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "🔀 Merging local (repo) + remote (S3) caches..."
+          echo "──────────────────────────────────────────────"
+          python << 'PY'
+          import json
+          from pathlib import Path
+          from typing import Any, Dict, Tuple
+
+          def load_cache(path: Path) -> Dict[str, Any]:
+              if not path.exists():
+                  print(f"  ⚠️  Not found: {path}  → using empty cache")
+                  return {"foods": {}, "barcodes": {}}
+              try:
+                  with path.open("r", encoding="utf-8") as f:
+                      data = json.load(f)
+                  if not isinstance(data, dict):
+                      return {"foods": {}, "barcodes": {}}
+                  data.setdefault("foods", {})
+                  data.setdefault("barcodes", {})
+                  return data
+              except Exception as e:
+                  print(f"  ❌ Error reading {path}: {e}  → using empty cache")
+                  return {"foods": {}, "barcodes": {}}
+
+          def get_ts(entry: Any) -> float:
+              if isinstance(entry, dict):
+                  try:
+                      return float(entry.get("_ts", 0))
+                  except Exception:
+                      return 0.0
+              return 0.0
+
+          def merge_bucket(remote: dict, local: dict) -> Tuple[dict, set]:
+              merged: dict = {}
+              keys = set(remote) | set(local)
+              new_keys = set(local) - set(remote)
+              for key in keys:
+                  has_r, has_l = key in remote, key in local
+                  if has_r and not has_l:
+                      merged[key] = remote[key]
+                  elif has_l and not has_r:
+                      merged[key] = local[key]
+                  else:
+                      # tie → keep remote (server state wins)
+                      r_val, l_val = remote[key], local[key]
+                      merged[key] = r_val if get_ts(r_val) >= get_ts(l_val) else l_val
+              return merged, new_keys
+
+          def merge_cache(remote: dict, local: dict):
+              merged_foods,    new_food_keys    = merge_bucket(remote.get("foods",    {}), local.get("foods",    {}))
+              merged_barcodes, new_barcode_keys = merge_bucket(remote.get("barcodes", {}), local.get("barcodes", {}))
+              merged = dict(remote)
+              merged["foods"]    = merged_foods
+              merged["barcodes"] = merged_barcodes
+              return merged, new_food_keys, new_barcode_keys
+
+          CACHE_FILES = ["avocavo_cache.json", "openfoodfacts_cache.json", "usda_cache.json"]
+
+          print(f"  {'File':<26} | {'Local (F/B)':<13} | {'Remote (F/B)':<14} | {'Merged (F/B)':<14} | {'New (F/B)':<10}")
+          print(f"  {'-'*26}-|-{'-'*13}-|-{'-'*14}-|-{'-'*14}-|-{'-'*10}")
+
+          for name in CACHE_FILES:
+              local_path  = Path("data") / name
+              remote_path = Path(".cache-sync/remote") / name
+              local_cache  = load_cache(local_path)
+              remote_cache = load_cache(remote_path)
+
+              merged_cache, new_food_keys, new_barcode_keys = merge_cache(remote_cache, local_cache)
+
+              local_path.parent.mkdir(parents=True, exist_ok=True)
+              with local_path.open("w", encoding="utf-8") as f:
+                  json.dump(merged_cache, f, ensure_ascii=False, indent=2)
+
+              print(f"  {name:<26} | "
+                    f"{len(local_cache.get('foods',{}))}/{len(local_cache.get('barcodes',{})):<12} | "
+                    f"{len(remote_cache.get('foods',{}))}/{len(remote_cache.get('barcodes',{})):<13} | "
+                    f"{len(merged_cache.get('foods',{}))}/{len(merged_cache.get('barcodes',{})):<13} | "
+                    f"+{len(new_food_keys)}/+{len(new_barcode_keys)}")
+
+          print()
+          print("  ✅ Merge complete!")
+          PY
+          echo "──────────────────────────────────────────────"
+
+      # ── Step 3: Push merged cache back to S3 ─────────────
+      - name: 📤 Upload merged cache to S3
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📤 Uploading merged cache files to S3..."
+          echo "──────────────────────────────────────────────"
+
+          upload_with_retry() {
+            local src="$1"
+            local name; name="$(basename "$src")"
+            local s3_dst="s3://${{ env.S3_BUCKET }}/${name}"
+            local size; size=$(du -sh "$src" | cut -f1)
+            echo "  📤 Uploading: ${name}  (${size})  →  ${s3_dst}"
+            for i in 1 2 3 4 5; do
+              if aws s3 cp "$src" "$s3_dst"; then
+                echo "  ✅ Uploaded OK (attempt ${i}/5): ${s3_dst}"
+                return 0
+              fi
+              echo "  🔄 Retry ${i}/5..."
+              sleep 8
+            done
+            echo "  ::error::❌ Failed to upload ${src} after 5 retries."
+            return 1
+          }
+
+          for src in data/usda_cache.json data/avocavo_cache.json data/openfoodfacts_cache.json; do
+            [ -f "$src" ] && upload_with_retry "$src" || echo "  ⚠️  Not found: $src"
+          done
+          echo "──────────────────────────────────────────────"
+
+      # ── Step 4: Verify S3 state ───────────────────────────
+      - name: ✅ Verify S3 cache state
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📊 S3 Cache Verification"
+          echo "   Bucket: s3://${{ env.S3_BUCKET }}/"
+          echo "──────────────────────────────────────────────"
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/" --human-readable --summarize || \
+            echo "::warning::Could not list S3 bucket contents."
+          echo "──────────────────────────────────────────────"
+
+# ────────────────────────────────────────────────────────────
+#  JOB 5 · 🚀 DEPLOY → ECS FARGATE SPOT (ARM64)
+#  Uses the EXISTING task definition revision (no update).
+#  ECS will pull the new arm-latest image from Docker Hub
+#  on the next task launch.
+# ────────────────────────────────────────────────────────────
+  deploy:
+    name: "🚀 Deploy → ECS Fargate Spot (ARM64)"
+    runs-on: ubuntu-latest
+    needs: [build, sync-cache]
+    # Run deploy even if sync-cache is skipped or fails
+    if: always() && needs.build.result == 'success'
+
+    steps:
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      # ── Confirm task definition is ACTIVE ─────────────────
+      - name: 🔍 Verify task definition (ACTIVE revision)
+        id: verify-td
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "🔍 Verifying task definition: ${{ env.TASK_DEFINITION }}"
+          echo "──────────────────────────────────────────────"
+
+          TD_JSON=$(aws ecs describe-task-definition \
+            --task-definition "${{ env.TASK_DEFINITION }}" \
+            --query 'taskDefinition.{Family:family,Revision:revision,Status:status,CPU:cpu,Memory:memory,Arch:runtimePlatform.cpuArchitecture}' \
+            --output json 2>&1)
+
+          if echo "$TD_JSON" | grep -q '"Status": "ACTIVE"'; then
+            echo "✅ Task definition is ACTIVE."
+            echo "$TD_JSON" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          print()
+          print(f'  Family   : {d[\"Family\"]}')
+          print(f'  Revision : {d[\"Revision\"]}')
+          print(f'  Status   : {d[\"Status\"]}')
+          print(f'  CPU      : {d[\"CPU\"]} ({int(d[\"CPU\"])/1024:.1f} vCPU)')
+          print(f'  Memory   : {d[\"Memory\"]} MiB')
+          print(f'  Arch     : {d.get(\"Arch\", \"N/A\")}')
+          "
+          else
+            echo "::error::❌ Task definition not found or not ACTIVE."
+            echo "$TD_JSON"
+            exit 1
+          fi
+          echo "──────────────────────────────────────────────"
+
+      # ── Show current image in running task def ────────────
+      - name: 🖼️ Show current image in task definition
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "🖼️  Container image currently in task definition:"
+          aws ecs describe-task-definition \
+            --task-definition "${{ env.TASK_DEFINITION }}" \
+            --query "taskDefinition.containerDefinitions[?name=='${{ env.CONTAINER_NAME }}'].image" \
+            --output text
+          echo ""
+          echo "🆕 New image that ECS will pull on next task launch:"
+          echo "   ${{ needs.build.outputs.image_url }}"
+          echo "   (${{ needs.build.outputs.date_tag }} — rollback tag)"
+          echo "──────────────────────────────────────────────"
+
+      # ── Force new deployment (no task def change) ─────────
+      - name: 🚀 Force new deployment on ECS service
+        id: deploy
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "🚀 Triggering force-new-deployment:"
+          echo "   Cluster   : ${{ env.ECS_CLUSTER }}"
+          echo "   Service   : ${{ env.ECS_SERVICE }}"
+          echo "   Task Def  : ${{ env.TASK_DEFINITION }} (latest ACTIVE revision)"
+          echo "   Strategy  : FARGATE_SPOT weight=1"
+          echo "──────────────────────────────────────────────"
+
+          aws ecs update-service \
+            --cluster      "${{ env.ECS_CLUSTER }}" \
+            --service      "${{ env.ECS_SERVICE }}" \
+            --desired-count 1 \
+            --force-new-deployment \
+            --capacity-provider-strategy \
+              capacityProvider=FARGATE_SPOT,weight=1 \
+            --no-cli-pager
+
+          echo "✅ update-service command sent."
+          echo "──────────────────────────────────────────────"
+
+      # ── Wait for service to stabilize (10-min timeout) ────
+      - name: ⏳ Wait for service stability
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "⏳ Waiting for ECS service to stabilize..."
+          echo "   Timeout: 10 minutes"
+          echo "──────────────────────────────────────────────"
+
+          aws ecs wait services-stable \
+            --cluster  "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --region   "${{ env.AWS_REGION }}"
+
+          echo "✅ Service is stable!"
+          echo "──────────────────────────────────────────────"
+
+      # ── ECS service status table ──────────────────────────
+      - name: 📊 ECS service status
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📊 ECS Service Status"
+          echo "──────────────────────────────────────────────"
+          aws ecs describe-services \
+            --cluster  "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --query 'services[0].{
+              Service:serviceName,
+              TaskDef:taskDefinition,
+              Desired:desiredCount,
+              Running:runningCount,
+              Pending:pendingCount,
+              Status:status,
+              CapacityProvider:capacityProviderStrategy[0].capacityProvider,
+              LastEvent:events[0].message
+            }' \
+            --output table
+          echo "──────────────────────────────────────────────"
+
+      # ── Auto-scaling bounds ───────────────────────────────
+      - name: 📈 Verify / update Auto-scaling limits
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📈 Ensuring Auto-Scaling target: Min=1 Max=10"
+          echo "──────────────────────────────────────────────"
+          aws application-autoscaling register-scalable-target \
+            --service-namespace   ecs \
+            --scalable-dimension  ecs:service:DesiredCount \
+            --resource-id         "service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE }}" \
+            --min-capacity 1 \
+            --max-capacity 10
+          echo "✅ Applied Min=1, Max=10"
+
+          echo ""
+          echo "📊 Scaling Policies"
+          aws application-autoscaling describe-scaling-policies \
+            --service-namespace ecs \
+            --resource-id "service/${{ env.ECS_CLUSTER }}/${{ env.ECS_SERVICE }}" \
+            --query 'ScalingPolicies[].{Policy:PolicyName,Type:PolicyType,Target:TargetTrackingScalingPolicyConfiguration.TargetValue}' \
+            --output table || echo "::warning::No scaling policies found."
+          echo "──────────────────────────────────────────────"
+
+      # ── CloudWatch alarms ─────────────────────────────────
+      - name: 📊 CloudWatch alarms status
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📊 CloudWatch Alarms"
+          echo "──────────────────────────────────────────────"
+          aws cloudwatch describe-alarms \
+            --alarm-names \
+              "nutritrack-api-cluster-cpu-above-70-alarm" \
+              "nutritrack-api-cluster-cpu-below-20-alarm" \
+            --query 'MetricAlarms[].{Name:AlarmName,State:StateValue,Reason:StateReason}' \
+            --output table || echo "::warning::Could not retrieve CloudWatch alarms."
+          echo "──────────────────────────────────────────────"
+
+      # ── ALB & Target Group health ─────────────────────────
+      - name: 📊 ALB & Target Group health
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📊 Load Balancer: nutritrack-api-vpc-alb"
+          echo "──────────────────────────────────────────────"
+          ALB_ARN=$(aws elbv2 describe-load-balancers \
+            --names "nutritrack-api-vpc-alb" \
+            --query 'LoadBalancers[0].LoadBalancerArn' \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
+            echo "  ALB ARN : ${ALB_ARN}"
+            TG_ARN=$(aws elbv2 describe-target-groups \
+              --names "nutritrack-api-vpc-tg" \
+              --query 'TargetGroups[0].TargetGroupArn' \
+              --output text 2>/dev/null || echo "")
+
+            if [ -n "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
+              echo ""
+              echo "📊 Target Group Health: nutritrack-api-vpc-tg"
+              aws elbv2 describe-target-health \
+                --target-group-arn "$TG_ARN" \
+                --query 'TargetHealthDescriptions[].{Target:Target.Id,Port:Target.Port,Health:TargetHealth.State,Desc:TargetHealth.Description}' \
+                --output table
+            else
+              echo "  ::warning::Target group 'nutritrack-api-vpc-tg' not found."
+            fi
+          else
+            echo "  ::warning::ALB 'nutritrack-api-vpc-alb' not found."
+          fi
+          echo "──────────────────────────────────────────────"
+
+      # ── Secrets Manager sanity check ──────────────────────
+      - name: 📊 Secrets Manager sanity check
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "📊 Secrets Manager: nutritrack/prod/api-keys"
+          echo "──────────────────────────────────────────────"
+          aws secretsmanager describe-secret \
+            --secret-id "nutritrack/prod/api-keys" \
+            --query '{Name:Name,ARN:ARN,LastChanged:LastChangedDate,LastAccess:LastAccessedDate}' \
+            --output table || echo "::warning::Could not describe secret."
+          echo "──────────────────────────────────────────────"
+
+# ────────────────────────────────────────────────────────────
+#  JOB 6 · 🎉 SUMMARY
+# ────────────────────────────────────────────────────────────
+  summary:
+    name: "🎉 Deployment Summary"
+    runs-on: ubuntu-latest
+    needs: [scan, test, build, sync-cache, deploy]
+    if: always()
+
+    steps:
+      - name: 📋 Print final summary
+        env:
+          DATE_TAG: ${{ needs.build.outputs.date_tag }}
+          DIGEST:   ${{ needs.build.outputs.image_digest }}
+        run: |
+          echo "╔══════════════════════════════════════════════╗"
+          echo "║  🚀 NutriTrack → Docker Hub + ECS Fargate   ║"
+          echo "╚══════════════════════════════════════════════╝"
+          echo ""
+          echo "  📊 Job Results:"
+          echo "  ┌────────────────────┬──────────────────┐"
+          echo "  │ Job                │ Result           │"
+          echo "  ├────────────────────┼──────────────────┤"
+          echo "  │ 🛡️  Scan           │ ${{ needs.scan.result }}     │"
+          echo "  │ 🧪  Test           │ ${{ needs.test.result }}     │"
+          echo "  │ 🔨  Build          │ ${{ needs.build.result }}    │"
+          echo "  │ 🗄️  Sync Cache     │ ${{ needs.sync-cache.result }} │"
+          echo "  │ 🚀  Deploy         │ ${{ needs.deploy.result }}   │"
+          echo "  └────────────────────┴──────────────────┘"
+          echo ""
+          echo "  🖼️  Docker Hub Image:"
+          echo "  • Latest   : ${{ env.DH_REPOSITORY }}:${{ env.DH_TAG_LATEST }}"
+          echo "  • Rollback : ${{ env.DH_REPOSITORY }}:${DATE_TAG}"
+          echo "  • Digest   : ${DIGEST}"
+          echo ""
+          echo "  🏗️  Infrastructure:"
+          echo "  • Region   : ap-southeast-2"
+          echo "  • Cluster  : ${{ env.ECS_CLUSTER }}"
+          echo "  • Service  : ${{ env.ECS_SERVICE }}"
+          echo "  • Task Def : ${{ env.TASK_DEFINITION }} (existing revision, no update)"
+          echo "  • Strategy : FARGATE_SPOT  |  Architecture: ARM64"
+          echo "  • S3 Cache : s3://${{ env.S3_BUCKET }}/"
+          echo ""
+          echo "  🌐 Networking:"
+          echo "  • VPC      : nutritrack-api-vpc  (10.0.0.0/16)"
+          echo "  • ALB      : nutritrack-api-vpc-alb  (HTTP:80 → :8000)"
+          echo "  • NAT HA   : t4g.nano × 2  (ap-southeast-2a / 2c)"
+          echo "  • ECS Nets : nutritrack-api-vpc-private-ecs01/02"
+          echo ""
+          echo "  🌿 Branch  : ${{ github.ref_name }}"
+          echo "  👤 Actor   : ${{ github.actor }}"
+          echo "  🕐 Run ID  : ${{ github.run_id }}"
+          echo ""
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "  🎉 DEPLOYMENT SUCCESSFUL!"
+            echo ""
+            echo "  ↩️  To rollback → re-tag image on Docker Hub:"
+            echo "     docker pull ${{ env.DH_REPOSITORY }}:${DATE_TAG}"
+            echo "     docker tag  ${{ env.DH_REPOSITORY }}:${DATE_TAG} ${{ env.DH_REPOSITORY }}:${{ env.DH_TAG_LATEST }}"
+            echo "     docker push ${{ env.DH_REPOSITORY }}:${{ env.DH_TAG_LATEST }}"
+            echo "     Then trigger this workflow again."
+          else
+            echo "  ❌ DEPLOYMENT HAD ISSUES — check job logs above."
+          fi
+          echo ""

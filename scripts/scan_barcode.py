@@ -137,9 +137,8 @@ def _lookup_in_disk_caches(barcode: str) -> Optional[Dict]:
                 entry["source"] = source
                 entry = {k: v for k, v in entry.items() if k != "_ts"}
                 if entry_found:
-                    _l1_barcodes.set(barcode, food)
                     logger.info("L2 cache hit for barcode '%s' in %s", barcode, source)
-                    return entry
+                    return entry  # L1 promotion handled by lookup_barcode()
 
                 # Keep the first negative hit as a fallback while continuing to
                 # scan later providers for any positive hit.
@@ -162,6 +161,7 @@ def _lookup_in_disk_caches(barcode: str) -> Optional[Dict]:
 
 
 def lookup_via_api(barcode: str, clients: Dict) -> Optional[Dict]:
+    had_errors = False
     for source in _L3_LOOKUP_ORDER:
         client = clients.get(source)
         if client is None:
@@ -182,8 +182,22 @@ def lookup_via_api(barcode: str, clients: Dict) -> Optional[Dict]:
             logger.debug("L3: %s returned found=False for barcode '%s'", source, barcode)
 
         except Exception as e:
+            had_errors = True
             logger.warning("L3: %s.search_by_barcode failed for '%s': %s",
                            source, barcode, e)
+
+    if had_errors:
+        logger.error(
+            "L3: API error(s) encountered for barcode '%s' — all clients raised exceptions",
+            barcode,
+        )
+        return {
+            "food": None,
+            "found": False,
+            "message": "API error: one or more upstream services are unavailable",
+            "source": "api error",
+            "cache_level": "ERROR",
+        }
 
     logger.info("L3: no API hit for barcode '%s' across all clients", barcode)
     return {
@@ -330,8 +344,8 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
     elapsed_scan = time.time() - start
 
     if not code:
-        result["food"] = None
-        result["found"] = {"barcode": code}
+        result["food"] = {"barcode": None}
+        result["found"] = False
         result["message"] = "No barcode detected in image"
         result["scan_time_s"] = round(elapsed_scan, 3)
         result["total_time_s"] = round(time.time() - start, 3)
@@ -353,10 +367,16 @@ def barcode_pipeline(image_source, clients: Optional[Dict] = None) -> Dict:
             logger.info("Promoted barcode '%s' from L3 to L1 (source=%s)",
                         barcode, lookup_result.get("source"))
 
-    logger.debug("result: %s", result)
-    logger.debug("lookup_result: %s", lookup_result)
-    lookup_result["food"] = {"barcode": code}
-    logger.debug("lookup_result: %s", lookup_result)
+    # Ensure food dict always contains the decoded barcode,
+    # whether the product was found or not.
+    food = lookup_result.get("food")
+    if isinstance(food, dict):
+        # Product found — inject barcode into existing product data (don't overwrite)
+        food.setdefault("barcode", code)
+        lookup_result["food"] = food
+    else:
+        # Product not found — return at least the decoded barcode
+        lookup_result["food"] = {"barcode": code}
 
     elapsed_total = time.time() - start
 

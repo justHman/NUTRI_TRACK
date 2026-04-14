@@ -5,7 +5,7 @@ import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.client_config import CACHE_TTL_DAYS
+from config.client_config import CACHE_TTL_DAYS, NEGATIVE_CACHE_TTL_DAYS
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -16,8 +16,14 @@ def get_now_ts() -> float:
 
 
 def is_expired(entry: dict) -> bool:
+    """Check if a cache entry has exceeded its TTL.
+
+    Negative entries (found=False) use a shorter TTL (NEGATIVE_CACHE_TTL_DAYS)
+    so that "not found" results are re-tried sooner than positive cache hits.
+    """
     ts = entry.get("_ts", 0)
-    return (get_now_ts() - ts) > (CACHE_TTL_DAYS * 86400)
+    ttl_days = NEGATIVE_CACHE_TTL_DAYS if entry.get("found") is False else CACHE_TTL_DAYS
+    return (get_now_ts() - ts) > (ttl_days * 86400)
 
 
 def load_disk_cache(cache_file: str, cache_dir=None, cache_key=None) -> dict:
